@@ -1,6 +1,6 @@
-# tanami-vision
+# Tanami
 
-Layanan inferensi untuk Tanami. Menerima satu foto daun atau buah, mengembalikan
+Fitur yang diberikan adalah menerima satu foto daun atau buah, mengembalikan
 hasil diagnosis atau tahap kematangan **sesuai kontrak `design.md` bagian 11**.
 
 ## Kenapa layanan terpisah
