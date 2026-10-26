@@ -1,0 +1,22 @@
+{
+  "model_version": "ripeness-chili-v0.1.0",
+  "scan_type": "ripeness",
+  "commodity_code": "chili",
+  "artifact": "model.onnx",
+  "labels": [
+    "unripe",
+    "turning",
+    "ripe",
+    "overripe"
+  ],
+  "input_size": 224,
+  "input_name": "input",
+  "output_name": "logits",
+  "normalization": "zero_one",
+  "output_activation": "softmax",
+  "sha256": "",
+  "metrics": {
+    "source": "stub",
+    "macro_f1": 0.0
+  }
+}

@@ -1,0 +1,25 @@
+{
+  "model_version": "disease-chili-v0.1.0",
+  "scan_type": "disease",
+  "commodity_code": "chili",
+  "artifact": "model.onnx",
+  "labels": [
+    "healthy",
+    "anthracnose",
+    "cercospora_leaf_spot",
+    "bacterial_wilt",
+    "leaf_curl_virus",
+    "pest_damage",
+    "nutrient_deficiency"
+  ],
+  "input_size": 224,
+  "input_name": "input",
+  "output_name": "logits",
+  "normalization": "zero_one",
+  "output_activation": "softmax",
+  "sha256": "",
+  "metrics": {
+    "source": "stub",
+    "macro_f1": 0.0
+  }
+}
