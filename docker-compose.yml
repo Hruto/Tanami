@@ -1,0 +1,39 @@
+services:
+  vision:
+    build:
+      context: .
+      target: runtime
+    image: tanami-vision:local
+    ports:
+      - "8001:8001"
+    environment:
+      VISION_APP_ENV: local
+      VISION_MODEL_BACKEND: ${VISION_MODEL_BACKEND:-stub}
+      VISION_MODEL_DIR: /app/models
+      VISION_SERVICE_TOKEN: ${VISION_SERVICE_TOKEN:-}
+      VISION_ADMIN_TOKEN: ${VISION_ADMIN_TOKEN:-}
+      VISION_LOG_JSON: "true"
+    volumes:
+      # Mount models read-only so a new version can be dropped in and picked up
+      # through POST /v1/models/reload without rebuilding the image.
+      - ./models:/app/models:ro
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "curl", "--fail", "--silent", "http://127.0.0.1:8001/readyz"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+      start_period: 20s
+    deploy:
+      resources:
+        limits:
+          cpus: "2.0"
+          memory: 2g
+
+  # One-shot helper: generates manifest-only stub models if ./models is empty.
+  seed-models:
+    image: tanami-vision:local
+    profiles: ["seed"]
+    entrypoint: ["/opt/venv/bin/python", "scripts/make_stub_models.py", "--model-dir", "/app/models"]
+    volumes:
+      - ./models:/app/models
