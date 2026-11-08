@@ -2,7 +2,7 @@
 
 | | |
 |---|---|
-| Versi | 0.2 (diselaraskan dengan dokumen requirement R0-R7) |
+| Versi | 0.3 (requirement R0-R7 + ruang kerja tim) |
 | Tanggal | 8 November 2026 |
 | Berlaku untuk | Seluruh anggota tim Tanami (1 PM, 2 Frontend, 2 Backend/ML) |
 | Dokumen pendamping | `design.md` (kontrak desain, data, dan API) |
@@ -82,7 +82,7 @@ Perubahan stack setelah sprint 2 memerlukan persetujuan seluruh tim karena biaya
 ## 4. Manajemen Repositori dan Git
 
 **Struktur repo (saat ini):**
-- Repo `tanami`: root = layanan inferensi `tanami-vision`; folder `tanami-backend/` = API, database, job; `design.md` dan `tqa.md` di `docs/` (bersama `architecture.md`).
+- Repo `tanami`: root = layanan inferensi `tanami-vision`; folder `tanami-backend/` = API, database, job; folder `tanami-admin/` = ruang kerja tim (React + Vite + TypeScript, tanpa pustaka UI); `design.md` dan `tqa.md` di `docs/` (bersama `architecture.md`).
 - `tanami-app` (frontend), repo terpisah.
 - `tanami-ml` (eksperimen, training, evaluasi, data card), repo terpisah atau digabung bila tim lebih nyaman.
 
@@ -404,3 +404,4 @@ Dengan menandatangani, anggota tim menyatakan telah membaca dan menyepakati doku
 |---|---|---|
 | 0.1 | 2026-10-23 | Draf awal |
 | 0.2 | 2026-11-08 | Ruang lingkup mengikuti requirement R0-R7; fitur ripeness dan cuaca ditandai tambahan; stack aktual (layanan vision terpisah, FCM HTTP v1, APScheduler); struktur repo; strategi tes (PostgreSQL asli, contract test terhadap `design.md` 10, cakupan 80%); E2E alur requirement; privasi profil (email tidak ditampilkan, username publik); pembersihan akun 30 hari; CI backend. |
+| 0.3 | 2026-11-08 | Ruang kerja tim `tanami-admin` untuk moderator, ahli, dan admin; CI dashboard (typecheck + build); server lokal tanpa Docker (`scripts/dev_server.py`). |

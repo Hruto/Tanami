@@ -30,6 +30,8 @@ alembic upgrade head        # 0001 -> 0004
 uvicorn app.asgi:app --reload --port 8000
 ```
 
+Quickest local run, no Docker and no PostgreSQL install: `python scripts/dev_server.py` starts an embedded PostgreSQL (`.devdata/`), in-memory Redis and photo storage, a stub vision model, and fills two weeks of demo data. Demo accounts `admin`, `ahli`, `moderator` (password `tanami-demo-123`) are for the staff dashboard in `../tanami-admin`. The database is recreated on every start; `--no-demo` starts empty.
+
 No system PostgreSQL? `pgserver` (in `[dev]`) starts one:
 
 ```powershell
@@ -69,6 +71,10 @@ Staff and extra endpoints:
 | `PATCH /admin/users/{id}/role` | admin | Verify an expert, appoint a moderator |
 | `POST /admin/reminders/general` | admin | Team broadcast (`general` reminder) to one user or everyone |
 | `GET/PATCH /review/feedback...` | expert, admin | Review "incorrect" scan feedback and set the correct label (TQA 8.4) |
+| `GET /admin/overview` | expert, moderator, admin | Aggregate counts for the dashboard home (no personal data) |
+| `GET /admin/users` | admin | Search accounts, keyset-paginated |
+| `GET /admin/reminders/general` | admin | Broadcast history with read counts |
+| `GET/PATCH /admin/diseases...` | expert, admin | Edit the reviewed knowledge base; the editor and today become the review stamp |
 
 The first admin comes from `TANAMI_BOOTSTRAP_ADMINS` (promoted at registration).
 
@@ -77,6 +83,7 @@ Behaviour worth knowing:
 * `POST /scans` returns **201** for a new scan and **200** for a resend with the same `client_uuid` (design 10.6).
 * Plant `health_status` is recomputed by replaying the leaf scans in capture order (design 8.2), so a late offline upload or a deleted scan cannot leave a wrong status. A plant without a leaf scan for 14 days becomes `unknown` (nightly job).
 * `advice` in a disease result is built only from the reviewed `diseases` row (summary, first aid, reviewer, review date). A class the model knows but the knowledge base does not is stored without a disease link and without advice.
+* The startup seed only rewrites a disease when its `REVIEWED_AT` is newer than the stored `reviewed_at`, so an expert's edit from the dashboard survives deploys. Bump `REVIEWED_AT` in `app/data/diseases_seed.py` to roll new seed text out.
 * Forum reads are public; hidden posts are visible to their author and moderators only. `image_keys` must come from the caller's own `/uploads/forum-image`.
 
 ## Scheduled jobs (`TANAMI_JOBS_ENABLED=true` on exactly one replica)

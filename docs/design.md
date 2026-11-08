@@ -4,7 +4,7 @@ Dokumen ini adalah **kontrak bersama** antara frontend, backend, dan ML. Tujuann
 
 | | |
 |---|---|
-| Versi | 0.2 |
+| Versi | 0.3 |
 | Tanggal | 8 November 2026 |
 | Dasar | Dokumen *Requirements Aplikasi Deteksi dan Tracking Tanaman* (requirement 0-7) |
 | Dokumen pendamping | `tqa.md` (standar kualitas) |
@@ -540,14 +540,34 @@ Aturan: judul 5-120 karakter, isi maks. 5000, foto maks. 3. Penulis tampil denga
 
 ### 10.10 Staf (moderator, admin, ahli)
 
+Dipakai oleh ruang kerja tim `tanami-admin` (lihat bagian 10.11). Peran dibaca dari database pada setiap permintaan, jadi penurunan peran langsung berlaku.
+
 | Metode | Path | Peran | Keterangan |
 |---|---|---|---|
+| GET | `/admin/overview` | expert, moderator, admin | Angka agregat untuk beranda dashboard: pengguna per peran, tanaman aktif/selesai dan hasil akhir, scan 14 hari per hari (zona `TANAMI_TIMEZONE`), status scan dan penyakit terbanyak 30 hari, ukuran antrean. Tanpa data pribadi |
 | GET | `/moderation/reports` | moderator, admin | Konten dilaporkan, terlama dulu |
 | POST | `/moderation/reports/{post\|comment}/{id}/resolve` | moderator, admin | `{ "action": "dismiss" \| "hide" \| "remove" }` |
 | PATCH | `/moderation/posts/{id}`, `/moderation/comments/{id}` | moderator, admin | Ubah `status` |
-| PATCH | `/admin/users/{id}/role` | admin | Verifikasi ahli, angkat moderator |
-| POST | `/admin/reminders/general` | admin | Pengumuman tim (`general`) |
-| GET/PATCH | `/review/feedback`, `/review/feedback/{id}` | expert, admin | Tinjau umpan balik "salah" dan isi label benar (`tqa.md` 8.4) |
+| GET | `/admin/users?q=&role=&include_deleted=&limit=&cursor=` | admin | Cari akun (nama, username, email; wildcard dianggap huruf biasa), terbaru dulu, paginasi kursor |
+| PATCH | `/admin/users/{id}/role` | admin | Verifikasi ahli, angkat moderator. Admin tidak dapat menurunkan perannya sendiri |
+| POST | `/admin/reminders/general` | admin | Pengumuman tim (`general`, prioritas rendah, berlaku 7 hari) ke semua akun atau satu `user_id` |
+| GET | `/admin/reminders/general` | admin | Riwayat pengumuman: judul, isi, sasaran, jumlah penerima, jumlah dibaca |
+| GET | `/admin/diseases` | expert, admin | Seluruh basis penyakit, termasuk yang disembunyikan |
+| PATCH | `/admin/diseases/{code}` | expert, admin | Sunting teks dan penanganan; penyunting dan tanggal hari ini menjadi `reviewed_by`/`reviewed_at`. Saran kimia wajib punya catatan keselamatan dan tanpa dosis. Seed saat startup hanya menimpa baris yang `reviewed_at`-nya lebih lama dari seed |
+| GET/PATCH | `/review/feedback`, `/review/feedback/{id}` | expert, admin | Tinjau umpan balik "salah" dan isi label benar (`tqa.md` 8.4). Setiap item membawa `allowed_labels` untuk jenis scan-nya |
+
+### 10.11 Ruang kerja tim (`tanami-admin`)
+
+Aplikasi web terpisah untuk staf; akun petani ditolak saat masuk. Menu yang tampil mengikuti peran.
+
+| Layar | Peran | Isi |
+|---|---|---|
+| Ringkasan | expert, moderator, admin | Catatan antrean hari ini, grafik scan 14 hari, pengguna per peran, hasil panen, deteksi 30 hari |
+| Laporan forum | moderator, admin | Abaikan laporan (tampilkan lagi), sembunyikan, atau hapus konten |
+| Tinjauan deteksi | expert, admin | Foto, tebakan model, catatan petani, izin data latih, pilih label benar |
+| Basis penyakit | expert, admin | Sunting gejala, penyebab, pencegahan, penanganan, tampil/sembunyikan |
+| Pengguna | admin | Cari akun, ubah peran, kirim pesan ke satu pengguna |
+| Pengumuman | admin | Tulis pengumuman dengan pratinjau notifikasi, riwayat dan jumlah dibaca |
 
 ---
 
@@ -830,3 +850,4 @@ data/  notebooks/  src/  configs/  reports/
 |---|---|---|---|
 | 0.1 | 2026-10-23 | Draf awal | Tim |
 | 0.2 | 2026-11-08 | Diselaraskan dengan dokumen requirement (R0-R7): kebun indoor/outdoor, tracking (jadwal irigasi, foto, catatan perawatan, akhiri tracking + hasil akhir), History Tracking, daftar Deteksi terpisah + History Deteksi + aktifkan kembali, profil email/username/nama lengkap, suka di forum, pengingat siram/foto/pemantauan. Ripeness dan cuaca ditandai fitur tambahan. API dan model data disesuaikan dengan implementasi backend. | Tim |
+| 0.3 | 2026-11-08 | Ruang kerja tim `tanami-admin` (10.11) dan endpoint staf baru: ringkasan, cari pengguna, riwayat pengumuman, sunting basis penyakit, `allowed_labels` pada tinjauan. Suntingan ahli tidak lagi tertimpa seed saat startup. | Tim |
