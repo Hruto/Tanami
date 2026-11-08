@@ -1,0 +1,26 @@
+name: admin-ci
+
+# tqa.md 11: the staff dashboard must typecheck and build on every change.
+on:
+  pull_request:
+    paths: ["tanami-admin/**", ".github/workflows/admin-ci.yml"]
+  push:
+    branches: [main]
+    paths: ["tanami-admin/**", ".github/workflows/admin-ci.yml"]
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: tanami-admin
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: npm
+          cache-dependency-path: tanami-admin/package-lock.json
+      - run: npm ci
+      - run: npm run build
+      - run: npm audit --omit=dev --audit-level=high
