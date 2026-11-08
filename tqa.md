@@ -2,8 +2,8 @@
 
 | | |
 |---|---|
-| Versi | 0.1 (draft untuk disepakati tim) |
-| Tanggal | 23 Oktober 2026 |
+| Versi | 0.2 (diselaraskan dengan dokumen requirement R0-R7) |
+| Tanggal | 8 November 2026 |
 | Berlaku untuk | Seluruh anggota tim Tanami (1 PM, 2 Frontend, 2 Backend/ML) |
 | Dokumen pendamping | `design.md` (kontrak desain, data, dan API) |
 
@@ -15,16 +15,24 @@ Dokumen ini adalah kesepakatan tim tentang standar kualitas teknis. Semua keputu
 
 **Tujuan:** memastikan frontend, backend, dan ML dibangun dengan standar yang sama sehingga hasilnya konsisten, aman, dan dapat dipercaya petani.
 
-**Ruang lingkup produk (5 fitur):**
-1. Deteksi kapan buah siap panen (ML #1)
-2. Deteksi kesehatan tanaman dari daun beserta penyebab dan solusi (ML #2)
-3. Reminder cuaca dan jadwal siap panen
-4. Forum
-5. Cek historis pertumbuhan dan status tanaman
+**Ruang lingkup produk** (dokumen *Requirements Aplikasi Deteksi dan Tracking Tanaman*):
 
-**Prioritas rilis MVP:** fitur 2, 1, 5, lalu 3, lalu 4 (forum versi sederhana). Rincian ada di `design.md` bagian 3.
+| Kode | Fitur |
+|---|---|
+| R0 | Tambah Kebun: nama, lokasi kelurahan, indoor/outdoor |
+| R1 | Tracking Tanaman: jenis (dropdown), tanggal tanam + umur otomatis, foto, jadwal irigasi, hasil akhir, akhiri tracking |
+| R2 | History Tracking Tanaman: daftar, detail, alasan pengakhiran, riwayat perkembangan |
+| R3 | Deteksi Penyakit Tanaman: daftar tanaman deteksi terpisah, input nama + foto, hasil (penyakit, keyakinan %, gejala, saran), riwayat, akhiri deteksi |
+| R4 | History Deteksi Penyakit: daftar, detail, riwayat hasil, aktifkan kembali |
+| R5 | Forum Komunitas: posting, lihat, komentar, suka |
+| R6 | Profil dan Pengaturan: email, username, nama lengkap, password, periode pengingat, logout, hapus akun |
+| R7 | Notifikasi dan Pengingat: foto, penyiraman, pemantauan, berhenti saat tracking diakhiri, deteksi ulang manual |
 
-**Di luar ruang lingkup MVP:** banyak komoditas sekaligus, sensor IoT, marketplace saprotan, prediksi harga pasar, peta sebaran penyakit.
+**Prioritas rilis MVP:** R0 + R1 + R3, lalu R2 + R4, lalu R6 + R7, lalu R5. Rincian di `design.md` bagian 3.
+
+**Fitur tambahan yang sudah ada tetapi tidak disebut requirement:** scan kematangan buah + estimasi panen, dan reminder cuaca BMKG (hanya kebun outdoor). Keduanya dipertahankan sampai PM memutuskan (`design.md` 17 #11) dan tidak boleh menghambat rilis R0-R7.
+
+**Di luar ruang lingkup MVP:** deteksi untuk jenis tanaman tanpa model (MVP: model hanya cabai), sensor IoT, marketplace saprotan, prediksi harga pasar, peta sebaran penyakit.
 
 ---
 
@@ -56,13 +64,13 @@ Stack dipilih untuk tim kecil: sedikit teknologi, bahasa yang sama antara backen
 | Backend | Python 3.12 + FastAPI | OpenAPI otomatis, satu bahasa dengan ML. |
 | Database | PostgreSQL 16 | Kolom JSONB untuk hasil ML dan data fleksibel. |
 | Cache dan antrean | Redis | Cache cuaca, rate limit, antrean job. |
-| Job terjadwal | APScheduler atau Celery beat | Pengambilan cuaca dan pembuatan reminder. |
+| Job terjadwal | APScheduler (satu instans, `TANAMI_JOBS_ENABLED`) | Pengingat siram/foto/pemantauan, cuaca, pengiriman push tertunda, pembersihan akun. |
 | Penyimpanan gambar | Object storage kompatibel S3 (mis. Cloudflare R2/MinIO) | Gambar tidak disimpan di database. |
 | Training ML | PyTorch (atau TensorFlow/Keras) | Eksperimen dilacak (MLflow atau Weights & Biases). |
-| Serving ML | ONNX Runtime di dalam backend | Model diekspor ke ONNX. TFLite/ONNX Mobile dipertimbangkan setelah MVP untuk mode offline. |
+| Serving ML | Layanan `tanami-vision` terpisah (ONNX Runtime), dipanggil backend lewat HTTP | Stateless, model bisa diganti/rollback tanpa deploy backend. TFLite/ONNX Mobile dipertimbangkan setelah MVP untuk mode offline. |
 | Arsitektur model | MobileNetV3 atau EfficientNet-Lite | Ringan, cocok untuk perangkat dan server murah. |
 | Versi data | DVC (atau skema folder berversi di storage) | Dataset dan model punya versi. |
-| Notifikasi | Firebase Cloud Messaging | Push notification. |
+| Notifikasi | Firebase Cloud Messaging **HTTP v1** (service account) | API lama berbasis server key sudah dimatikan Google; jangan dipakai. |
 | Kontainerisasi | Docker + Docker Compose | Lingkungan lokal sama dengan staging. |
 | CI/CD | GitHub Actions | Lihat bagian 11. |
 | Monitoring | Sentry + log terstruktur | Lihat bagian 12. |
@@ -73,10 +81,10 @@ Perubahan stack setelah sprint 2 memerlukan persetujuan seluruh tim karena biaya
 
 ## 4. Manajemen Repositori dan Git
 
-**Struktur repo [USULAN]:** tiga repo (atau dua, jika `tanami-ml` digabung ke backend).
-- `tanami-app` (frontend)
-- `tanami-backend` (API, job, kode serving ML)
-- `tanami-ml` (eksperimen, training, evaluasi, data card). Boleh digabung ke `tanami-backend` pada tahap awal jika tim lebih nyaman.
+**Struktur repo (saat ini):**
+- Repo `tanami`: root = layanan inferensi `tanami-vision`; folder `tanami-backend/` = API, database, job; `design.md` dan `tqa.md` di root.
+- `tanami-app` (frontend), repo terpisah.
+- `tanami-ml` (eksperimen, training, evaluasi, data card), repo terpisah atau digabung bila tim lebih nyaman.
 
 **Alur branch:** GitHub Flow.
 - `main` selalu dalam keadaan bisa dirilis dan diproteksi (tidak boleh push langsung).
@@ -149,12 +157,12 @@ docs(design): perbarui skema reminder
 
 | Jenis uji | Cakupan | Target [USULAN] | Siapa |
 |---|---|---|---|
-| Unit test backend | Services, aturan reminder, validasi | Cakupan baris **>= 70%** keseluruhan, **>= 85%** untuk modul aturan reminder dan skor ML | Backend |
-| Integration test backend | Endpoint dengan database uji | Semua endpoint punya minimal 1 skenario sukses dan 1 skenario galat | Backend |
-| Contract test | Respons API sesuai OpenAPI | Berjalan di CI pada setiap PR | Backend |
+| Unit test backend | Services, aturan reminder (siram/foto/pemantauan/cuaca), status kesehatan, validasi | Cakupan baris+cabang **>= 80%** keseluruhan (dijaga CI), **>= 85%** untuk modul aturan reminder dan skor ML | Backend |
+| Integration test backend | Endpoint terhadap **PostgreSQL 16 sungguhan** yang dimigrasi Alembic (bukan SQLite/mock) | Semua endpoint punya minimal 1 skenario sukses dan 1 skenario galat; tes "nol drift" model vs migrasi | Backend |
+| Contract test | Setiap endpoint di `design.md` bagian 10 ada di OpenAPI; semua respons memakai amplop; `contracts/openapi.json` mutakhir | Berjalan di CI pada setiap PR | Backend |
 | Unit test frontend | Logika, hook, util | Cakupan **>= 60%** untuk logika non-UI | Frontend |
 | Component test | Komponen kunci (kartu hasil scan, grafik) | Semua komponen design system | Frontend |
-| E2E | Alur utama: daftar, buat kebun, scan, lihat riwayat, terima reminder | 5 alur utama lulus sebelum rilis | Frontend + Backend |
+| E2E | Alur utama: daftar, tambah kebun + tanaman (R0-R1), catat siram/foto, deteksi penyakit + riwayat (R3), akhiri tracking/deteksi + lihat History (R2, R4), terima pengingat (R7) | Semua alur lulus sebelum rilis | Frontend + Backend |
 | Uji ML | Lihat bagian 8 | Lihat bagian 8 | ML |
 | Uji beban ringan | Endpoint scan | 20 pengguna bersamaan, p95 <= 3 detik | Backend |
 | Uji pengguna (UAT) | Dengan petani/penyuluh sungguhan | Minimal 5 petani sebelum rilis beta | PM |
@@ -189,7 +197,7 @@ Bagian ini paling penting, karena kesalahan model langsung memengaruhi keputusan
 | Penyakit daun | Recall tiap kelas penyakit | **>= 0,70** (tidak ada kelas yang diabaikan) |
 | Penyakit daun | Akurasi sehat vs sakit | **>= 0,90** |
 | Kematangan buah | Akurasi (3-4 tahap) | **>= 0,85** |
-| Estimasi hari panen | MAE terhadap hari panen aktual | MVP: tampil sebagai **rentang** dan dievaluasi apakah panen aktual jatuh dalam rentang pada **>= 65%** kasus. Target jangka menengah MAE <= 2 hari. |
+| Estimasi hari panen (fitur tambahan) | MAE terhadap hari panen aktual | MVP: tampil sebagai **rentang** dan dievaluasi apakah panen aktual jatuh dalam rentang pada **>= 65%** kasus. Target jangka menengah MAE <= 2 hari. |
 | Deteksi gambar tidak valid | Recall gambar bukan daun/buah | **>= 0,90** |
 
 Jika target tidak tercapai, fitur tetap boleh dirilis sebagai **beta** dengan label jelas ("hasil perkiraan") hanya dengan persetujuan PM dan ML. Target tidak boleh diturunkan diam-diam. Perubahannya dicatat dan diumumkan ke tim.
@@ -227,9 +235,10 @@ Ambang keyakinan **berlaku sama di backend, frontend, dan dokumen ini** (sumber 
 ## 9. Keamanan dan Privasi
 
 **Autentikasi dan akses**
-- Login dengan JWT (access token pendek, refresh token) atau mekanisme setara. Kata sandi di-hash dengan Argon2 atau bcrypt.
+- Login dengan **email atau username** + kata sandi (R6). JWT access token pendek + refresh token yang dirotasi dan bisa dicabut. Kata sandi di-hash dengan Argon2id. Ganti kata sandi mengeluarkan semua perangkat lain.
 - Setiap endpoint memeriksa **kepemilikan data** (pengguna hanya bisa mengakses kebun, tanaman, dan scan miliknya).
-- Rate limiting pada login dan unggah (nilai awal di `design.md` bagian 10).
+- Rate limiting pada login, pendaftaran, dan unggah (nilai awal di `design.md` 10.3). Header `X-Forwarded-For` hanya dipercaya di balik proxy milik sendiri.
+- Peran `moderator`/`admin`/`expert` dicek dari database pada setiap request, bukan dari token.
 - Validasi unggahan: tipe berkas diperiksa dari isi (bukan hanya ekstensi), ukuran maksimal, dan nama berkas dibuat ulang server.
 - HTTPS wajib. CORS dibatasi ke asal yang diizinkan.
 
@@ -238,10 +247,12 @@ Ambang keyakinan **berlaku sama di backend, frontend, dan dokumen ini** (sumber 
 - Dependensi dipindai (mis. Dependabot, `pip-audit`, `npm audit`) di CI. Kerentanan tingkat tinggi diperbaiki dalam 1 sprint.
 
 **Privasi data pribadi** (mengacu pada UU No. 27 Tahun 2022 tentang Pelindungan Data Pribadi; konfirmasikan kewajiban rinci dengan pihak yang paham hukum)
-- Kumpulkan data seminimal mungkin. Lokasi kebun disimpan pada tingkat **desa/kelurahan (kode adm4)** dan, jika perlu, koordinat; koordinat tidak ditampilkan ke pengguna lain.
-- Metadata lokasi (EXIF GPS) pada foto **dibuang** sebelum disimpan.
+- Kumpulkan data seminimal mungkin: email, username, nama lengkap (R6). **Email tidak pernah ditampilkan ke pengguna lain**; di forum yang tampil hanya username dan nama lengkap.
+- Lokasi kebun disimpan pada tingkat **desa/kelurahan (kode adm4)** dan, jika perlu, koordinat; koordinat tidak ditampilkan ke pengguna lain.
+- Metadata lokasi (EXIF GPS) pada **semua** foto (deteksi, foto perkembangan, forum) **dibuang** sebelum disimpan. Foto forum hanya boleh berasal dari unggahan pengguna itu sendiri.
 - Pengguna memberi **persetujuan** eksplisit untuk penggunaan foto dalam pelatihan model. Persetujuan bisa ditarik.
-- Pengguna dapat menghapus akun dan datanya. Penghapusan dijalankan dalam waktu wajar (mis. 30 hari) kecuali data yang wajib disimpan.
+- Pengguna dapat menghapus akun dan datanya. Akun langsung dinonaktifkan dan semua sesi dicabut; job harian menghapus permanen baris dan foto setelah 30 hari.
+- Mengakhiri tracking atau deteksi **tidak** menghapus data (R2, R4); data tetap milik pengguna sampai akunnya dihapus.
 - Konten forum yang dibagikan bersifat publik. Aplikasi memberi tahu hal ini sebelum posting.
 
 **Forum**
@@ -279,7 +290,7 @@ Ambang keyakinan **berlaku sama di backend, frontend, dan dokumen ini** (sumber 
 | `production` | Pengguna nyata | Data nyata, akses terbatas |
 
 **Pemeriksaan wajib di CI (setiap PR)**
-- Backend: `ruff`, `mypy`, tes unit dan integrasi, contract test OpenAPI, pemindaian dependensi.
+- Backend: `ruff`, `mypy` (strict), tes unit + integrasi (PostgreSQL 16 sebagai service container) + kontrak, cakupan >= 80%, `contracts/openapi.json` mutakhir, `pip-audit`. Workflow: `.github/workflows/backend-ci.yml`.
 - Frontend: `eslint`, `tsc --noEmit`, tes unit/komponen, pembangunan (build) berhasil.
 - ML: tes unit untuk pra-pemrosesan dan modul serving; evaluasi pada set uji tetap (saat model berubah).
 - Pemeriksaan rahasia di repo (secret scanning).
@@ -305,8 +316,8 @@ Ambang keyakinan **berlaku sama di backend, frontend, dan dokumen ini** (sumber 
 
 - **Log terstruktur (JSON)** dengan `request_id` yang juga dikembalikan di respons galat. Data pribadi, token, dan isi foto **tidak** dicatat di log.
 - **Sentry** (atau setara) untuk galat backend dan aplikasi.
-- **Metrik:** jumlah scan per hari, latensi, tingkat galat, distribusi status hasil ML, keberhasilan job cuaca/reminder, jumlah notifikasi terkirim.
-- **Pemeriksaan kesehatan:** endpoint `/health` untuk API, database, Redis, dan model.
+- **Metrik:** jumlah scan per hari, latensi, tingkat galat, distribusi status hasil ML, keberhasilan setiap job (pengingat perawatan, cuaca, push tertunda, pembersihan akun), jumlah notifikasi terkirim dan token FCM tidak valid.
+- **Pemeriksaan kesehatan:** `/health` (proses hidup), `/readyz` (database, Redis, dan layanan vision sebagai pemeriksaan lunak), `/metrics` (Prometheus).
 - **Peringatan:** galat 5xx > 2% selama 10 menit, job cuaca gagal 2 kali berturut-turut, kegagalan pemuatan model.
 
 **Tingkat keparahan bug**
@@ -345,7 +356,7 @@ Setelah insiden Kritis, tim membuat catatan **post-mortem** tanpa menyalahkan in
 - [ ] Kode lolos lint, tipe, dan semua tes CI
 - [ ] Tes baru ditambahkan (unit/integrasi, dan regresi untuk bug)
 - [ ] PR direview dan disetujui sesuai bagian 4
-- [ ] Dokumentasi diperbarui (OpenAPI, `design.md`, README, atau model card)
+- [ ] Dokumentasi diperbarui (`design.md`, `contracts/openapi.json` lewat `scripts/export_openapi.py`, README, atau model card); fitur baru menyebut nomor requirement-nya (R0-R7)
 - [ ] Kelima keadaan UI ditangani (frontend)
 - [ ] Teks pengguna dalam bahasa Indonesia dan lewat i18n
 - [ ] Tidak ada rahasia atau data pribadi di kode/log
@@ -384,3 +395,12 @@ Dengan menandatangani, anggota tim menyatakan telah membaca dan menyepakati doku
 | | Frontend 2 | | |
 | | Backend / ML Engineer 1 | | |
 | | Backend / ML Engineer 2 | | |
+
+---
+
+## 18. Riwayat Perubahan
+
+| Versi | Tanggal | Perubahan |
+|---|---|---|
+| 0.1 | 2026-10-23 | Draf awal |
+| 0.2 | 2026-11-08 | Ruang lingkup mengikuti requirement R0-R7; fitur ripeness dan cuaca ditandai tambahan; stack aktual (layanan vision terpisah, FCM HTTP v1, APScheduler); struktur repo; strategi tes (PostgreSQL asli, contract test terhadap `design.md` 10, cakupan 80%); E2E alur requirement; privasi profil (email tidak ditampilkan, username publik); pembersihan akun 30 hari; CI backend. |
