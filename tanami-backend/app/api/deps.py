@@ -152,7 +152,7 @@ def require_roles(*roles: UserRole) -> Callable[[User], Awaitable[User]]:
 
     async def dependency(user: Annotated[User, Depends(get_current_user)]) -> User:
         if user.role not in allowed:
-            raise Forbidden("Fitur ini hanya untuk moderator atau admin.")
+            raise Forbidden("Peran akun Anda tidak memiliki akses ke fitur ini.")
         return user
 
     return dependency

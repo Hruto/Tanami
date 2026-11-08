@@ -1,6 +1,66 @@
 {
   "components": {
     "schemas": {
+      "AdminOverviewOut": {
+        "additionalProperties": false,
+        "properties": {
+          "detection": {
+            "$ref": "#/components/schemas/DetectionCounts"
+          },
+          "generated_at": {
+            "format": "date-time",
+            "title": "Generated At",
+            "type": "string"
+          },
+          "queues": {
+            "$ref": "#/components/schemas/QueueCounts"
+          },
+          "scan_status_30d": {
+            "additionalProperties": {
+              "type": "integer"
+            },
+            "title": "Scan Status 30D",
+            "type": "object"
+          },
+          "scans_daily": {
+            "items": {
+              "$ref": "#/components/schemas/DailyScans"
+            },
+            "title": "Scans Daily",
+            "type": "array"
+          },
+          "timezone": {
+            "title": "Timezone",
+            "type": "string"
+          },
+          "top_diseases_30d": {
+            "items": {
+              "$ref": "#/components/schemas/DiseaseCount"
+            },
+            "title": "Top Diseases 30D",
+            "type": "array"
+          },
+          "tracking": {
+            "$ref": "#/components/schemas/TrackingCounts"
+          },
+          "users": {
+            "$ref": "#/components/schemas/UserCounts"
+          }
+        },
+        "required": [
+          "generated_at",
+          "timezone",
+          "users",
+          "tracking",
+          "detection",
+          "queues",
+          "scans_daily",
+          "scan_status_30d",
+          "top_diseases_30d"
+        ],
+        "title": "AdminOverviewOut",
+        "type": "object"
+      },
       "AuthorOut": {
         "additionalProperties": false,
         "description": "Public identity on the forum: the username is the handle, the full name\nis shown next to it. Email is never exposed (TQA 9).",
@@ -153,6 +213,55 @@
         "title": "Body_upload_forum_image_api_v1_uploads_forum_image_post",
         "type": "object"
       },
+      "BroadcastHistoryItem": {
+        "additionalProperties": false,
+        "properties": {
+          "audience": {
+            "enum": [
+              "all",
+              "user"
+            ],
+            "title": "Audience",
+            "type": "string"
+          },
+          "batch": {
+            "title": "Batch",
+            "type": "string"
+          },
+          "body": {
+            "title": "Body",
+            "type": "string"
+          },
+          "read": {
+            "title": "Read",
+            "type": "integer"
+          },
+          "recipients": {
+            "title": "Recipients",
+            "type": "integer"
+          },
+          "sent_at": {
+            "format": "date-time",
+            "title": "Sent At",
+            "type": "string"
+          },
+          "title": {
+            "title": "Title",
+            "type": "string"
+          }
+        },
+        "required": [
+          "batch",
+          "title",
+          "body",
+          "audience",
+          "recipients",
+          "read",
+          "sent_at"
+        ],
+        "title": "BroadcastHistoryItem",
+        "type": "object"
+      },
       "BroadcastOut": {
         "additionalProperties": false,
         "properties": {
@@ -276,6 +385,55 @@
         ],
         "title": "CauseCategory",
         "type": "string"
+      },
+      "DailyScans": {
+        "additionalProperties": false,
+        "properties": {
+          "day": {
+            "format": "date",
+            "title": "Day",
+            "type": "string"
+          },
+          "disease": {
+            "title": "Disease",
+            "type": "integer"
+          },
+          "ripeness": {
+            "title": "Ripeness",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "day",
+          "disease",
+          "ripeness"
+        ],
+        "title": "DailyScans",
+        "type": "object"
+      },
+      "DetectionCounts": {
+        "additionalProperties": false,
+        "properties": {
+          "active_detection_plants": {
+            "title": "Active Detection Plants",
+            "type": "integer"
+          },
+          "scans_7d": {
+            "title": "Scans 7D",
+            "type": "integer"
+          },
+          "scans_total": {
+            "title": "Scans Total",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "active_detection_plants",
+          "scans_total",
+          "scans_7d"
+        ],
+        "title": "DetectionCounts",
+        "type": "object"
       },
       "DetectionEnd": {
         "additionalProperties": false,
@@ -652,6 +810,139 @@
         "title": "DeviceOut",
         "type": "object"
       },
+      "DiseaseAdminOut": {
+        "additionalProperties": false,
+        "properties": {
+          "cause_category": {
+            "$ref": "#/components/schemas/CauseCategory"
+          },
+          "causes_text": {
+            "title": "Causes Text",
+            "type": "string"
+          },
+          "code": {
+            "title": "Code",
+            "type": "string"
+          },
+          "commodity_code": {
+            "title": "Commodity Code",
+            "type": "string"
+          },
+          "is_active": {
+            "title": "Is Active",
+            "type": "boolean"
+          },
+          "name_id": {
+            "title": "Name Id",
+            "type": "string"
+          },
+          "name_latin": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Name Latin"
+          },
+          "prevention": {
+            "title": "Prevention",
+            "type": "string"
+          },
+          "reviewed_at": {
+            "anyOf": [
+              {
+                "format": "date",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Reviewed At"
+          },
+          "reviewed_by": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Reviewed By"
+          },
+          "severity_note": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Severity Note"
+          },
+          "symptoms": {
+            "title": "Symptoms",
+            "type": "string"
+          },
+          "treatments": {
+            "additionalProperties": true,
+            "title": "Treatments",
+            "type": "object"
+          },
+          "updated_at": {
+            "format": "date-time",
+            "title": "Updated At",
+            "type": "string"
+          }
+        },
+        "required": [
+          "code",
+          "commodity_code",
+          "name_id",
+          "name_latin",
+          "cause_category",
+          "symptoms",
+          "causes_text",
+          "treatments",
+          "prevention",
+          "severity_note",
+          "reviewed_by",
+          "reviewed_at",
+          "is_active",
+          "updated_at"
+        ],
+        "title": "DiseaseAdminOut",
+        "type": "object"
+      },
+      "DiseaseCount": {
+        "additionalProperties": false,
+        "properties": {
+          "code": {
+            "title": "Code",
+            "type": "string"
+          },
+          "count": {
+            "title": "Count",
+            "type": "integer"
+          },
+          "name": {
+            "title": "Name",
+            "type": "string"
+          }
+        },
+        "required": [
+          "code",
+          "name",
+          "count"
+        ],
+        "title": "DiseaseCount",
+        "type": "object"
+      },
       "DiseaseOut": {
         "additionalProperties": false,
         "properties": {
@@ -778,6 +1069,111 @@
         "title": "DiseaseSummaryOut",
         "type": "object"
       },
+      "DiseaseUpdate": {
+        "additionalProperties": false,
+        "description": "Every field optional; the editor becomes ``reviewed_by`` with today's date.",
+        "properties": {
+          "causes_text": {
+            "anyOf": [
+              {
+                "maxLength": 4000,
+                "minLength": 10,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Causes Text"
+          },
+          "is_active": {
+            "anyOf": [
+              {
+                "type": "boolean"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Is Active"
+          },
+          "name_id": {
+            "anyOf": [
+              {
+                "maxLength": 120,
+                "minLength": 2,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Name Id"
+          },
+          "name_latin": {
+            "anyOf": [
+              {
+                "maxLength": 160,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Name Latin"
+          },
+          "prevention": {
+            "anyOf": [
+              {
+                "maxLength": 4000,
+                "minLength": 10,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Prevention"
+          },
+          "severity_note": {
+            "anyOf": [
+              {
+                "maxLength": 1000,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Severity Note"
+          },
+          "symptoms": {
+            "anyOf": [
+              {
+                "maxLength": 4000,
+                "minLength": 10,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Symptoms"
+          },
+          "treatments": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/TreatmentsIn"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          }
+        },
+        "title": "DiseaseUpdate",
+        "type": "object"
+      },
       "EndTracking": {
         "additionalProperties": false,
         "description": "Requirement 1: end tracking; the plant moves to the history list.",
@@ -828,6 +1224,19 @@
           "reason"
         ],
         "title": "EndTracking",
+        "type": "object"
+      },
+      "Envelope_AdminOverviewOut_": {
+        "additionalProperties": false,
+        "properties": {
+          "data": {
+            "$ref": "#/components/schemas/AdminOverviewOut"
+          }
+        },
+        "required": [
+          "data"
+        ],
+        "title": "Envelope[AdminOverviewOut]",
         "type": "object"
       },
       "Envelope_BroadcastOut_": {
@@ -893,6 +1302,19 @@
           "data"
         ],
         "title": "Envelope[DeviceOut]",
+        "type": "object"
+      },
+      "Envelope_DiseaseAdminOut_": {
+        "additionalProperties": false,
+        "properties": {
+          "data": {
+            "$ref": "#/components/schemas/DiseaseAdminOut"
+          }
+        },
+        "required": [
+          "data"
+        ],
+        "title": "Envelope[DiseaseAdminOut]",
         "type": "object"
       },
       "Envelope_DiseaseOut_": {
@@ -1649,6 +2071,13 @@
         "additionalProperties": false,
         "description": "One ``correct``/``incorrect`` verdict waiting for expert review (TQA 8.4).",
         "properties": {
+          "allowed_labels": {
+            "items": {
+              "type": "string"
+            },
+            "title": "Allowed Labels",
+            "type": "array"
+          },
           "comment": {
             "anyOf": [
               {
@@ -2422,6 +2851,27 @@
         "title": "IrrigationSchedule",
         "type": "string"
       },
+      "ListEnvelope_BroadcastHistoryItem_": {
+        "additionalProperties": false,
+        "properties": {
+          "data": {
+            "items": {
+              "$ref": "#/components/schemas/BroadcastHistoryItem"
+            },
+            "title": "Data",
+            "type": "array"
+          },
+          "meta": {
+            "$ref": "#/components/schemas/PaginationMeta"
+          }
+        },
+        "required": [
+          "data",
+          "meta"
+        ],
+        "title": "ListEnvelope[BroadcastHistoryItem]",
+        "type": "object"
+      },
       "ListEnvelope_CareLogOut_": {
         "additionalProperties": false,
         "properties": {
@@ -2483,6 +2933,27 @@
           "meta"
         ],
         "title": "ListEnvelope[DeviceOut]",
+        "type": "object"
+      },
+      "ListEnvelope_DiseaseAdminOut_": {
+        "additionalProperties": false,
+        "properties": {
+          "data": {
+            "items": {
+              "$ref": "#/components/schemas/DiseaseAdminOut"
+            },
+            "title": "Data",
+            "type": "array"
+          },
+          "meta": {
+            "$ref": "#/components/schemas/PaginationMeta"
+          }
+        },
+        "required": [
+          "data",
+          "meta"
+        ],
+        "title": "ListEnvelope[DiseaseAdminOut]",
         "type": "object"
       },
       "ListEnvelope_DiseaseSummaryOut_": {
@@ -2756,6 +3227,27 @@
           "meta"
         ],
         "title": "ListEnvelope[ScanOut]",
+        "type": "object"
+      },
+      "ListEnvelope_StaffUserOut_": {
+        "additionalProperties": false,
+        "properties": {
+          "data": {
+            "items": {
+              "$ref": "#/components/schemas/StaffUserOut"
+            },
+            "title": "Data",
+            "type": "array"
+          },
+          "meta": {
+            "$ref": "#/components/schemas/PaginationMeta"
+          }
+        },
+        "required": [
+          "data",
+          "meta"
+        ],
+        "title": "ListEnvelope[StaffUserOut]",
         "type": "object"
       },
       "ListEnvelope_TimelineEntry_": {
@@ -3537,6 +4029,25 @@
         "title": "PostStatus",
         "type": "string"
       },
+      "QueueCounts": {
+        "additionalProperties": false,
+        "properties": {
+          "feedback_pending": {
+            "title": "Feedback Pending",
+            "type": "integer"
+          },
+          "open_reports": {
+            "title": "Open Reports",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "open_reports",
+          "feedback_pending"
+        ],
+        "title": "QueueCounts",
+        "type": "object"
+      },
       "RefreshRequest": {
         "additionalProperties": false,
         "properties": {
@@ -4246,10 +4757,27 @@
       "StaffUserOut": {
         "additionalProperties": false,
         "properties": {
+          "consent_training_data": {
+            "default": false,
+            "title": "Consent Training Data",
+            "type": "boolean"
+          },
           "created_at": {
             "format": "date-time",
             "title": "Created At",
             "type": "string"
+          },
+          "deleted_at": {
+            "anyOf": [
+              {
+                "format": "date-time",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Deleted At"
           },
           "email": {
             "title": "Email",
@@ -4357,6 +4885,33 @@
         "title": "TokenPair",
         "type": "object"
       },
+      "TrackingCounts": {
+        "additionalProperties": false,
+        "properties": {
+          "active_plants": {
+            "title": "Active Plants",
+            "type": "integer"
+          },
+          "ended_plants": {
+            "title": "Ended Plants",
+            "type": "integer"
+          },
+          "outcomes": {
+            "additionalProperties": {
+              "type": "integer"
+            },
+            "title": "Outcomes",
+            "type": "object"
+          }
+        },
+        "required": [
+          "active_plants",
+          "ended_plants",
+          "outcomes"
+        ],
+        "title": "TrackingCounts",
+        "type": "object"
+      },
       "TrackingEndReason": {
         "description": "Why tracking of a plant ended (requirement 1, 2).",
         "enum": [
@@ -4367,6 +4922,108 @@
         ],
         "title": "TrackingEndReason",
         "type": "string"
+      },
+      "TreatmentStep": {
+        "additionalProperties": false,
+        "properties": {
+          "how": {
+            "maxLength": 1000,
+            "minLength": 1,
+            "title": "How",
+            "type": "string"
+          },
+          "title": {
+            "maxLength": 120,
+            "minLength": 1,
+            "title": "Title",
+            "type": "string"
+          }
+        },
+        "required": [
+          "title",
+          "how"
+        ],
+        "title": "TreatmentStep",
+        "type": "object"
+      },
+      "TreatmentsIn": {
+        "additionalProperties": false,
+        "description": "Shape of ``diseases.treatments`` (design 9.3).",
+        "properties": {
+          "chemical": {
+            "items": {
+              "$ref": "#/components/schemas/TreatmentStep"
+            },
+            "maxItems": 10,
+            "title": "Chemical",
+            "type": "array"
+          },
+          "first_aid": {
+            "items": {
+              "type": "string"
+            },
+            "maxItems": 10,
+            "title": "First Aid",
+            "type": "array"
+          },
+          "organic": {
+            "items": {
+              "$ref": "#/components/schemas/TreatmentStep"
+            },
+            "maxItems": 10,
+            "title": "Organic",
+            "type": "array"
+          },
+          "safety_note": {
+            "default": "",
+            "maxLength": 1000,
+            "title": "Safety Note",
+            "type": "string"
+          },
+          "when_to_call_expert": {
+            "maxLength": 1000,
+            "minLength": 1,
+            "title": "When To Call Expert",
+            "type": "string"
+          }
+        },
+        "required": [
+          "when_to_call_expert"
+        ],
+        "title": "TreatmentsIn",
+        "type": "object"
+      },
+      "UserCounts": {
+        "additionalProperties": false,
+        "properties": {
+          "by_role": {
+            "additionalProperties": {
+              "type": "integer"
+            },
+            "title": "By Role",
+            "type": "object"
+          },
+          "new_7d": {
+            "title": "New 7D",
+            "type": "integer"
+          },
+          "pending_deletion": {
+            "title": "Pending Deletion",
+            "type": "integer"
+          },
+          "total": {
+            "title": "Total",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "total",
+          "new_7d",
+          "pending_deletion",
+          "by_role"
+        ],
+        "title": "UserCounts",
+        "type": "object"
       },
       "UserOut": {
         "additionalProperties": false,
@@ -4676,7 +5333,236 @@
   },
   "openapi": "3.1.0",
   "paths": {
+    "/api/v1/admin/diseases": {
+      "get": {
+        "description": "Every disease, including ones taken out of the catalogue.",
+        "operationId": "list_diseases_api_v1_admin_diseases_get",
+        "parameters": [
+          {
+            "in": "header",
+            "name": "authorization",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Authorization"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ListEnvelope_DiseaseAdminOut_"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "List Diseases",
+        "tags": [
+          "review"
+        ]
+      }
+    },
+    "/api/v1/admin/diseases/{code}": {
+      "patch": {
+        "description": "Edit reviewed content; the editor and today's date become the review stamp.",
+        "operationId": "update_disease_api_v1_admin_diseases__code__patch",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "code",
+            "required": true,
+            "schema": {
+              "title": "Code",
+              "type": "string"
+            }
+          },
+          {
+            "in": "header",
+            "name": "authorization",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Authorization"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/DiseaseUpdate"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Envelope_DiseaseAdminOut_"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Update Disease",
+        "tags": [
+          "review"
+        ]
+      }
+    },
+    "/api/v1/admin/overview": {
+      "get": {
+        "description": "Counts for the staff dashboard. Aggregates only, no personal data.",
+        "operationId": "overview_api_v1_admin_overview_get",
+        "parameters": [
+          {
+            "in": "header",
+            "name": "authorization",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Authorization"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Envelope_AdminOverviewOut_"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Overview",
+        "tags": [
+          "admin"
+        ]
+      }
+    },
     "/api/v1/admin/reminders/general": {
+      "get": {
+        "description": "Team announcements already sent, newest first, with read counts.",
+        "operationId": "broadcast_history_api_v1_admin_reminders_general_get",
+        "parameters": [
+          {
+            "in": "query",
+            "name": "limit",
+            "required": false,
+            "schema": {
+              "default": 30,
+              "maximum": 100,
+              "minimum": 1,
+              "title": "Limit",
+              "type": "integer"
+            }
+          },
+          {
+            "in": "header",
+            "name": "authorization",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Authorization"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ListEnvelope_BroadcastHistoryItem_"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Broadcast History",
+        "tags": [
+          "admin"
+        ]
+      },
       "post": {
         "operationId": "broadcast_general_api_v1_admin_reminders_general_post",
         "parameters": [
@@ -4730,6 +5616,133 @@
           }
         },
         "summary": "Broadcast General",
+        "tags": [
+          "admin"
+        ]
+      }
+    },
+    "/api/v1/admin/users": {
+      "get": {
+        "description": "Search accounts by name, username or email, newest first.",
+        "operationId": "list_users_api_v1_admin_users_get",
+        "parameters": [
+          {
+            "in": "query",
+            "name": "q",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "maxLength": 80,
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Q"
+            }
+          },
+          {
+            "in": "query",
+            "name": "role",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "$ref": "#/components/schemas/UserRole"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Role"
+            }
+          },
+          {
+            "in": "query",
+            "name": "include_deleted",
+            "required": false,
+            "schema": {
+              "default": false,
+              "title": "Include Deleted",
+              "type": "boolean"
+            }
+          },
+          {
+            "in": "query",
+            "name": "limit",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "maximum": 50,
+                  "minimum": 1,
+                  "type": "integer"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Limit"
+            }
+          },
+          {
+            "in": "query",
+            "name": "cursor",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Cursor"
+            }
+          },
+          {
+            "in": "header",
+            "name": "authorization",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Authorization"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ListEnvelope_StaffUserOut_"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "List Users",
         "tags": [
           "admin"
         ]

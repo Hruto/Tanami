@@ -90,6 +90,18 @@ DESIGN_ENDPOINTS: list[tuple[str, str]] = [
     ("put", "/forum/posts/{post_id}/like"),
     ("delete", "/forum/posts/{post_id}/like"),
     ("delete", "/forum/comments/{comment_id}"),
+    # Staff workspace (design.md 10.10, tanami-admin)
+    ("get", "/moderation/reports"),
+    ("post", "/moderation/reports/{target_type}/{target_id}/resolve"),
+    ("get", "/admin/overview"),
+    ("get", "/admin/users"),
+    ("patch", "/admin/users/{user_id}/role"),
+    ("get", "/admin/reminders/general"),
+    ("post", "/admin/reminders/general"),
+    ("get", "/admin/diseases"),
+    ("patch", "/admin/diseases/{code}"),
+    ("get", "/review/feedback"),
+    ("patch", "/review/feedback/{feedback_id}"),
 ]
 
 

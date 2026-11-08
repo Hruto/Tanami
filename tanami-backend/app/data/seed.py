@@ -11,7 +11,7 @@ from __future__ import annotations
 
 from typing import Any, cast
 
-from sqlalchemy import CursorResult, select
+from sqlalchemy import CursorResult, or_, select
 from sqlalchemy.dialects.postgresql import insert
 from sqlalchemy.ext.asyncio import AsyncSession
 
@@ -28,7 +28,10 @@ async def seed_diseases(session: AsyncSession) -> int:
 
     ``is_active`` is deliberately *not* overwritten with ``True``: taking a
     disease out of the catalogue is an editorial action that must survive a
-    deploy.
+    deploy. For the same reason the text is only replaced when the seed's
+    ``reviewed_at`` is newer than the stored one, so an expert's edit from the
+    staff dashboard (signed with the day it was made) is not undone by the
+    next restart. Bump ``REVIEWED_AT`` in the seed to roll new text out.
     """
     rows = disease_rows()
     statement = insert(Disease).values(rows)
@@ -46,6 +49,10 @@ async def seed_diseases(session: AsyncSession) -> int:
             "reviewed_by": statement.excluded.reviewed_by,
             "reviewed_at": statement.excluded.reviewed_at,
         },
+        where=or_(
+            Disease.reviewed_at.is_(None),
+            Disease.reviewed_at < statement.excluded.reviewed_at,
+        ),
     )
     await session.execute(statement)
     await session.commit()
