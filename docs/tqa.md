@@ -82,7 +82,7 @@ Perubahan stack setelah sprint 2 memerlukan persetujuan seluruh tim karena biaya
 ## 4. Manajemen Repositori dan Git
 
 **Struktur repo (saat ini):**
-- Repo `tanami`: root = layanan inferensi `tanami-vision`; folder `tanami-backend/` = API, database, job; `design.md` dan `tqa.md` di root.
+- Repo `tanami`: root = layanan inferensi `tanami-vision`; folder `tanami-backend/` = API, database, job; `design.md` dan `tqa.md` di `docs/` (bersama `architecture.md`).
 - `tanami-app` (frontend), repo terpisah.
 - `tanami-ml` (eksperimen, training, evaluasi, data card), repo terpisah atau digabung bila tim lebih nyaman.
 
