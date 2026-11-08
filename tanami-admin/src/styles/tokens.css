@@ -1,0 +1,64 @@
+/*
+  Tanami staff workspace.
+  Palette: cream paper and pine ink, like a field notebook kept by an agronomist.
+  Green is the only hue with meaning beyond text; amber marks "waiting",
+  brick marks "destructive". Nothing else is colored.
+*/
+:root {
+  color-scheme: light;
+
+  --paper: #f1ecdd;
+  --paper-deep: #e7e0cb;
+  --sheet: #fbf8f0;
+  --line: #d8cfb7;
+  --line-strong: #b9ae92;
+
+  --ink: #1c2b22;
+  --ink-soft: #5c6150;
+  --pine: #1f3d2e;
+  --pine-deep: #17301f;
+  --leaf: #3d6b47;
+  --leaf-strong: #2f5739;
+  --sprout: #a7bd8a;
+  --sprout-soft: #dbe3c8;
+
+  --amber: #8f6512;
+  --amber-soft: #f0e2bd;
+  --brick: #8f3628;
+  --brick-soft: #f1d9cf;
+
+  --rail-text: #ede6d2;
+  --rail-muted: #a9b59e;
+
+  --font-display: "Literata", "Iowan Old Style", "Palatino Linotype", Georgia, serif;
+  --font-ui: "Figtree", "Segoe UI", system-ui, sans-serif;
+
+  /* Type scale: 1.2 minor third from 15px body. */
+  --text-xs: 0.8125rem;
+  --text-sm: 0.875rem;
+  --text-md: 0.9375rem;
+  --text-lg: 1.125rem;
+  --text-xl: 1.375rem;
+  --text-2xl: 1.75rem;
+  --text-3xl: 2.25rem;
+
+  --space-1: 4px;
+  --space-2: 8px;
+  --space-3: 12px;
+  --space-4: 16px;
+  --space-5: 24px;
+  --space-6: 32px;
+  --space-7: 48px;
+  --space-8: 64px;
+
+  --radius-control: 6px;
+  --radius-panel: 12px;
+
+  --rail-width: 248px;
+  --content-max: 1120px;
+
+  --shadow-panel: 0 1px 0 rgba(31, 61, 46, 0.06), 0 18px 40px -24px rgba(31, 61, 46, 0.35);
+  --focus: 0 0 0 3px rgba(61, 107, 71, 0.35);
+
+  --ease-out: cubic-bezier(0.2, 0.7, 0.2, 1);
+}

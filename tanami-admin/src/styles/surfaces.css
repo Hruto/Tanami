@@ -1,0 +1,239 @@
+/* ---------- Ruled tables (the default way to show a list) ---------- */
+.table-wrap {
+  overflow-x: auto;
+  border-top: 1px solid var(--line-strong);
+}
+
+.table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: var(--text-sm);
+}
+
+.table th {
+  padding: 10px 12px;
+  border-bottom: 1px solid var(--line);
+  color: var(--ink-soft);
+  font-weight: 500;
+  text-align: left;
+  white-space: nowrap;
+}
+
+.table td {
+  padding: 14px 12px;
+  border-bottom: 1px solid var(--line);
+  vertical-align: middle;
+}
+
+.table tbody tr {
+  transition: background-color 120ms;
+}
+
+.table tbody tr.is-clickable {
+  cursor: pointer;
+}
+
+.table tbody tr.is-clickable:hover {
+  background: rgba(231, 224, 203, 0.55);
+}
+
+.table .cell-main {
+  font-size: var(--text-md);
+  color: var(--ink);
+}
+
+.table .cell-sub {
+  margin-top: 2px;
+  color: var(--ink-soft);
+  font-size: var(--text-xs);
+}
+
+.table .cell-right {
+  text-align: right;
+}
+
+.table-foot {
+  display: flex;
+  justify-content: center;
+  padding: var(--space-5) 0;
+}
+
+/* ---------- Toolbar above a list ---------- */
+.toolbar {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--space-3) var(--space-4);
+  margin-bottom: var(--space-4);
+}
+
+.toolbar .input {
+  max-width: 320px;
+}
+
+/* ---------- Empty and loading states ---------- */
+.empty {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: var(--space-2);
+  padding: var(--space-7) 0;
+  border-top: 1px solid var(--line-strong);
+  color: var(--ink-soft);
+}
+
+.empty h2 {
+  font-size: var(--text-lg);
+}
+
+.loading {
+  padding: var(--space-6) 0;
+  color: var(--ink-soft);
+  font-size: var(--text-sm);
+}
+
+.notice {
+  padding: var(--space-3) var(--space-4);
+  border-left: 3px solid var(--brick);
+  background: var(--brick-soft);
+  font-size: var(--text-sm);
+}
+
+.notice-calm {
+  border-left-color: var(--leaf);
+  background: var(--sprout-soft);
+}
+
+/* ---------- Drawer (side sheet) and dialog ---------- */
+.drawer {
+  width: min(640px, 100vw);
+  max-width: none;
+  height: 100vh;
+  max-height: none;
+  margin: 0 0 0 auto;
+  padding: 0;
+  border: 0;
+  background: var(--sheet);
+  color: var(--ink);
+  box-shadow: -30px 0 80px -30px rgba(23, 48, 31, 0.45);
+}
+
+.drawer[open] {
+  display: flex;
+  flex-direction: column;
+  animation: drawer-in 260ms var(--ease-out);
+}
+
+.drawer::backdrop,
+.dialog::backdrop {
+  background: rgba(23, 48, 31, 0.32);
+}
+
+@keyframes drawer-in {
+  from {
+    transform: translateX(32px);
+    opacity: 0;
+  }
+}
+
+.drawer-head {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: var(--space-4);
+  padding: var(--space-6) var(--space-6) var(--space-4);
+  border-bottom: 1px solid var(--line);
+}
+
+.drawer-body {
+  flex: 1;
+  overflow-y: auto;
+  padding: var(--space-5) var(--space-6) var(--space-6);
+}
+
+.drawer-foot {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-3);
+  padding: var(--space-4) var(--space-6);
+  border-top: 1px solid var(--line);
+  background: var(--paper);
+}
+
+.icon-button {
+  display: inline-flex;
+  padding: 6px;
+  border: 0;
+  border-radius: var(--radius-control);
+  background: none;
+  color: var(--ink-soft);
+  cursor: pointer;
+}
+
+.icon-button:hover {
+  background: var(--paper-deep);
+  color: var(--ink);
+}
+
+.dialog {
+  width: min(460px, calc(100vw - 32px));
+  padding: var(--space-6);
+  border: 0;
+  border-radius: var(--radius-panel);
+  background: var(--sheet);
+  color: var(--ink);
+  box-shadow: var(--shadow-panel);
+}
+
+.dialog[open] {
+  animation: dialog-in 180ms var(--ease-out);
+}
+
+@keyframes dialog-in {
+  from {
+    transform: translateY(6px);
+    opacity: 0;
+  }
+}
+
+.dialog p {
+  margin-top: var(--space-3);
+  color: var(--ink-soft);
+}
+
+.dialog-actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: var(--space-3);
+  margin-top: var(--space-6);
+}
+
+/* ---------- Toast ---------- */
+.toast-region {
+  position: fixed;
+  left: 50%;
+  bottom: var(--space-5);
+  z-index: 60;
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+  transform: translateX(-50%);
+}
+
+.toast {
+  max-width: min(520px, calc(100vw - 32px));
+  padding: 12px 18px;
+  border-radius: var(--radius-control);
+  background: var(--pine-deep);
+  color: var(--rail-text);
+  font-size: var(--text-sm);
+  box-shadow: var(--shadow-panel);
+  animation: dialog-in 200ms var(--ease-out);
+}
+
+.toast-error {
+  background: var(--brick);
+  color: var(--sheet);
+}
