@@ -164,12 +164,51 @@ IRRIGATION_INTERVAL_DAYS: dict[str, int] = {
 
 
 class TrackingEndReason(StrEnum):
-    """Why tracking of a plant ended (requirement 1, 2)."""
+    """Why tracking of a plant ended (requirement 1, 2; design 8.2 v2).
 
+    ``HARVESTED``, ``DIED`` and ``NOT_MAINTAINED`` are the v0.3 values, kept only
+    until migration 0005 rewrites stored rows; nothing new may use them.
+    """
+
+    PRODUCTIVE_PERIOD_OVER = "productive_period_over"  # set by the daily job only
+    DISEASE = "disease"
+    CUT_DOWN = "cut_down"
+    DIED_OTHER = "died_other"
+    OTHER = "other"
     HARVESTED = "harvested"
     DIED = "died"
     NOT_MAINTAINED = "not_maintained"
+
+
+class TrackingOutcome(StrEnum):
+    """How a plant's tracking ended (design 8.6)."""
+
+    COMPLETED = "completed"  # productive period ran out
+    ENDED_EARLY = "ended_early"  # stopped early, harvested at least once
+    FAILED = "failed"  # stopped before the first harvest
+
+
+class LifecyclePhase(StrEnum):
+    JUVENILE = "juvenile"
+    PRODUCTIVE = "productive"
+
+
+class PlantingMaterial(StrEnum):
+    GRAFTED = "grafted"
+    SEED = "seed"
+    RUNNER = "runner"  # strawberry only
     OTHER = "other"
+
+
+class EpisodeStatus(StrEnum):
+    OPEN = "open"
+    RESOLVED = "resolved"
+
+
+class EpisodeCloseReason(StrEnum):
+    USER_MARKED_HEALED = "user_marked_healed"
+    HEALTHY_SCAN = "healthy_scan"
+    TRACKING_ENDED = "tracking_ended"
 
 
 class HarvestOutcome(StrEnum):
