@@ -2,8 +2,8 @@
 
 | | |
 |---|---|
-| Versi | 0.3 (requirement R0-R7 + ruang kerja tim) |
-| Tanggal | 8 November 2026 |
+| Versi | 2.0 (selaras dengan `design.md` v2: mangga, jeruk, stroberi) |
+| Tanggal | 9 November 2026 |
 | Berlaku untuk | Seluruh anggota tim Tanami (1 PM, 2 Frontend, 2 Backend/ML) |
 | Dokumen pendamping | `design.md` (kontrak desain, data, dan API) |
 
@@ -15,24 +15,26 @@ Dokumen ini adalah kesepakatan tim tentang standar kualitas teknis. Semua keputu
 
 **Tujuan:** memastikan frontend, backend, dan ML dibangun dengan standar yang sama sehingga hasilnya konsisten, aman, dan dapat dipercaya petani.
 
-**Ruang lingkup produk** (dokumen *Requirements Aplikasi Deteksi dan Tracking Tanaman*):
+**Ruang lingkup produk** (dokumen *Requirements Aplikasi Deteksi dan Tracking Tanaman*, sebagaimana diubah `design.md` v2). Komoditas: **mangga, jeruk, stroberi**.
 
 | Kode | Fitur |
 |---|---|
 | R0 | Tambah Kebun: nama, lokasi kelurahan, indoor/outdoor |
-| R1 | Tracking Tanaman: jenis (dropdown), tanggal tanam + umur otomatis, foto, jadwal irigasi, hasil akhir, akhiri tracking |
-| R2 | History Tracking Tanaman: daftar, detail, alasan pengakhiran, riwayat perkembangan |
-| R3 | Deteksi Penyakit Tanaman: daftar tanaman deteksi terpisah, input nama + foto, hasil (penyakit, keyakinan %, gejala, saran), riwayat, akhiri deteksi |
-| R4 | History Deteksi Penyakit: daftar, detail, riwayat hasil, aktifkan kembali |
+| R1 | Tracking Tanaman: jenis, jenis bibit, tanggal tanam + umur otomatis, jumlah, foto, jadwal irigasi, perkiraan panen dari profil tanaman, catat panen ke-n, akhiri tracking sebelum masa produktif habis |
+| R2 | Riwayat Tanaman: daftar, detail, status akhir (selesai/dihentikan/gagal panen), alasan, penyakit, riwayat perkembangan |
+| R3 | Scan Penyakit Daun: pilih tanaman terdaftar + foto, hasil (penyakit, keyakinan %, gejala, pencegahan, saran), konfirmasi penyakit yang dapat memundurkan perkiraan panen |
+| R4 | Riwayat Scan: daftar semua scan dengan filter jenis tanaman, penyakit, dan tanaman |
 | R5 | Forum Komunitas: posting, lihat, komentar, suka |
 | R6 | Profil dan Pengaturan: email, username, nama lengkap, password, periode pengingat, logout, hapus akun |
-| R7 | Notifikasi dan Pengingat: foto, penyiraman, pemantauan, berhenti saat tracking diakhiri, deteksi ulang manual |
+| R7 | Notifikasi dan Pengingat: foto, penyiraman, pemantauan, tindak lanjut penyakit, panen, berhenti saat tracking diakhiri, scan ulang manual |
+
+R1, R3, dan R4 di atas menyimpang dari dokumen requirement asli dan menunggu persetujuan pemilik requirement (`design.md` 17 #11).
 
 **Prioritas rilis MVP:** R0 + R1 + R3, lalu R2 + R4, lalu R6 + R7, lalu R5. Rincian di `design.md` bagian 3.
 
-**Fitur tambahan yang sudah ada tetapi tidak disebut requirement:** scan kematangan buah + estimasi panen, dan reminder cuaca BMKG (hanya kebun outdoor). Keduanya dipertahankan sampai PM memutuskan (`design.md` 17 #11) dan tidak boleh menghambat rilis R0-R7.
+**Fitur tambahan yang tidak disebut requirement:** reminder cuaca BMKG (hanya kebun outdoor) dan Cek cepat (scan tanpa simpan). Keduanya tidak boleh menghambat rilis R0-R7. Scan kematangan buah **dipensiunkan** di v2.
 
-**Di luar ruang lingkup MVP:** deteksi untuk jenis tanaman tanpa model (MVP: model hanya cabai), sensor IoT, marketplace saprotan, prediksi harga pasar, peta sebaran penyakit.
+**Di luar ruang lingkup MVP:** tanaman selain mangga/jeruk/stroberi, scan penyakit buah/bunga, scan kematangan, prediksi jumlah panen, sensor IoT, marketplace saprotan, prediksi harga pasar, peta sebaran penyakit.
 
 ---
 
@@ -157,12 +159,12 @@ docs(design): perbarui skema reminder
 
 | Jenis uji | Cakupan | Target [USULAN] | Siapa |
 |---|---|---|---|
-| Unit test backend | Services, aturan reminder (siram/foto/pemantauan/cuaca), status kesehatan, validasi | Cakupan baris+cabang **>= 80%** keseluruhan (dijaga CI), **>= 85%** untuk modul aturan reminder dan skor ML | Backend |
+| Unit test backend | Services, aturan reminder (siram/foto/pemantauan/panen/cuaca), status kesehatan, **perkiraan panen, episode penyakit, status akhir** (`design.md` 8.4-8.6), validasi | Cakupan baris+cabang **>= 80%** keseluruhan (dijaga CI), **>= 85%** untuk modul aturan reminder, perkiraan panen, episode penyakit, dan skor ML | Backend |
 | Integration test backend | Endpoint terhadap **PostgreSQL 16 sungguhan** yang dimigrasi Alembic (bukan SQLite/mock) | Semua endpoint punya minimal 1 skenario sukses dan 1 skenario galat; tes "nol drift" model vs migrasi | Backend |
 | Contract test | Setiap endpoint di `design.md` bagian 10 ada di OpenAPI; semua respons memakai amplop; `contracts/openapi.json` mutakhir | Berjalan di CI pada setiap PR | Backend |
 | Unit test frontend | Logika, hook, util | Cakupan **>= 60%** untuk logika non-UI | Frontend |
 | Component test | Komponen kunci (kartu hasil scan, grafik) | Semua komponen design system | Frontend |
-| E2E | Alur utama: daftar, tambah kebun + tanaman (R0-R1), catat siram/foto, deteksi penyakit + riwayat (R3), akhiri tracking/deteksi + lihat History (R2, R4), terima pengingat (R7) | Semua alur lulus sebelum rilis | Frontend + Backend |
+| E2E | Alur utama: daftar, tambah kebun + tanaman (R0-R1), catat siram/foto/panen, scan daun + konfirmasi penyakit + perkiraan panen mundur (R3), akhiri tracking + lihat Riwayat Tanaman dan Riwayat Scan dengan filter (R2, R4), terima pengingat (R7) | Semua alur lulus sebelum rilis | Frontend + Backend |
 | Uji ML | Lihat bagian 8 | Lihat bagian 8 | ML |
 | Uji beban ringan | Endpoint scan | 20 pengguna bersamaan, p95 <= 3 detik | Backend |
 | Uji pengguna (UAT) | Dengan petani/penyuluh sungguhan | Minimal 5 petani sebelum rilis beta | PM |
@@ -178,7 +180,8 @@ Aturan:
 Bagian ini paling penting, karena kesalahan model langsung memengaruhi keputusan petani.
 
 ### 8.1 Data
-- **Sumber data:** foto lapangan dari kebun nyata adalah data utama. Dataset publik hanya untuk pra-latih atau tambahan, dan **lisensinya dicek** sebelum dipakai.
+- **Sumber data:** foto lapangan dari kebun nyata adalah data utama. Dataset publik (kandidat di `design.md` 11.5: MangoLeafBD, Citrus Leaves, PlantVillage, Strawberry Disease) hanya untuk pra-latih atau tambahan, dan **lisensinya dicek** sebelum dipakai.
+- **Pergeseran domain:** dataset publik berasal dari luar Indonesia dan sebagian berlatar laboratorium. Waspadai model yang belajar dari latar, bukan daun (periksa dengan Grad-CAM), dan selalu laporkan metrik di set uji lapangan Indonesia terpisah dari set uji publik.
 - **Protokol pengambilan foto:** ditulis dan dibagikan ke pengumpul data (sudut, jarak, pencahayaan, variasi latar, minimal beberapa kondisi cuaca).
 - **Pelabelan:**
   - Label penyakit dan penyebab **divalidasi oleh ahli** (penyuluh/dosen/dinas pertanian). Sampel tanpa validasi ahli ditandai dan tidak masuk set uji.
@@ -186,19 +189,19 @@ Bagian ini paling penting, karena kesalahan model langsung memengaruhi keputusan
 - **Pembagian data (split):**
   - Dibagi **per kebun/per tanaman**, bukan per foto, untuk mencegah kebocoran data (foto dari tanaman yang sama tidak boleh ada di train dan test sekaligus).
   - **Set uji berisi foto lapangan saja** dan tidak pernah dipakai untuk memilih model atau menyetel hyperparameter.
-- **Versi data:** setiap dataset dan label punya versi (`dataset-cabai-v0.1`). Perubahan label dicatat.
+- **Versi data:** setiap dataset dan label punya versi per jenis tanaman (`dataset-mango-v0.1`). Perubahan label dicatat.
 - **Data card:** tiap dataset punya ringkasan (sumber, jumlah per kelas, tanggal, lokasi, keterbatasan).
 
-### 8.2 Target metrik [USULAN, untuk MVP, diukur pada set uji lapangan]
+### 8.2 Target metrik [USULAN, untuk MVP, dilaporkan per jenis tanaman]
 
-| Model | Metrik | Target MVP |
+| Model / aturan | Metrik | Target MVP |
 |---|---|---|
-| Penyakit daun | Macro-F1 | **>= 0,80** |
-| Penyakit daun | Recall tiap kelas penyakit | **>= 0,70** (tidak ada kelas yang diabaikan) |
-| Penyakit daun | Akurasi sehat vs sakit | **>= 0,90** |
-| Kematangan buah | Akurasi (3-4 tahap) | **>= 0,85** |
-| Estimasi hari panen (fitur tambahan) | MAE terhadap hari panen aktual | MVP: tampil sebagai **rentang** dan dievaluasi apakah panen aktual jatuh dalam rentang pada **>= 65%** kasus. Target jangka menengah MAE <= 2 hari. |
-| Deteksi gambar tidak valid | Recall gambar bukan daun/buah | **>= 0,90** |
+| Penyakit daun (per jenis) | Macro-F1 di set uji publik | **>= 0,80**; angka di set uji lapangan dilaporkan apa adanya |
+| Penyakit daun (per jenis) | Recall tiap kelas penyakit | **>= 0,70** (tidak ada kelas yang diabaikan) |
+| Penyakit daun (per jenis) | Akurasi sehat vs sakit | **>= 0,90** |
+| Penyakit daun (per jenis) | Kalibrasi: Expected Calibration Error | **<= 0,05** setelah kalibrasi; wajib karena hanya `confident` yang dapat memundurkan perkiraan panen |
+| Deteksi gambar tidak valid | Recall gambar bukan daun | **>= 0,90** |
+| Perkiraan panen (aturan, bukan ML) | Proporsi panen aktual yang jatuh di dalam rentang perkiraan | Dipantau dari catatan panen pengguna; bila **< 65%** untuk satu jenis, profil tanaman ditinjau ulang bersama ahli |
 
 Jika target tidak tercapai, fitur tetap boleh dirilis sebagai **beta** dengan label jelas ("hasil perkiraan") hanya dengan persetujuan PM dan ML. Target tidak boleh diturunkan diam-diam. Perubahannya dicatat dan diumumkan ke tim.
 
@@ -217,7 +220,7 @@ Ambang keyakinan **berlaku sama di backend, frontend, dan dokumen ini** (sumber 
 - Rekomendasi bahan kimia memuat peringatan keselamatan standar (baca label kemasan, alat pelindung diri, jangan melebihi dosis anjuran) dan **tidak memberi angka dosis** sebelum ditinjau ahli. Untuk keluhan berat atau menyebar, aplikasi mengarahkan ke penyuluh.
 
 ### 8.4 Pengelolaan model
-- **Penamaan versi:** `<jenis>-<komoditas>-v<semver>`, mis. `disease-cabai-v0.1.0`. Versi ini disertakan dalam setiap hasil scan.
+- **Penamaan versi:** `<jenis>-<komoditas>-v<semver>` dengan kode komoditas dari `design.md` 8.2, mis. `disease-mango-v1.0.0`. Versi ini disertakan dalam setiap hasil scan.
 - **Model card** untuk tiap model: data latih, metrik per kelas, keterbatasan, kondisi yang tidak didukung.
 - **Registri model:** model yang akan dirilis disimpan dengan hash berkas, metrik, dan tanggal.
 - **Rilis model:** model baru harus lebih baik atau setara pada set uji tetap, **dan** lolos uji regresi (kumpulan gambar acuan yang hasilnya tidak boleh berubah drastis). Model baru dijalankan dulu di mode bayangan (shadow) pada staging.
@@ -405,3 +408,4 @@ Dengan menandatangani, anggota tim menyatakan telah membaca dan menyepakati doku
 | 0.1 | 2026-10-23 | Draf awal |
 | 0.2 | 2026-11-08 | Ruang lingkup mengikuti requirement R0-R7; fitur ripeness dan cuaca ditandai tambahan; stack aktual (layanan vision terpisah, FCM HTTP v1, APScheduler); struktur repo; strategi tes (PostgreSQL asli, contract test terhadap `design.md` 10, cakupan 80%); E2E alur requirement; privasi profil (email tidak ditampilkan, username publik); pembersihan akun 30 hari; CI backend. |
 | 0.3 | 2026-11-08 | Ruang kerja tim `tanami-admin` untuk moderator, ahli, dan admin; CI dashboard (typecheck + build); server lokal tanpa Docker (`scripts/dev_server.py`). |
+| 2.0 | 2026-11-09 | Selaras dengan `design.md` v2: komoditas mangga/jeruk/stroberi, ruang lingkup R1-R4 baru, tes untuk perkiraan panen dan episode penyakit, metrik ML per jenis tanaman dengan kalibrasi wajib, pergeseran domain dataset publik, scan kematangan dipensiunkan. Nomor versi disamakan dengan `design.md`. |

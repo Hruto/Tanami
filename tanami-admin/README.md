@@ -1,5 +1,7 @@
 # tanami-admin
 
+> **Status:** dokumen ini menjelaskan kode yang berjalan sekarang, yang masih mengikuti `docs/design.md` **v0.3** (cabai, daftar deteksi terpisah, scan kematangan). Targetnya `docs/design.md` **v2** (mangga, jeruk, stroberi); daftar perubahan yang tertunda ada di lampiran "Dampak ke Implementasi".
+
 Ruang kerja tim Tanami: web untuk **ahli**, **moderator**, dan **admin**. Akun petani ditolak saat masuk.
 
 | Layar | Peran | Untuk apa |
