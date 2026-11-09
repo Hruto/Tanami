@@ -1,5 +1,7 @@
 # Arsitektur layanan inferensi
 
+> Selaras dengan `design.md` v2: satu layanan memuat model penyakit daun untuk mangga, jeruk, dan stroberi; backend selalu mengirim `commodity_code`. Kode layanan saat ini masih memuat model stub cabai (v0.3).
+
 ## Keputusan: satu layanan inferensi terpisah dari backend
 
 **Konteks.** `design.md` 16 menaruh `ml/` di dalam `tanami-backend`, dengan
@@ -31,7 +33,7 @@ data.
 | Alternatif | Alasan ditolak |
 |---|---|
 | Tetap di dalam backend | Gagal memenuhi syarat rollback model tanpa deploy dan isolasi beban |
-| Satu layanan per model | Dua model, dua deployable, dua titik gagal; tidak sepadan untuk tim 5 orang |
+| Satu layanan per model | Satu model per jenis tanaman berarti tiga deployable dan tiga titik gagal; tidak sepadan untuk tim 5 orang. Satu layanan memuat semua model lewat manifest |
 | Server inferensi generik (TorchServe/Triton) | Fitur berlebih, kontrak keluar tidak bisa dikunci ke design.md 11, biaya operasional lebih tinggi |
 | Model di perangkat | Ditunda pasca-MVP (design.md 14); butuh TFLite dan pembaruan model lewat store |
 
@@ -65,10 +67,11 @@ layanan mudah diuji, di-scale, dan di-rollback.
 | Hal | Backend | tanami-vision |
 |---|---|---|
 | Validasi 2 MB / 1280 px | ya (otoritatif) | ya (pagar kedua) |
-| Deteksi gambar bukan daun/buah | tidak | ya, lewat ambang kualitas + model |
+| Jenis tanaman (`commodity_code`) | ya, diambil dari tanaman yang dipilih (atau pilihan Cek cepat) | ya, hanya mengembalikan kelas jenis itu (`design.md` 11.1) |
+| Deteksi gambar bukan daun | tidak | ya, lewat ambang kualitas + model (`invalid_reason`) |
 | Ambang `status` | tidak | ya, sumber tunggal |
 | Rekomendasi pengobatan | ya (`diseases`) | tidak pernah |
-| Tanggal panen absolut | ya | tidak (hanya rentang hari) |
+| Perkiraan panen dan episode penyakit | ya (aturan `design.md` 8.4-8.5) | tidak pernah |
 | Idempotensi scan | ya (`client_uuid` + DB) | tidak (stateless) |
 | Rate limit | ya | tidak |
 | Menyimpan `model_version` | ya (di `scans`) | mengembalikannya |

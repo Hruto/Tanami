@@ -1,5 +1,7 @@
 # Data model reference
 
+> **Status:** this document describes the code as implemented, which still follows `docs/design.md` **v0.3** (chili, separate detection list, ripeness scans). The target is `docs/design.md` **v2** (mango, citrus, strawberry); see its appendix "Dampak ke Implementasi" for the pending changes.
+
 Canonical source: `design.md` section 9. This document records what the
 backend actually implements, including every constraint, index, and server
 default, so the schema can be regenerated from it without reading the code.

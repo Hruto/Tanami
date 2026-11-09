@@ -700,7 +700,7 @@ Tambahan pada respons scan tersimpan:
 ```json
 { "data": {
   "id": "5f0e...", "saved": true, "plant_id": "7c2a...", "plant_code": "MGA-001",
-  "status": "confident", "model_version": "mango-leaf-1.0.0",
+  "status": "confident", "model_version": "disease-mango-v1.0.0",
   "result": { "...": "bagian 11.3" },
   "confirmation": {
     "can_confirm": true,
@@ -924,7 +924,7 @@ Kode penyakit **unik global** dengan prefiks jenis; kelas sehat memakai kode ber
 > Penyebab yang labelnya sudah diketahui diselesaikan dengan **klasifikasi**, bukan clustering.
 
 ### 11.6 Versi, kalibrasi, dan umpan balik
-- `model_version` ada di setiap hasil dan menyebut jenis tanaman (mis. `mango-leaf-1.0.0`). Frontend menyimpannya bersama scan untuk pelaporan bug.
+- `model_version` ada di setiap hasil dan menyebut jenis tanaman, dengan pola `tqa.md` 8.4 (mis. `disease-mango-v1.0.0`). Frontend menyimpannya bersama scan untuk pelaporan bug.
 - **Metrik wajib per jenis tanaman** [USULAN]: macro-F1, recall per kelas, matriks kebingungan, dan **kalibrasi** (Expected Calibration Error, diagram reliabilitas). Model dikalibrasi (mis. temperature scaling) di data validasi sebelum ambang 11.2 dipakai.
 - Target rilis [USULAN]: macro-F1 >= 0,80 di set uji publik **dan** dilaporkan apa adanya di set uji lapangan; ECE <= 0,05. Bila hasil di set uji lapangan jauh lebih buruk, tim memutuskan bersama apakah rilis dengan ambang `confident` yang lebih tinggi.
 - Pengguna dapat menandai `correct`/`incorrect` lewat `PUT /scans/{id}/feedback`. Data ini ditinjau ahli sebelum dipakai melatih ulang (`tqa.md` bagian 8.4).
