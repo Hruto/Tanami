@@ -83,12 +83,11 @@ class UserCounts(ApiModel):
 class TrackingCounts(ApiModel):
     active_plants: int
     ended_plants: int
-    # Requirement 1 "Hasil Akhir": failed / suboptimal / normal / bumper.
+    # Status akhir (design 8.6): completed / ended_early / failed.
     outcomes: dict[str, int]
 
 
 class DetectionCounts(ApiModel):
-    active_detection_plants: int
     scans_total: int
     scans_7d: int
 

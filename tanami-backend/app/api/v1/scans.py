@@ -79,7 +79,6 @@ async def create_scan(
     scan_type: Annotated[ScanType, Form(alias="type")],
     client_uuid: Annotated[UUID | None, Form()] = None,
     plant_id: Annotated[UUID | None, Form()] = None,
-    detection_plant_id: Annotated[UUID | None, Form()] = None,
     captured_at: Annotated[datetime | None, Form()] = None,
     idempotency_key: Annotated[str | None, Header(alias="Idempotency-Key")] = None,
 ) -> Envelope[ScanCreated]:
@@ -107,7 +106,6 @@ async def create_scan(
             client_uuid=resolved_uuid,
             captured_at=captured_at,
             plant_id=plant_id,
-            detection_plant_id=detection_plant_id,
         )
     )
     if created.is_duplicate:
@@ -120,7 +118,6 @@ async def list_scans(
     user: CurrentUser,
     service: ScanServiceDep,
     plant_id: Annotated[UUID | None, Query()] = None,
-    detection_plant_id: Annotated[UUID | None, Query()] = None,
     scan_type: Annotated[ScanType | None, Query(alias="type")] = None,
     limit: Annotated[int | None, Query(ge=1, le=50)] = None,
     cursor: Annotated[str | None, Query()] = None,
@@ -129,7 +126,6 @@ async def list_scans(
     scans = await service.list(
         user.id,
         plant_id=plant_id,
-        detection_plant_id=detection_plant_id,
         scan_type=scan_type,
         limit=page.limit + 1,
         cursor=page.cursor,

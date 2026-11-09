@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+from collections.abc import Iterable
 from datetime import datetime
 from enum import StrEnum
 from typing import Any
@@ -24,6 +25,12 @@ def uuid_pk() -> Mapped[UUID]:
 def enum_check(column: str, enum: type[StrEnum], *, name: str) -> CheckConstraint:
     values = ", ".join(f"'{member.value}'" for member in enum)
     return CheckConstraint(f"{column} IN ({values})", name=name)
+
+
+def values_check(column: str, values: Iterable[str], *, name: str) -> CheckConstraint:
+    """A CHECK over an explicit value list, for columns whose allowed set is not a whole enum."""
+    listed = ", ".join(f"'{value}'" for value in values)
+    return CheckConstraint(f"{column} IN ({listed})", name=name)
 
 
 def enum_values(enum: type[StrEnum]) -> str:

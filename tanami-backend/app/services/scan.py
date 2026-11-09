@@ -70,7 +70,6 @@ class ScanCommand:
     client_uuid: UUID
     captured_at: datetime | None
     plant_id: UUID | None
-    detection_plant_id: UUID | None = None
 
 
 # --------------------------------------------------------------------------- #
@@ -157,17 +156,13 @@ class ScanService:
                 )
             return self._to_created(existing, is_duplicate=True)
 
-        detection = None
-        if command.detection_plant_id is not None:
-            from app.services.detection import DetectionService
-
-            detection = await DetectionService(
-                self.session, self.settings, self.storage
-            ).get_active(command.user_id, command.detection_plant_id)
-        plant_id = command.plant_id or (detection.plant_id if detection else None)
-        plant = await self._resolve_plant(
-            command.user_id, plant_id, linked=command.plant_id is None
-        )
+        # Every stored scan belongs to a registered plant (design v2). The
+        # "cek cepat" path that stores nothing is added with the scan endpoint.
+        if command.plant_id is None:
+            raise ValidationError(
+                "Pilih tanaman yang akan diperiksa.", details={"field": "plant_id"}
+            )
+        plant = await self._resolve_plant(command.user_id, command.plant_id)
         captured_at = self._captured_at(command.captured_at)
         validated = self._validate_image(command.image)
         image_key = new_object_key(
@@ -182,10 +177,8 @@ class ScanService:
                 content_type=validated.content_type,
                 client_uuid=str(command.client_uuid),
                 commodity_code=(
-                    detection.commodity_code
-                    if detection
-                    else plant.commodity_code
-                    if plant and plant.commodity_code in DETECTION_COMMODITIES
+                    plant.commodity_code
+                    if plant.commodity_code in DETECTION_COMMODITIES
                     else "chili"
                 ),
             )
@@ -207,8 +200,7 @@ class ScanService:
         scan = Scan(
             id=uuid4(),
             user_id=command.user_id,
-            plant_id=plant.id if plant else None,
-            detection_plant_id=detection.id if detection else None,
+            plant_id=plant.id,
             scan_type=command.scan_type.value,
             image_key=image_key,
             image_content_type=validated.content_type,
@@ -237,8 +229,7 @@ class ScanService:
                 raise
             return self._to_created(winner, is_duplicate=True)
 
-        if plant is not None:
-            await self.refresh_plant(plant)
+        await self.refresh_plant(plant)
 
         await self.session.commit()
 
@@ -275,7 +266,6 @@ class ScanService:
         user_id: UUID,
         *,
         plant_id: UUID | None = None,
-        detection_plant_id: UUID | None = None,
         scan_type: ScanType | None = None,
         limit: int,
         cursor: Cursor | None,
@@ -286,8 +276,6 @@ class ScanService:
         route learns whether another page exists without a second count query.
         """
         statement = select(Scan).where(Scan.user_id == user_id)
-        if detection_plant_id is not None:
-            statement = statement.where(Scan.detection_plant_id == detection_plant_id)
         if plant_id is not None:
             statement = statement.where(Scan.plant_id == plant_id)
         if scan_type is not None:
@@ -425,21 +413,8 @@ class ScanService:
         )
         return result.scalar_one_or_none()
 
-    async def _resolve_plant(
-        self, user_id: UUID, plant_id: UUID | None, *, linked: bool = False
-    ) -> Plant | None:
-        """The tracked plant a scan belongs to.
-
-        ``linked`` means the id came from the detection plant rather than the
-        request: then a tracked plant whose tracking has ended is silently
-        skipped instead of rejecting the detection.
-        """
-        if plant_id is None:
-            return None
-        if linked:
-            candidate = await self.session.get(Plant, plant_id)
-            if candidate is None or candidate.ended_at is not None:
-                return None
+    async def _resolve_plant(self, user_id: UUID, plant_id: UUID) -> Plant:
+        """The active plant a scan belongs to; someone else's plant looks like a missing one."""
         plant = await self.session.get(Plant, plant_id)
         if plant is None:
             raise NotFound("Tanaman tidak ditemukan.")
@@ -551,8 +526,7 @@ def scan_fields(scan: Scan, storage: StorageProvider) -> dict[str, Any]:
         "status": ResultStatus(scan.status),
         "model_version": scan.model_version,
         "image_url": storage.public_url(scan.image_key),
-        "plant_id": str(scan.plant_id) if scan.plant_id else None,
-        "detection_plant_id": str(scan.detection_plant_id) if scan.detection_plant_id else None,
+        "plant_id": str(scan.plant_id),
         "captured_at": scan.captured_at,
         "result": dict(scan.result),
         "quality": dict(scan.quality),

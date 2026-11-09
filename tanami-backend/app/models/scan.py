@@ -20,23 +20,22 @@ from sqlalchemy.dialects.postgresql import UUID as PgUUID
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from app.db.base import Base, created_at_column, updated_at_column
-from app.domain import FeedbackValue, ResultStatus, ScanType
-from app.models.columns import enum_check, uuid_pk
+from app.domain import FeedbackValue, ResultStatus
+from app.models.columns import enum_check, uuid_pk, values_check
 
 if TYPE_CHECKING:
     from app.models.content import Disease
+    from app.models.episode import DiseaseEpisode
     from app.models.farm import Plant
     from app.models.forum import ForumPost
     from app.models.user import User
 
 
 class Scan(Base):
-    """One analysed photo.
+    """One analysed leaf photo of a registered plant (design v2).
 
-    ``user_id`` is required even when ``plant_id`` is null: an unlinked scan still
-    belongs to whoever took it, appears in their history and can receive
-    feedback. Only the plant-derived fields (health status, harvest estimate)
-    require a plant.
+    Every stored scan belongs to a plant; a "cek cepat" scan is never stored.
+    ``user_id`` is kept as well so history and feedback do not need a join.
     """
 
     __tablename__ = "scans"
@@ -47,16 +46,15 @@ class Scan(Base):
         ForeignKey("users.id", ondelete="CASCADE"),
         nullable=False,
     )
-    plant_id: Mapped[UUID | None] = mapped_column(
+    plant_id: Mapped[UUID] = mapped_column(
         PgUUID(as_uuid=True),
-        ForeignKey("plants.id", ondelete="SET NULL"),
-        nullable=True,
+        ForeignKey("plants.id", ondelete="CASCADE"),
+        nullable=False,
     )
-
-    # Requirement 3: the detection-list plant this photo was taken for.
-    detection_plant_id: Mapped[UUID | None] = mapped_column(
+    # Set when the user confirmed this result and it opened or joined an episode.
+    disease_episode_id: Mapped[UUID | None] = mapped_column(
         PgUUID(as_uuid=True),
-        ForeignKey("detection_plants.id", ondelete="SET NULL"),
+        ForeignKey("disease_episodes.id", ondelete="SET NULL"),
         nullable=True,
     )
 
@@ -87,7 +85,10 @@ class Scan(Base):
     created_at: Mapped[datetime] = created_at_column()
 
     user: Mapped[User] = relationship(back_populates="scans")
-    plant: Mapped[Plant | None] = relationship(back_populates="scans")
+    plant: Mapped[Plant] = relationship(back_populates="scans")
+    episode: Mapped[DiseaseEpisode | None] = relationship(
+        back_populates="scans", foreign_keys=[disease_episode_id]
+    )
     disease: Mapped[Disease | None] = relationship(back_populates="scans")
     feedback: Mapped[ScanFeedback | None] = relationship(
         back_populates="scan", cascade="all, delete-orphan", uselist=False
@@ -95,7 +96,7 @@ class Scan(Base):
     forum_posts: Mapped[list[ForumPost]] = relationship(back_populates="scan")
 
     __table_args__ = (
-        enum_check("scan_type", ScanType, name="scan_type"),
+        values_check("scan_type", ("disease",), name="scan_type"),
         enum_check("status", ResultStatus, name="status"),
         UniqueConstraint("user_id", "client_uuid", name="uq_scans_user_client_uuid"),
         CheckConstraint(
@@ -113,7 +114,7 @@ class Scan(Base):
         Index("ix_scans_user_plant_created", "user_id", "plant_id", text("created_at DESC")),
         Index("ix_scans_disease_code", "disease_code"),
         Index("ix_scans_status", "status"),
-        Index("ix_scans_detection_plant_captured", "detection_plant_id", text("captured_at DESC")),
+        Index("ix_scans_disease_episode_id", "disease_episode_id"),
     )
 
     def __repr__(self) -> str:  # pragma: no cover - debugging aid

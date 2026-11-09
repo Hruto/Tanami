@@ -64,8 +64,13 @@ class ReminderType(StrEnum):
     # Weather and scan rules (design 12.3).
     FUNGAL_RISK = "fungal_risk"
     HEAVY_RAIN_HARVEST = "heavy_rain_harvest"
-    HARVEST_SOON = "harvest_soon"
+    HARVEST_SOON = "harvest_soon"  # retired in v2, replaced by HARVEST_DUE
     HEAT_STRESS = "heat_stress"
+    # Harvest tracking (design 12.1 v2).
+    HARVEST_DUE = "harvest_due"
+    HARVEST_CHECK = "harvest_check"
+    PRODUCTIVE_ENDING = "productive_ending"
+    TRACKING_COMPLETED = "tracking_completed"
     SCAN_FOLLOWUP = "scan_followup"
     GENERAL = "general"
 
@@ -283,6 +288,29 @@ DETECTION_COMMODITIES: tuple[str, ...] = ("chili",)
 # design 13: one forum category per commodity plus "Umum".
 FORUM_GENERAL_CATEGORY = "general"
 FORUM_CATEGORIES: tuple[str, ...] = (*SUPPORTED_COMMODITIES, FORUM_GENERAL_CATEGORY)
+
+# --- design v2 (mango, citrus, strawberry) ------------------------------------
+# The stored-value constraints below use these, not the legacy enums above, so the
+# database already speaks v2 while services are being moved over.
+COMMODITIES_V2: tuple[str, ...] = ("mango", "citrus", "strawberry")
+COMMODITY_LABELS_V2: dict[str, str] = {
+    "mango": "Mangga",
+    "citrus": "Jeruk",
+    "strawberry": "Stroberi",
+}
+# Prefix of the display code of a plant, e.g. ``MGA-001`` (design 8.2).
+PLANT_CODE_PREFIX: dict[str, str] = {"mango": "MGA", "citrus": "JRK", "strawberry": "STB"}
+
+TRACKING_END_REASONS_V2: tuple[str, ...] = (
+    TrackingEndReason.PRODUCTIVE_PERIOD_OVER.value,
+    TrackingEndReason.DISEASE.value,
+    TrackingEndReason.CUT_DOWN.value,
+    TrackingEndReason.DIED_OTHER.value,
+    TrackingEndReason.OTHER.value,
+)
+REMINDER_TYPES_V2: tuple[str, ...] = tuple(
+    member.value for member in ReminderType if member is not ReminderType.HARVEST_SOON
+)
 
 # Backend-owned copy of the labels used in scan results. The authoritative
 # label list lives in the model manifest; this mapping only decorates stored

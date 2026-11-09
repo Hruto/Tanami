@@ -20,8 +20,14 @@ from sqlalchemy.dialects.postgresql import UUID as PgUUID
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from app.db.base import Base, created_at_column, updated_at_column
-from app.domain import Platform, PushState, ReminderPriority, ReminderStatus, ReminderType
-from app.models.columns import enum_check, uuid_pk
+from app.domain import (
+    REMINDER_TYPES_V2,
+    Platform,
+    PushState,
+    ReminderPriority,
+    ReminderStatus,
+)
+from app.models.columns import enum_check, uuid_pk, values_check
 
 if TYPE_CHECKING:
     from app.models.farm import Farm, Plant
@@ -84,7 +90,7 @@ class Reminder(Base):
     plant: Mapped[Plant | None] = relationship(back_populates="reminders")
 
     __table_args__ = (
-        enum_check("type", ReminderType, name="type"),
+        values_check("type", REMINDER_TYPES_V2, name="type"),
         enum_check("priority", ReminderPriority, name="priority"),
         enum_check("status", ReminderStatus, name="status"),
         enum_check("push_state", PushState, name="push_state"),

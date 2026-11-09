@@ -13,19 +13,21 @@ Two deliberate departures from the document, both recorded in
 
 from __future__ import annotations
 
-from app.models.content import Disease, Region, WeatherSnapshot
+from app.models.content import CropProfile, Disease, Region, WeatherSnapshot
+from app.models.episode import DiseaseEpisode
 from app.models.farm import Farm, HarvestRecord, Plant
 from app.models.forum import ForumComment, ForumPost, ForumReaction, ForumReport
 from app.models.reminder import Device, Reminder
 from app.models.scan import Scan, ScanFeedback
-from app.models.tracking import CareLog, DetectionPlant, PlantPhoto
+from app.models.tracking import CareLog, PlantPhoto
 from app.models.user import User
 
 __all__ = [
     "CareLog",
-    "DetectionPlant",
+    "CropProfile",
     "Device",
     "Disease",
+    "DiseaseEpisode",
     "Farm",
     "ForumComment",
     "ForumPost",
