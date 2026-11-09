@@ -17,8 +17,10 @@ from alembic import context
 from app.core.config import Settings
 from app.db.base import Base
 from app.models import (  # noqa: F401 - imported for their side effect on metadata
+    CropProfile,
     Device,
     Disease,
+    DiseaseEpisode,
     Farm,
     ForumComment,
     ForumPost,

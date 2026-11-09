@@ -13,11 +13,10 @@ from zoneinfo import ZoneInfo
 from sqlalchemy import func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from app.domain import DISEASE_LABELS, FeedbackValue, ScanType, UserRole
+from app.domain import DISEASE_LABELS, FeedbackValue, ScanType, TrackingOutcome, UserRole
 from app.models.farm import Plant
 from app.models.forum import ForumReport
 from app.models.scan import Scan, ScanFeedback
-from app.models.tracking import DetectionPlant
 from app.models.user import User
 from app.schemas.admin import (
     AdminOverviewOut,
@@ -81,21 +80,16 @@ class OverviewService:
                 )
             )
         ).one()
-        outcomes = {"failed": 0, "suboptimal": 0, "normal": 0, "bumper": 0}
+        outcomes = {member.value: 0 for member in TrackingOutcome}
         rows = await self.session.execute(
-            select(Plant.final_result, func.count())
-            .where(Plant.final_result.is_not(None))
-            .group_by(Plant.final_result)
+            select(Plant.outcome, func.count())
+            .where(Plant.outcome.is_not(None))
+            .group_by(Plant.outcome)
         )
         outcomes.update({str(result): count for result, count in rows.tuples()})
         return TrackingCounts(active_plants=counts[0], ended_plants=counts[1], outcomes=outcomes)
 
     async def _detection(self, moment: datetime) -> DetectionCounts:
-        active = await self.session.scalar(
-            select(func.count())
-            .select_from(DetectionPlant)
-            .where(DetectionPlant.ended_at.is_(None))
-        )
         scans = (
             await self.session.execute(
                 select(
@@ -104,9 +98,7 @@ class OverviewService:
                 ).select_from(Scan)
             )
         ).one()
-        return DetectionCounts(
-            active_detection_plants=active or 0, scans_total=scans[0], scans_7d=scans[1]
-        )
+        return DetectionCounts(scans_total=scans[0], scans_7d=scans[1])
 
     async def _queues(self) -> QueueCounts:
         reports = await self.session.scalar(

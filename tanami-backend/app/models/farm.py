@@ -12,18 +12,31 @@ from sqlalchemy import (
     Date,
     ForeignKey,
     Index,
+    Integer,
     Numeric,
     String,
     Text,
+    UniqueConstraint,
+    text,
 )
+from sqlalchemy.dialects.postgresql import ARRAY
 from sqlalchemy.dialects.postgresql import UUID as PgUUID
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from app.db.base import Base, created_at_column, updated_at_column
-from app.domain import GrowthStage, HealthStatus, IrrigationSchedule, Placement
-from app.models.columns import enum_check, uuid_pk
+from app.domain import (
+    COMMODITIES_V2,
+    TRACKING_END_REASONS_V2,
+    HealthStatus,
+    IrrigationSchedule,
+    Placement,
+    PlantingMaterial,
+    TrackingOutcome,
+)
+from app.models.columns import enum_check, uuid_pk, values_check
 
 if TYPE_CHECKING:
+    from app.models.episode import DiseaseEpisode
     from app.models.reminder import Reminder
     from app.models.scan import Scan
     from app.models.user import User
@@ -77,6 +90,8 @@ class Farm(Base):
 
 
 class Plant(Base):
+    """One tree, or one group of plants of the same kind planted together (design 8.1)."""
+
     __tablename__ = "plants"
 
     id: Mapped[UUID] = uuid_pk()
@@ -86,20 +101,28 @@ class Plant(Base):
         nullable=False,
         index=True,
     )
+    # Denormalised from the farm so a display code can be unique per user.
+    user_id: Mapped[UUID] = mapped_column(
+        PgUUID(as_uuid=True),
+        ForeignKey("users.id", ondelete="CASCADE"),
+        nullable=False,
+        index=True,
+    )
+    # ``MGA-001``: commodity prefix + per-user counter. Never reused or edited.
+    code: Mapped[str] = mapped_column(String(16), nullable=False)
 
     commodity_code: Mapped[str] = mapped_column(String(32), nullable=False, index=True)
+    planting_material: Mapped[str] = mapped_column(String(16), nullable=False)
     variety: Mapped[str | None] = mapped_column(String(80), nullable=True)
     label: Mapped[str] = mapped_column(String(120), nullable=False)
     planted_at: Mapped[date] = mapped_column(Date, nullable=False)
-    growth_stage: Mapped[str] = mapped_column(String(16), nullable=False)
+    quantity: Mapped[int] = mapped_column(Integer, nullable=False, server_default=text("1"))
+    # planted_at + the profile's productive years; tracking ends by itself then.
+    productive_until: Mapped[date] = mapped_column(Date, nullable=False)
+
     health_status: Mapped[str] = mapped_column(
         String(16), nullable=False, server_default=HealthStatus.UNKNOWN.value
     )
-
-    # Filled from the most recent ripeness scan; the backend owns the absolute
-    # dates because the vision service only returns a day range.
-    expected_harvest_min: Mapped[date | None] = mapped_column(Date, nullable=True)
-    expected_harvest_max: Mapped[date | None] = mapped_column(Date, nullable=True)
 
     # Requirement 1: watering frequency, drives the watering reminder.
     irrigation_schedule: Mapped[str] = mapped_column(
@@ -108,10 +131,12 @@ class Plant(Base):
 
     # Requirement 1-2: ending tracking moves the plant to the history list.
     ended_at: Mapped[datetime | None] = mapped_column(nullable=True)
-    end_reason: Mapped[str | None] = mapped_column(String(16), nullable=True)
+    end_reason: Mapped[str | None] = mapped_column(String(24), nullable=True)
     end_note: Mapped[str | None] = mapped_column(Text, nullable=True)
-    final_result: Mapped[str | None] = mapped_column(String(16), nullable=True)
-    yield_percent: Mapped[Decimal | None] = mapped_column(Numeric(6, 1), nullable=True)
+    # Only for ``end_reason = disease``: what the plant was lost to (design 8.6).
+    end_disease_codes: Mapped[list[str] | None] = mapped_column(ARRAY(String(64)), nullable=True)
+    end_cause_note: Mapped[str | None] = mapped_column(Text, nullable=True)
+    outcome: Mapped[str | None] = mapped_column(String(16), nullable=True)
 
     created_at: Mapped[datetime] = created_at_column()
     updated_at: Mapped[datetime] = updated_at_column()
@@ -122,40 +147,43 @@ class Plant(Base):
     harvests: Mapped[list[HarvestRecord]] = relationship(
         back_populates="plant", cascade="all, delete-orphan", order_by="HarvestRecord.harvested_at"
     )
+    episodes: Mapped[list[DiseaseEpisode]] = relationship(
+        back_populates="plant", cascade="all, delete-orphan", order_by="DiseaseEpisode.opened_at"
+    )
 
     @property
     def is_active(self) -> bool:
         return self.ended_at is None
 
     __table_args__ = (
-        enum_check("growth_stage", GrowthStage, name="growth_stage"),
+        values_check("commodity_code", COMMODITIES_V2, name="commodity_code"),
+        enum_check("planting_material", PlantingMaterial, name="planting_material"),
         enum_check("health_status", HealthStatus, name="health_status"),
         enum_check("irrigation_schedule", IrrigationSchedule, name="irrigation_schedule"),
-        CheckConstraint(
-            "end_reason IS NULL OR end_reason IN ('harvested', 'died', 'not_maintained', 'other')",
-            name="end_reason",
-        ),
-        CheckConstraint(
-            "final_result IS NULL OR final_result IN ('failed', 'suboptimal', 'normal', 'bumper')",
-            name="final_result",
-        ),
+        values_check("end_reason", TRACKING_END_REASONS_V2, name="end_reason"),
+        enum_check("outcome", TrackingOutcome, name="outcome"),
         CheckConstraint("(ended_at IS NULL) = (end_reason IS NULL)", name="ended_with_reason"),
-        CheckConstraint("yield_percent IS NULL OR yield_percent >= 0", name="yield_non_negative"),
+        CheckConstraint("(ended_at IS NULL) = (outcome IS NULL)", name="ended_with_outcome"),
+        CheckConstraint("quantity >= 1", name="quantity_positive"),
         CheckConstraint(
-            "(expected_harvest_min IS NULL AND expected_harvest_max IS NULL) "
-            "OR (expected_harvest_min IS NOT NULL AND expected_harvest_max IS NOT NULL "
-            "AND expected_harvest_min <= expected_harvest_max)",
-            name="harvest_range",
+            "end_reason IS DISTINCT FROM 'disease' "
+            "OR cardinality(coalesce(end_disease_codes, '{}')) > 0 "
+            "OR btrim(coalesce(end_cause_note, '')) <> ''",
+            name="disease_end_has_cause",
         ),
+        UniqueConstraint("user_id", "code", name="uq_plants_user_code"),
         Index("ix_plants_farm_ended", "farm_id", "ended_at"),
+        Index("ix_plants_user_ended", "user_id", "ended_at"),
         Index("ix_plants_health_status", "health_status"),
     )
 
     def __repr__(self) -> str:  # pragma: no cover - debugging aid
-        return f"<Plant {self.id} label={self.label!r}>"
+        return f"<Plant {self.code} label={self.label!r}>"
 
 
 class HarvestRecord(Base):
+    """One harvest of a plant; ``sequence`` is "panen ke-n" (design 8.1)."""
+
     __tablename__ = "harvest_records"
 
     id: Mapped[UUID] = uuid_pk()
@@ -172,6 +200,9 @@ class HarvestRecord(Base):
     )
 
     harvested_at: Mapped[datetime] = mapped_column(nullable=False)
+    # Numbered by harvest date per plant and renumbered when a record is edited or
+    # deleted, so the unique constraint is checked at commit, not per row.
+    sequence: Mapped[int] = mapped_column(Integer, nullable=False)
     quality_note: Mapped[str | None] = mapped_column(Text, nullable=True)
     quantity_kg: Mapped[Decimal | None] = mapped_column(Numeric(10, 2), nullable=True)
 
@@ -182,5 +213,13 @@ class HarvestRecord(Base):
 
     __table_args__ = (
         CheckConstraint("quantity_kg IS NULL OR quantity_kg >= 0", name="quantity_non_negative"),
+        CheckConstraint("sequence >= 1", name="sequence_positive"),
+        UniqueConstraint(
+            "plant_id",
+            "sequence",
+            name="uq_harvest_records_plant_sequence",
+            deferrable=True,
+            initially="DEFERRED",
+        ),
         Index("ix_harvest_records_plant_harvested", "plant_id", "harvested_at"),
     )

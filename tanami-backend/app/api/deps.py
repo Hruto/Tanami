@@ -26,7 +26,6 @@ from app.providers.storage import StorageProvider
 from app.providers.vision import VisionClient
 from app.providers.weather import WeatherProvider
 from app.services.auth import AuthService
-from app.services.detection import DetectionService
 from app.services.farm import FarmService, PlantService, RegionService
 from app.services.forum import ForumService
 from app.services.reminder import ReminderService
@@ -217,15 +216,8 @@ def tracking_service(
     return TrackingService(session, settings, storage)
 
 
-def detection_service(
-    session: SessionDep, settings: SettingsDep, storage: StorageDep
-) -> DetectionService:
-    return DetectionService(session, settings, storage)
-
-
 ScanServiceDep = Annotated[ScanService, Depends(scan_service)]
 TrackingServiceDep = Annotated[TrackingService, Depends(tracking_service)]
-DetectionServiceDep = Annotated[DetectionService, Depends(detection_service)]
 FarmServiceDep = Annotated[FarmService, Depends(farm_service)]
 PlantServiceDep = Annotated[PlantService, Depends(plant_service)]
 RegionServiceDep = Annotated[RegionService, Depends(region_service)]

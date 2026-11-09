@@ -81,8 +81,7 @@ class ScanOut(ApiModel):
     status: ResultStatus
     model_version: str
     image_url: str
-    plant_id: str | None
-    detection_plant_id: str | None = None
+    plant_id: str
     captured_at: datetime
     result: dict[str, Any]
     quality: dict[str, Any]
@@ -139,8 +138,7 @@ class ScanCreated(ApiModel):
     status: ResultStatus
     model_version: str
     image_url: str
-    plant_id: str | None
-    detection_plant_id: str | None = None
+    plant_id: str
     captured_at: datetime
     result: dict[str, Any]
     quality: dict[str, Any]

@@ -11,6 +11,7 @@ from sqlalchemy import (
     CheckConstraint,
     Date,
     Index,
+    Integer,
     String,
     Text,
     UniqueConstraint,
@@ -20,8 +21,8 @@ from sqlalchemy.dialects.postgresql import JSONB
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from app.db.base import Base, created_at_column, updated_at_column
-from app.domain import CauseCategory
-from app.models.columns import enum_check, uuid_pk
+from app.domain import COMMODITIES_V2, CauseCategory, PlantingMaterial
+from app.models.columns import enum_check, uuid_pk, values_check
 
 if TYPE_CHECKING:
     from app.models.scan import Scan
@@ -44,6 +45,11 @@ class Disease(Base):
     causes_text: Mapped[str] = mapped_column(Text, nullable=False)
     prevention: Mapped[str] = mapped_column(Text, nullable=False)
     severity_note: Mapped[str | None] = mapped_column(Text, nullable=True)
+    # Days a confirmed episode of this disease pushes the harvest estimate back
+    # (design 8.5). An expert fills it in; it is always shown as an estimate.
+    harvest_delay_days: Mapped[int] = mapped_column(
+        Integer, nullable=False, server_default=text("0")
+    )
 
     # Shape from design 9.3. Content is written and reviewed by an agronomist;
     # chemical entries carry a safety note and never a dose (TQA 8.3).
@@ -71,7 +77,51 @@ class Disease(Base):
             "jsonb_typeof(treatments) = 'object'",
             name="treatments_object",
         ),
+        CheckConstraint("harvest_delay_days >= 0", name="harvest_delay_non_negative"),
         Index("ix_diseases_active_commodity", "commodity_code", "is_active"),
+    )
+
+
+class CropProfile(Base):
+    """Agronomic numbers behind the harvest estimate (design 8.3).
+
+    Data, not code: an expert edits it from the team workspace. All values are
+    days except ``productive_years``. ``source`` must be filled in before release.
+    """
+
+    __tablename__ = "crop_profiles"
+
+    id: Mapped[UUID] = uuid_pk()
+    commodity_code: Mapped[str] = mapped_column(String(32), nullable=False)
+    planting_material: Mapped[str] = mapped_column(String(16), nullable=False)
+
+    first_harvest_min_days: Mapped[int] = mapped_column(Integer, nullable=False)
+    first_harvest_max_days: Mapped[int] = mapped_column(Integer, nullable=False)
+    harvest_cycle_min_days: Mapped[int] = mapped_column(Integer, nullable=False)
+    harvest_cycle_max_days: Mapped[int] = mapped_column(Integer, nullable=False)
+    productive_years: Mapped[int] = mapped_column(Integer, nullable=False)
+
+    harvest_pattern_note: Mapped[str | None] = mapped_column(Text, nullable=True)
+    source: Mapped[str | None] = mapped_column(Text, nullable=True)
+    reviewed_by: Mapped[str | None] = mapped_column(String(120), nullable=True)
+    reviewed_at: Mapped[date | None] = mapped_column(Date, nullable=True)
+
+    created_at: Mapped[datetime] = created_at_column()
+    updated_at: Mapped[datetime] = updated_at_column()
+
+    __table_args__ = (
+        values_check("commodity_code", COMMODITIES_V2, name="commodity_code"),
+        enum_check("planting_material", PlantingMaterial, name="planting_material"),
+        UniqueConstraint("commodity_code", "planting_material", name="uq_crop_profiles_material"),
+        CheckConstraint(
+            "first_harvest_min_days > 0 AND first_harvest_min_days <= first_harvest_max_days",
+            name="first_harvest_range",
+        ),
+        CheckConstraint(
+            "harvest_cycle_min_days > 0 AND harvest_cycle_min_days <= harvest_cycle_max_days",
+            name="harvest_cycle_range",
+        ),
+        CheckConstraint("productive_years > 0", name="productive_years_positive"),
     )
 
 

@@ -47,6 +47,12 @@ class User(Base):
         JSONB, nullable=False, server_default=text("'{}'::jsonb")
     )
 
+    # Last number handed out per commodity for plant display codes (``MGA-007``);
+    # never reused, so a deleted plant's code does not come back (design 8.2).
+    plant_code_seq: Mapped[dict[str, int]] = mapped_column(
+        JSONB, nullable=False, server_default=text("'{}'::jsonb")
+    )
+
     deleted_at: Mapped[datetime | None] = mapped_column(nullable=True)
 
     created_at: Mapped[datetime] = created_at_column()
