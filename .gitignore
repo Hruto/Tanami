@@ -15,3 +15,8 @@ build/
 models/**/*.onnx
 models/**/*.onnx.data
 !models/README.md
+
+# Local dev server data (tanami-backend/scripts/dev_server.py)
+.devdata/
+node_modules/
+.playwright-mcp/

@@ -1,5 +1,9 @@
 # Kontrak API — `tanami-vision`
 
+> **Status:** dokumen ini menjelaskan kode yang berjalan sekarang, yang masih mengikuti `docs/design.md` **v0.3** (cabai, daftar deteksi terpisah, scan kematangan). Targetnya `docs/design.md` **v2** (mangga, jeruk, stroberi); daftar perubahan yang tertunda ada di lampiran "Dampak ke Implementasi".
+
+> Di v2 bidang `commodity_code` menjadi wajib dan bernilai `mango`, `citrus`, atau `strawberry`; `type` hanya `disease`; respons menambah `invalid_reason`.
+
 | | |
 |---|---|
 | Versi kontrak | 0.1.0 |

@@ -1,0 +1,78 @@
+name: Backend CI
+
+# tqa.md 11: ruff, mypy, unit + integration tests, OpenAPI contract and a
+# dependency scan on every PR that touches the backend.
+on:
+  pull_request:
+    paths: ["tanami-backend/**", ".github/workflows/backend-ci.yml"]
+  push:
+    branches: [main]
+    paths: ["tanami-backend/**", ".github/workflows/backend-ci.yml"]
+
+concurrency:
+  group: backend-ci-${{ github.ref }}
+  cancel-in-progress: true
+
+defaults:
+  run:
+    working-directory: tanami-backend
+
+jobs:
+  checks:
+    name: Lint, types, tests
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    services:
+      postgres:
+        image: postgres:16
+        env:
+          POSTGRES_USER: tanami
+          POSTGRES_PASSWORD: tanami
+          POSTGRES_DB: tanami_test
+        ports: ["5432:5432"]
+        options: >-
+          --health-cmd "pg_isready -U tanami"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 10
+    env:
+      TANAMI_TEST_DATABASE_URL: postgresql+asyncpg://tanami:tanami@127.0.0.1:5432/tanami_test
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+          cache: pip
+          cache-dependency-path: tanami-backend/pyproject.toml
+
+      - name: Install
+        run: pip install -e ".[dev]"
+
+      - name: Ruff lint
+        run: ruff check --output-format=github app tests scripts migrations
+
+      - name: Ruff format
+        run: ruff format --check app tests scripts migrations
+
+      - name: Mypy (strict)
+        run: mypy app scripts
+
+      - name: Contract is in sync with code
+        run: |
+          python scripts/export_openapi.py
+          git diff --exit-code -- contracts/openapi.json
+
+      - name: Tests (unit, integration, contract)
+        run: pytest -q --cov=app --cov-report=term-missing:skip-covered --cov-report=xml --cov-fail-under=80
+
+      - name: Dependency audit
+        run: pip-audit --skip-editable --progress-spinner off
+        continue-on-error: true
+
+      - name: Upload coverage
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: backend-coverage
+          path: tanami-backend/coverage.xml
