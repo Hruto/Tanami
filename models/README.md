@@ -1,5 +1,9 @@
 # Model directory
 
+> **Status:** this document describes the code as implemented, which still follows `docs/design.md` **v0.3** (chili, separate detection list, ripeness scans). The target is `docs/design.md` **v2** (mango, citrus, strawberry); see its appendix "Dampak ke Implementasi" for the pending changes.
+
+> In v2 the folders become e.g. `disease-mango-v1.0.0/`, `disease-citrus-v1.0.0/`, `disease-strawberry-v1.0.0/`, and ripeness models are retired.
+
 Each version lives in its own folder and is discovered only through its
 `manifest.json`:
 

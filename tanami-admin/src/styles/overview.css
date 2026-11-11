@@ -1,0 +1,306 @@
+/* ---------- Overview: a written brief, the stem chart, then a ledger ---------- */
+.overview-date {
+  margin-bottom: var(--space-2);
+  color: var(--ink-soft);
+  font-size: var(--text-sm);
+}
+
+.brief {
+  max-width: 34em;
+  margin-top: var(--space-5);
+  font-family: var(--font-display);
+  font-size: clamp(1.25rem, 1.05rem + 0.8vw, 1.625rem);
+  line-height: 1.5;
+  color: var(--pine-deep);
+}
+
+.brief a {
+  color: var(--leaf-strong);
+  text-decoration-color: var(--sprout);
+  text-decoration-thickness: 2px;
+}
+
+.overview-section {
+  margin-top: var(--space-8);
+}
+
+.section-head {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: var(--space-2) var(--space-5);
+  padding-bottom: var(--space-3);
+  border-bottom: 1px solid var(--line-strong);
+}
+
+.section-aside {
+  color: var(--ink-soft);
+  font-size: var(--text-sm);
+}
+
+/* ---------- Stem chart ---------- */
+.stems {
+  margin: var(--space-4) 0 0;
+}
+
+.stems svg {
+  display: block;
+  width: 100%;
+  height: auto;
+  overflow: visible;
+}
+
+.stems-soil {
+  stroke: var(--line-strong);
+  stroke-width: 1;
+}
+
+.stem {
+  cursor: default;
+  outline: none;
+}
+
+.stem:focus-visible .stem-day {
+  fill: var(--leaf-strong);
+  font-weight: 700;
+}
+
+.stem-line {
+  stroke: var(--pine);
+  stroke-width: 2;
+  stroke-linecap: round;
+  stroke-dasharray: 1;
+  stroke-dashoffset: 1;
+  animation: stem-grow 700ms var(--ease-out) forwards;
+  animation-delay: var(--delay, 0ms);
+}
+
+.stem-leaf,
+.stem-fruit,
+.stem-value {
+  opacity: 0;
+  animation: stem-leaf 400ms var(--ease-out) forwards;
+  animation-delay: calc(var(--delay, 0ms) + 450ms);
+}
+
+.stem-leaf {
+  fill: var(--leaf);
+}
+
+.stem-fruit {
+  fill: var(--sprout);
+}
+
+.stem-seed {
+  fill: var(--line-strong);
+}
+
+.stem-value {
+  fill: var(--ink-soft);
+  font-family: var(--font-ui);
+  font-size: 12px;
+  text-anchor: middle;
+}
+
+.stem-day {
+  fill: var(--ink-soft);
+  font-family: var(--font-ui);
+  font-size: 12px;
+  text-anchor: middle;
+}
+
+.stem-day.is-today {
+  fill: var(--pine-deep);
+  font-weight: 700;
+}
+
+.stem-month {
+  fill: var(--ink-soft);
+  font-family: var(--font-ui);
+  font-size: 11px;
+  text-anchor: middle;
+}
+
+.stem.is-active .stem-line {
+  stroke: var(--leaf-strong);
+  stroke-width: 3;
+}
+
+.stem.is-active .stem-value {
+  fill: var(--pine-deep);
+  font-weight: 700;
+}
+
+@keyframes stem-grow {
+  to {
+    stroke-dashoffset: 0;
+  }
+}
+
+@keyframes stem-leaf {
+  to {
+    opacity: 1;
+  }
+}
+
+.stems-caption {
+  min-height: 1.6em;
+  margin-top: var(--space-3);
+  color: var(--ink-soft);
+  font-size: var(--text-sm);
+}
+
+/* ---------- Ledger: three ruled columns ---------- */
+.ledger {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  margin-top: var(--space-8);
+  border-top: 1px solid var(--line-strong);
+}
+
+.ledger-col {
+  padding: var(--space-5) var(--space-5) var(--space-5) 0;
+}
+
+.ledger-col + .ledger-col {
+  padding-left: var(--space-5);
+  border-left: 1px solid var(--line);
+}
+
+.ledger-col h2 {
+  font-size: var(--text-lg);
+}
+
+.ledger-figure {
+  margin-top: var(--space-3);
+  font-family: var(--font-display);
+  font-size: var(--text-3xl);
+  line-height: 1;
+  color: var(--pine-deep);
+}
+
+.ledger-note {
+  margin-top: var(--space-2);
+  color: var(--ink-soft);
+  font-size: var(--text-sm);
+}
+
+.ledger-sub {
+  margin-top: var(--space-5);
+  font-family: var(--font-ui);
+  font-size: var(--text-sm);
+  font-weight: 600;
+  color: var(--ink);
+}
+
+.ledger-list {
+  margin: var(--space-4) 0 0;
+}
+
+.ledger-row {
+  display: flex;
+  justify-content: space-between;
+  gap: var(--space-3);
+  padding: 7px 0;
+  border-bottom: 1px dashed var(--line);
+  font-size: var(--text-sm);
+}
+
+.ledger-row dt {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+}
+
+.ledger-row dd {
+  margin: 0;
+}
+
+.outcomes {
+  margin-top: var(--space-4);
+}
+
+.outcome-bar {
+  display: flex;
+  gap: 2px;
+  height: 10px;
+  border-radius: 999px;
+  overflow: hidden;
+}
+
+.outcome {
+  min-width: 4px;
+}
+
+.swatch {
+  display: inline-block;
+  width: 10px;
+  height: 10px;
+  border-radius: 3px;
+}
+
+.outcome-failed {
+  background: var(--brick);
+}
+
+.outcome-suboptimal {
+  background: #c9a14a;
+}
+
+.outcome-normal {
+  background: var(--leaf);
+}
+
+.outcome-bumper {
+  background: var(--pine-deep);
+}
+
+.rank {
+  margin: var(--space-3) 0 0;
+  padding: 0;
+  list-style: none;
+}
+
+.rank li {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) 64px 28px;
+  align-items: center;
+  gap: var(--space-3);
+  padding: 6px 0;
+  font-size: var(--text-sm);
+}
+
+.rank li .num {
+  text-align: right;
+}
+
+.rank-bar {
+  height: 4px;
+  border-radius: 999px;
+  background: var(--paper-deep);
+}
+
+.rank-bar span {
+  display: block;
+  height: 100%;
+  border-radius: inherit;
+  background: var(--leaf);
+}
+
+@media (max-width: 960px) {
+  .ledger {
+    grid-template-columns: minmax(0, 1fr);
+  }
+
+  .ledger-col,
+  .ledger-col + .ledger-col {
+    padding: var(--space-5) 0;
+    border-left: 0;
+  }
+
+  .ledger-col + .ledger-col {
+    border-top: 1px solid var(--line);
+  }
+}
+
