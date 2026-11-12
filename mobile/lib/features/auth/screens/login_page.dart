@@ -5,6 +5,9 @@ import 'package:flutter_svg/flutter_svg.dart';
 import '../widgets/auth_button.dart';
 import '../widgets/auth_text_field.dart';
 
+import '../models/login_request.dart';
+import '../services/auth_service.dart';
+
 class LoginPage extends StatefulWidget {
   const LoginPage({super.key});
 
@@ -14,6 +17,7 @@ class LoginPage extends StatefulWidget {
 
 class _LoginPageState extends State<LoginPage> {
   bool _obscurePassword = true;
+  bool _isLoading = false;
 
   final _usernameController = TextEditingController();
   final _passwordController = TextEditingController();
@@ -25,6 +29,62 @@ class _LoginPageState extends State<LoginPage> {
     super.dispose();
   }
 
+  Future<void> _login() async {
+  final username = _usernameController.text.trim();
+  final password = _passwordController.text;
+
+  // Validasi input
+  if (username.isEmpty || password.isEmpty) {
+    ScaffoldMessenger.of(context).showSnackBar(
+      const SnackBar(
+        content: Text('Username dan kata sandi wajib diisi.'),
+      ),
+    );
+    return;
+  }
+
+  setState(() {
+    _isLoading = true;
+  });
+
+  try {
+    final request = LoginRequest(
+      username: username,
+      password: password,
+    );
+
+    await AuthService().login(request);
+
+    if (!mounted) return;
+
+    ScaffoldMessenger.of(context).showSnackBar(
+      const SnackBar(
+        content: Text('Login berhasil! Selamat datang kembali.'),
+      ),
+    );
+
+    // Token sudah disimpan oleh AuthService.
+    // Navigasi ke halaman utama akan ditambahkan setelah
+    // kita memastikan nama route halaman Dashboard.
+
+  } catch (e) {
+    if (!mounted) return;
+
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(
+        content: Text(
+          e.toString().replaceFirst('Exception: ', ''),
+        ),
+      ),
+    );
+  } finally {
+    if (mounted) {
+      setState(() {
+        _isLoading = false;
+      });
+    }
+  }
+}
   @override
   Widget build(BuildContext context) {
     return Scaffold(
@@ -40,7 +100,7 @@ class _LoginPageState extends State<LoginPage> {
 
                 Center(
                   child: SvgPicture.asset(
-                    'assets/images/splash_logo.png',
+                    'assets/images/logo_tanami.svg',
                     width: 65,
                     height: 75,
                     fit: BoxFit.contain,
@@ -117,10 +177,8 @@ class _LoginPageState extends State<LoginPage> {
                 const SizedBox(height: 90),
 
                 AuthButton(
-                  text: 'Masuk',
-                  onPressed: () {
-                    // Proses login dihubungkan ke API nanti.
-                  },
+                  text: _isLoading ? 'Memproses...' : 'Masuk',
+                  onPressed: _isLoading ? null : _login,
                 ),
 
                 const SizedBox(height: 10),

@@ -19,7 +19,7 @@ class WelcomePage extends StatelessWidget {
               const Spacer(flex: 5),
 
               SvgPicture.asset(
-                'assets/images/splash_logo.png',
+                'assets/images/logo_tanami.svg',
                 width: 190,
                 fit: BoxFit.contain,
               ),

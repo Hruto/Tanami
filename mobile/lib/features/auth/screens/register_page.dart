@@ -5,30 +5,102 @@ import 'package:flutter_svg/flutter_svg.dart';
 import '../widgets/auth_button.dart';
 import '../widgets/auth_text_field.dart';
 
+import '../models/register_request.dart';
+import '../services/auth_service.dart';
+
 class RegisterPage extends StatefulWidget {
   const RegisterPage({super.key});
 
   @override
   State<RegisterPage> createState() => _RegisterPageState();
+  
 }
 
 class _RegisterPageState extends State<RegisterPage> {
   bool _obscurePassword = true;
   bool _obscureConfirmPassword = true;
+  bool _isLoading = false;
 
-  final _usernameController = TextEditingController();
-  final _emailController = TextEditingController();
-  final _passwordController = TextEditingController();
-  final _confirmPasswordController = TextEditingController();
+final _fullNameController = TextEditingController();
+final _usernameController = TextEditingController();
+final _emailController = TextEditingController();
+final _passwordController = TextEditingController();
+final _confirmPasswordController = TextEditingController();
 
   @override
   void dispose() {
+    _fullNameController.dispose();
     _usernameController.dispose();
     _emailController.dispose();
     _passwordController.dispose();
     _confirmPasswordController.dispose();
     super.dispose();
   }
+
+  
+Future<void> _register() async {
+  if (_fullNameController.text.trim().isEmpty ||
+      _usernameController.text.trim().isEmpty ||
+      _emailController.text.trim().isEmpty ||
+      _passwordController.text.isEmpty ||
+      _confirmPasswordController.text.isEmpty) {
+    ScaffoldMessenger.of(context).showSnackBar(
+      const SnackBar(
+        content: Text('Semua kolom wajib diisi.'),
+      ),
+    );
+    return;
+  }
+
+  if (_passwordController.text !=
+      _confirmPasswordController.text) {
+    ScaffoldMessenger.of(context).showSnackBar(
+      const SnackBar(
+        content: Text('Konfirmasi kata sandi tidak sama.'),
+      ),
+    );
+    return;
+  }
+
+  setState(() => _isLoading = true);
+
+  try {
+    final request = RegisterRequest(
+      fullName: _fullNameController.text.trim(),
+      username: _usernameController.text.trim(),
+      email: _emailController.text.trim(),
+      password: _passwordController.text,
+      consentTrainingData: false,
+    );
+
+    await AuthService().register(request);
+
+    if (!mounted) return;
+
+    ScaffoldMessenger.of(context).showSnackBar(
+      const SnackBar(
+        content: Text('Registrasi berhasil!'),
+      ),
+    );
+
+    Navigator.pushReplacementNamed(context, '/login');
+  } catch (e) {
+    if (!mounted) return;
+
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(
+        content: Text(
+          e.toString().replaceFirst('Exception: ', ''),
+        ),
+      ),
+    );
+  } finally {
+    if (mounted) {
+      setState(() => _isLoading = false);
+    }
+  }
+}
+
 
   @override
   Widget build(BuildContext context) {
@@ -45,7 +117,7 @@ class _RegisterPageState extends State<RegisterPage> {
 
                 Center(
                   child: SvgPicture.asset(
-                    'assets/images/splash_logo.png',
+                    'assets/images/logo_tanami.svg',
                     width: 65,
                     height: 75,
                     fit: BoxFit.contain,
@@ -68,9 +140,18 @@ class _RegisterPageState extends State<RegisterPage> {
                 const SizedBox(height: 55),
 
                 AuthTextField(
-                  label: 'Nama Pengguna',
+                  label: 'Nama Lengkap',
                   hint: 'Anonim',
                   icon: Icons.person_outline,
+                  controller: _fullNameController,
+                ),
+
+                const SizedBox(height: 20),
+
+                AuthTextField(
+                  label: 'Username',
+                  hint: 'tanamiuser',
+                  icon: Icons.alternate_email,
                   controller: _usernameController,
                 ),
 
@@ -120,10 +201,8 @@ class _RegisterPageState extends State<RegisterPage> {
                 const SizedBox(height: 70),
 
                 AuthButton(
-                  text: 'Daftar',
-                  onPressed: () {
-                    // Proses registrasi akan dihubungkan ke API nanti.
-                  },
+                  text: _isLoading ? 'Memproses...' : 'Daftar',
+                  onPressed: _isLoading ? null : _register,
                 ),
 
                 const SizedBox(height: 10),
