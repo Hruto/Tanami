@@ -95,7 +95,7 @@ def vision_payload(
     *,
     result: dict[str, Any] | None = None,
     status: str | None = None,
-    model_version: str = "disease-chili-v0.1.0",
+    model_version: str = "disease-mango-v0.1.0",
     quality: dict[str, Any] | None = None,
     confidence: float | None = 0.9,
 ) -> VisionResult:
@@ -109,7 +109,7 @@ def vision_payload(
         scan_type=scan_type.value,
         status=status or ResultStatus.CONFIDENT.value,
         model_version=model_version,
-        commodity_code="chili",
+        commodity_code="mango",
         confidence=confidence if status != ResultStatus.UNKNOWN.value else None,
         quality=quality or {"exposure": "ok", "blur": "ok"},
         result=result,
@@ -308,10 +308,9 @@ async def create_farm(client: Any, headers: dict[str, str], **overrides: Any) ->
 
 
 PLANT_PAYLOAD = {
-    "label": "Cabai Keriting 1",
-    "commodity_code": "chili",
+    "label": "Mangga Harum Manis 1",
+    "commodity_code": "mango",
     "planted_at": "2026-08-01",
-    "growth_stage": "fruiting",
 }
 
 
@@ -332,12 +331,15 @@ async def upload_scan(
     client_uuid: str | None = None,
     image: bytes | None = None,
     plant_id: str | None = None,
+    commodity_code: str | None = None,
     captured_at: datetime | None = None,
 ) -> Any:
     client_uuid = client_uuid or str(uuid4())
     data: dict[str, Any] = {"type": scan_type, "client_uuid": client_uuid}
     if plant_id:
         data["plant_id"] = plant_id
+    if commodity_code:
+        data["commodity_code"] = commodity_code
     if captured_at is not None:
         data["captured_at"] = captured_at.isoformat()
     files = {"image": ("foto.jpg", image or image_bytes(), "image/jpeg")}

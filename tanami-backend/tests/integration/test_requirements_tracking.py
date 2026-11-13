@@ -21,9 +21,19 @@ async def test_indoor_garden_and_plant_type_dropdown(client: AsyncClient) -> Non
     headers, farm = await garden(client, placement="indoor")
     assert farm["placement"] == "indoor" and farm["village"] == "Gambir"
     types = (await client.get("/api/v1/plant-types")).json()["data"]
+    # design 8.2: only mango, citrus and strawberry are offered in v2.
+    assert [row["code"] for row in types] == ["mango", "citrus", "strawberry"]
     by_code = {row["code"]: row for row in types}
-    assert by_code["chili"]["detection_supported"] is True
-    assert by_code["tomato"] == {"code": "tomato", "label": "Tomat", "detection_supported": False}
+    assert by_code["mango"]["label"] == "Mangga" and by_code["mango"]["detection_supported"] is True
+    assert by_code["citrus"]["detection_supported"] is True
+    assert by_code["strawberry"]["label"] == "Stroberi"
+    # design 8.3: material choices per commodity, with its default (8.2 note).
+    assert {item["code"] for item in by_code["mango"]["materials"]} == {"grafted", "seed", "other"}
+    defaults = {
+        code: [item["code"] for item in row["materials"] if item["is_default"]]
+        for code, row in by_code.items()
+    }
+    assert defaults == {"mango": ["grafted"], "citrus": ["grafted"], "strawberry": ["runner"]}
     bad = await client.post(
         "/api/v1/farms",
         json={"name": "X", "adm4_code": "31.71.03.1001", "placement": "roof"},
@@ -39,12 +49,13 @@ async def test_tracking_photos_care_logs_and_age(client: AsyncClient) -> None:
         client,
         headers,
         farm["id"],
-        commodity_code="tomato",
+        commodity_code="mango",
         planted_at=planted,
         irrigation_schedule="daily",
     )
     assert plant["age_days"] in (29, 30, 31)
-    assert plant["commodity_label"] == "Tomat" and plant["status"] == "active"
+    assert plant["commodity_label"] == "Mangga" and plant["status"] == "active"
+    assert plant["code"] == "MGA-001" and plant["planting_material"] == "grafted"
     url = f"/api/v1/plants/{plant['id']}"
 
     files = {"image": ("p.jpg", image_bytes(), "image/jpeg")}
@@ -84,19 +95,28 @@ async def test_end_tracking_moves_to_history_and_freezes_the_plant(
     await run_care_reminders(state, now=datetime.now(UTC) + timedelta(days=8))
     assert (await client.get("/api/v1/reminders?status=unread", headers=headers)).json()["data"]
 
-    missing = await client.post(f"{url}/end", json={"reason": "harvested"}, headers=headers)
-    assert missing.status_code == 400
+    # design 8.2/8.6: the v0.3 reasons are gone, "other" needs a note, and
+    # productive_period_over belongs to the daily job, not to the client.
+    assert (
+        await client.post(f"{url}/end", json={"reason": "harvested"}, headers=headers)
+    ).status_code == 400
+    assert (
+        await client.post(f"{url}/end", json={"reason": "other"}, headers=headers)
+    ).status_code == 400
+    assert (
+        await client.post(f"{url}/end", json={"reason": "productive_period_over"}, headers=headers)
+    ).status_code == 400
+
     ended = await client.post(
-        f"{url}/end",
-        json={"reason": "harvested", "yield_percent": 85, "note": "Lumayan"},
-        headers=headers,
+        f"{url}/end", json={"reason": "other", "note": "Lumayan"}, headers=headers
     )
+    assert ended.status_code == 200, ended.text
     body = ended.json()["data"]
-    assert (body["status"], body["final_result"], body["growth_stage"]) == (
-        "ended",
-        "normal",
-        "finished",
-    )
+    # No harvest yet, so ending early is "Gagal panen" (8.6).
+    assert (body["status"], body["end_reason"], body["outcome"]) == ("ended", "other", "failed")
+    assert body["end_note"] == "Lumayan" and body["next_harvest"] is None
+    # design 8.2: final_result, yield_percent and growth_stage were retired in v2.
+    assert not {"final_result", "yield_percent", "growth_stage"} & set(body)
 
     active = (await client.get("/api/v1/plants", headers=headers)).json()["data"]
     history = (await client.get("/api/v1/plants?status=ended", headers=headers)).json()["data"]
@@ -110,7 +130,7 @@ async def test_end_tracking_moves_to_history_and_freezes_the_plant(
     blocked = await client.post(f"{url}/care-logs", json={"action": "watering"}, headers=headers)
     assert blocked.status_code == 400
     assert (
-        await client.post(f"{url}/end", json={"reason": "died"}, headers=headers)
+        await client.post(f"{url}/end", json={"reason": "died_other"}, headers=headers)
     ).status_code == 400
     assert (await client.get(f"{url}/timeline", headers=headers)).json()["data"][0][
         "kind"

@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from datetime import UTC, datetime, timedelta
+from datetime import UTC, date, datetime, timedelta
 
 from httpx import AsyncClient
 
@@ -56,45 +56,85 @@ async def test_plant_validation_and_patch(client: AsyncClient) -> None:
     plants_url = f"/api/v1/farms/{farm['id']}/plants"
     future = (datetime.now(UTC) + timedelta(days=3)).date().isoformat()
     assert (
-        await client.post(plants_url, json={"label": "A", "planted_at": future}, headers=headers)
+        await client.post(
+            plants_url,
+            json={"label": "A", "commodity_code": "mango", "planted_at": future},
+            headers=headers,
+        )
     ).status_code == 400
-    tomato = {"label": "A", "planted_at": "2026-10-01", "commodity_code": "durian"}
-    assert (await client.post(plants_url, json=tomato, headers=headers)).status_code == 400
+    durian = {"label": "A", "planted_at": "2026-10-01", "commodity_code": "durian"}
+    assert (await client.post(plants_url, json=durian, headers=headers)).status_code == 400
 
     plant = await create_plant(client, headers, farm["id"])
+    assert plant["code"] == "MGA-001"
     assert plant["health_status"] == "unknown"
     assert plant["health_status_reason"] == "Belum ada scan."
+    # design 8.2: growth_stage is gone in v2, so it is neither returned nor writable.
+    assert "growth_stage" not in plant
     url = f"/api/v1/plants/{plant['id']}"
     assert (await client.patch(url, json={"label": None}, headers=headers)).status_code == 400
     assert (
-        await client.patch(url, json={"growth_stage": None}, headers=headers)
+        await client.patch(url, json={"growth_stage": "flowering"}, headers=headers)
     ).status_code == 400
-    ok = await client.patch(url, json={"growth_stage": "flowering"}, headers=headers)
-    assert ok.json()["data"]["growth_stage"] == "flowering"
+
+    # Changing the planting date (or the material) recomputes the timeline (8.3-8.4).
+    moved = await client.patch(
+        url,
+        json={
+            "planted_at": "2022-08-01",
+            "variety": "Harum Manis",
+            "quantity": 3,
+            "irrigation_schedule": "weekly",
+        },
+        headers=headers,
+    )
+    assert moved.status_code == 200, moved.text
+    data = moved.json()["data"]
+    assert (data["variety"], data["quantity"], data["irrigation_schedule"]) == (
+        "Harum Manis",
+        3,
+        "weekly",
+    )
+    assert data["planted_at"] == "2022-08-01"
+    assert data["productive_until"] == "2062-08-01"
+    assert data["lifecycle_phase"] == "productive"
+    assert data["next_harvest"]["start"] == (date(2022, 8, 1) + timedelta(days=1095)).isoformat()
+    assert data["next_harvest"]["end"] == (date(2022, 8, 1) + timedelta(days=1460)).isoformat()
+
     listed = (await client.get(plants_url, headers=headers)).json()["data"]
     assert [item["id"] for item in listed] == [plant["id"]]
 
 
-async def test_harvests_are_repeatable_until_final(client: AsyncClient) -> None:
+async def test_harvests_are_repeatable_until_tracking_ends(client: AsyncClient) -> None:
     headers = auth_headers(await register(client))
     farm = await create_farm(client, headers)
-    plant = await create_plant(client, headers, farm["id"])
+    planted = (datetime.now(UTC) - timedelta(days=2000)).date()
+    plant = await create_plant(client, headers, farm["id"], planted_at=planted.isoformat())
     url = f"/api/v1/plants/{plant['id']}/harvests"
+    detail_url = f"/api/v1/plants/{plant['id']}"
     picked = datetime.now(UTC) - timedelta(days=1)
 
     first = await client.post(
         url, json={"harvested_at": picked.isoformat(), "quantity_kg": 12.5}, headers=headers
     )
-    assert first.status_code == 201
-    state = (await client.get(f"/api/v1/plants/{plant['id']}", headers=headers)).json()["data"]
-    assert state["growth_stage"] == "harvesting"
+    assert first.status_code == 201, first.text
+    assert first.json()["data"]["sequence"] == 1
+    state = (await client.get(detail_url, headers=headers)).json()["data"]
+    assert state["lifecycle_phase"] == "productive" and state["harvest_count"] == 1
 
-    final = await client.post(
-        url, json={"harvested_at": picked.isoformat(), "is_final": True}, headers=headers
-    )
-    assert final.status_code == 201
-    state = (await client.get(f"/api/v1/plants/{plant['id']}", headers=headers)).json()["data"]
-    assert state["growth_stage"] == "finished"
+    # design 5.3/8.4: no "final" harvest in v2 — each harvest is panen ke-n and
+    # moves the next estimate on from its own date.
+    assert (await client.post(url, json={"is_final": True}, headers=headers)).status_code == 400
+    second = await client.post(url, json={}, headers=headers)  # no date: today
+    assert second.status_code == 201, second.text
+    body = second.json()["data"]
+    assert body["sequence"] == 2
+    day = date.fromisoformat(body["harvested_at"])
+    assert body["next_harvest"]["base_start"] == (day + timedelta(days=330)).isoformat()
+    assert body["next_harvest"]["end"] == (day + timedelta(days=400)).isoformat()
+    assert body["next_harvest"]["is_estimate"] is True
+    listed = (await client.get(url, headers=headers)).json()["data"]
+    assert [row["sequence"] for row in listed] == [1, 2]
 
     naive = await client.post(url, json={"harvested_at": "2026-11-01T08:00:00"}, headers=headers)
     assert naive.status_code == 400
@@ -103,15 +143,19 @@ async def test_harvests_are_repeatable_until_final(client: AsyncClient) -> None:
         await client.post(url, json={"harvested_at": future}, headers=headers)
     ).status_code == 400
 
-    timeline = (
-        await client.get(f"/api/v1/plants/{plant['id']}/timeline?limit=1", headers=headers)
-    ).json()
+    timeline = (await client.get(f"{detail_url}/timeline?limit=1", headers=headers)).json()
     assert timeline["meta"]["has_more"] is True
     second_page = await client.get(
-        f"/api/v1/plants/{plant['id']}/timeline?limit=1&cursor={timeline['meta']['next_cursor']}",
+        f"{detail_url}/timeline?limit=1&cursor={timeline['meta']['next_cursor']}",
         headers=headers,
     )
     assert second_page.json()["data"][0]["id"] != timeline["data"][0]["id"]
+
+    # Only ending tracking closes the plant (8.6); it then rejects new harvests.
+    ended = await client.post(f"{detail_url}/end", json={"reason": "cut_down"}, headers=headers)
+    assert ended.status_code == 200, ended.text
+    assert ended.json()["data"]["outcome"] == "ended_early"
+    assert (await client.post(url, json={}, headers=headers)).status_code == 400
 
 
 async def test_region_search_and_resolve(client: AsyncClient) -> None:
