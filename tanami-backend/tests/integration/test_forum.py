@@ -9,9 +9,25 @@ from app.models.user import User
 from httpx import AsyncClient
 from sqlalchemy import update
 
-from tests.helpers import auth_headers, image_bytes, register, upload_scan
+from tests.helpers import (
+    auth_headers,
+    create_farm,
+    create_plant,
+    image_bytes,
+    register,
+    upload_scan,
+)
 
-POST = {"commodity_code": "chili", "title": "Daun cabai bercak", "body": "Kenapa ya?"}
+POST = {"commodity_code": "mango", "title": "Daun mangga bercak", "body": "Kenapa ya?"}
+
+
+async def stored_scan(client: AsyncClient, headers: dict[str, str]) -> dict[str, Any]:
+    """A scan this user owns: v2 stores scans only against a plant (design 10.6)."""
+    farm = await create_farm(client, headers)
+    plant = await create_plant(client, headers, farm["id"])
+    response = await upload_scan(client, headers, plant_id=plant["id"])
+    assert response.status_code == 201, response.text
+    return dict(response.json()["data"])
 
 
 async def user_with_role(client: AsyncClient, state: AppState, role: str) -> dict[str, str]:
@@ -39,8 +55,8 @@ async def upload_photo(client: AsyncClient, headers: dict[str, str]) -> str:
 async def test_post_with_photo_scan_and_public_listing(client: AsyncClient) -> None:
     headers = auth_headers(await register(client))
     key = await upload_photo(client, headers)
-    scan_id = (await upload_scan(client, headers)).json()["data"]["id"]
-    post = await new_post(client, headers, image_keys=[key], scan_id=scan_id)
+    scan = await stored_scan(client, headers)
+    post = await new_post(client, headers, image_keys=[key], scan_id=scan["id"])
     assert post["image_urls"][0].endswith(key)
     assert post["scan_summary"]["label"] == "Antraknosa"
     assert "plant_id" not in post["scan_summary"]
@@ -49,15 +65,17 @@ async def test_post_with_photo_scan_and_public_listing(client: AsyncClient) -> N
     assert [row["id"] for row in listed["data"]] == [post["id"]]
     assert (await client.get("/api/v1/forum/posts?q=100%25")).json()["data"] == []
     cats = (await client.get("/api/v1/forum/categories")).json()["data"]
+    # design 10.9 v2: Mangga, Jeruk, Stroberi plus "Umum" - nothing else.
+    assert [c["commodity_code"] for c in cats] == ["mango", "citrus", "strawberry", "general"]
     counts = {c["commodity_code"]: c["post_count"] for c in cats}
-    assert counts["chili"] == 1 and counts["general"] == 0 and counts["tomato"] == 0
+    assert counts == {"mango": 1, "citrus": 0, "strawberry": 0, "general": 0}
 
 
 async def test_cannot_attach_someone_elses_photo_or_scan(client: AsyncClient) -> None:
     alice = auth_headers(await register(client))
     bob = auth_headers(await register(client))
     alice_key = await upload_photo(client, alice)
-    alice_scan = (await upload_scan(client, alice)).json()["data"]
+    alice_scan = await stored_scan(client, alice)
     stolen = await client.post(
         "/api/v1/forum/posts", json=POST | {"image_keys": [alice_key]}, headers=bob
     )
@@ -178,7 +196,7 @@ async def test_admin_roles_and_broadcast(client: AsyncClient, state: AppState) -
 
 async def test_expert_reviews_incorrect_feedback(client: AsyncClient, state: AppState) -> None:
     farmer = auth_headers(await register(client))
-    scan_id = (await upload_scan(client, farmer)).json()["data"]["id"]
+    scan_id = (await stored_scan(client, farmer))["id"]
     await client.put(
         f"/api/v1/scans/{scan_id}/feedback", json={"value": "incorrect"}, headers=farmer
     )
@@ -191,8 +209,6 @@ async def test_expert_reviews_incorrect_feedback(client: AsyncClient, state: App
     assert (
         await client.patch(url, json={"correct_label": "durian"}, headers=expert)
     ).status_code == 400
-    reviewed = await client.patch(
-        url, json={"correct_label": "cercospora_leaf_spot"}, headers=expert
-    )
+    reviewed = await client.patch(url, json={"correct_label": "healthy"}, headers=expert)
     assert reviewed.json()["data"]["reviewed_at"] is not None
     assert (await client.get("/api/v1/review/feedback", headers=expert)).json()["data"] == []

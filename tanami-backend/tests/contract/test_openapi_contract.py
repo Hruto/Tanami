@@ -48,7 +48,8 @@ DESIGN_ENDPOINTS: list[tuple[str, str]] = [
     ("get", "/scans/{scan_id}"),
     ("delete", "/scans/{scan_id}"),
     ("put", "/scans/{scan_id}/feedback"),
-    ("patch", "/scans/{scan_id}"),
+    # design 10.6 v2: `PATCH /scans/{id}` and every `/detection-plants*` route were
+    # removed (a scan is tied to a plant from the start), so they are not listed.
     ("get", "/plants/{plant_id}/timeline"),
     ("get", "/plants/{plant_id}/stats"),
     ("get", "/home"),
@@ -81,12 +82,6 @@ DESIGN_ENDPOINTS: list[tuple[str, str]] = [
     ("get", "/plants/{plant_id}/care-logs"),
     ("post", "/plants/{plant_id}/care-logs"),
     ("delete", "/plants/{plant_id}/care-logs/{log_id}"),
-    ("get", "/detection-plants"),
-    ("post", "/detection-plants"),
-    ("get", "/detection-plants/{detection_id}"),
-    ("patch", "/detection-plants/{detection_id}"),
-    ("post", "/detection-plants/{detection_id}/end"),
-    ("post", "/detection-plants/{detection_id}/reactivate"),
     ("put", "/forum/posts/{post_id}/like"),
     ("delete", "/forum/posts/{post_id}/like"),
     ("delete", "/forum/comments/{comment_id}"),

@@ -584,7 +584,16 @@ async def test_productive_period_ends_tracking_by_itself(
     session_factory: async_sessionmaker[AsyncSession],
 ) -> None:
     headers, farm = await start(client)
-    plant = await new_plant(client, headers, farm["id"], commodity_code="strawberry")
+    # Strawberry is productive for two years (design 8.3), so the plant has to be
+    # young enough to register; the job is then driven by moving productive_until.
+    plant = await new_plant(
+        client,
+        headers,
+        farm["id"],
+        commodity_code="strawberry",
+        planted_at=(TODAY - timedelta(days=400)).isoformat(),
+        label="Bedengan A",
+    )
     await harvest(client, headers, plant["id"], TODAY - timedelta(days=5))
     async with session_factory() as db:
         row = await db.get(Plant, UUID(plant["id"]))

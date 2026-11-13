@@ -18,14 +18,16 @@ async def test_overview_counts_and_access(client: AsyncClient, state: AppState) 
     farmer = auth_headers(await register(client))
     farm = await create_farm(client, farmer)
     plant = await create_plant(client, farmer, farm["id"])
-    await create_plant(client, farmer, farm["id"])
+    active = await create_plant(client, farmer, farm["id"])
+    # design 8.6: the user picks a v2 reason; no harvest yet -> ``failed``.
     ended = await client.post(
         f"/api/v1/plants/{plant['id']}/end",
-        json={"reason": "harvested", "final_result": "bumper"},
+        json={"reason": "cut_down", "cause_note": "Lahan dipakai untuk komoditas lain"},
         headers=farmer,
     )
     assert ended.status_code == 200, ended.text
-    scan_id = (await upload_scan(client, farmer)).json()["data"]["id"]
+    assert ended.json()["data"]["outcome"] == "failed"
+    scan_id = (await upload_scan(client, farmer, plant_id=active["id"])).json()["data"]["id"]
     await client.put(
         f"/api/v1/scans/{scan_id}/feedback", json={"value": "incorrect"}, headers=farmer
     )
@@ -47,7 +49,7 @@ async def test_overview_counts_and_access(client: AsyncClient, state: AppState) 
     assert data["tracking"] == {
         "active_plants": 1,
         "ended_plants": 1,
-        "outcomes": {"failed": 0, "suboptimal": 0, "normal": 0, "bumper": 1},
+        "outcomes": {"completed": 0, "ended_early": 0, "failed": 1},
     }
     assert data["detection"]["scans_total"] == 1
     assert data["detection"]["scans_7d"] == 1
@@ -171,7 +173,10 @@ async def test_expert_edits_disease_and_seed_keeps_the_edit(
 
 async def test_review_queue_lists_allowed_labels(client: AsyncClient, state: AppState) -> None:
     farmer = auth_headers(await register(client))
-    scan_id = (await upload_scan(client, farmer)).json()["data"]["id"]
+    farm = await create_farm(client, farmer)
+    plant = await create_plant(client, farmer, farm["id"])
+    # design 10.6: a stored scan always belongs to a plant in v2.
+    scan_id = (await upload_scan(client, farmer, plant_id=plant["id"])).json()["data"]["id"]
     await client.put(
         f"/api/v1/scans/{scan_id}/feedback", json={"value": "incorrect"}, headers=farmer
     )
