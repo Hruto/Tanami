@@ -7,27 +7,44 @@ from typing import Annotated, Literal
 from uuid import UUID
 
 from fastapi import APIRouter, File, Form, Query, Response, UploadFile, status
+from sqlalchemy import select
 
 from app.api.deps import (
     CurrentUser,
+    EpisodeServiceDep,
     FarmServiceDep,
     PlantServiceDep,
     RegionServiceDep,
+    SessionDep,
     TrackingServiceDep,
 )
-from app.domain import DETECTION_COMMODITIES, PLANT_TYPES, CareAction, TrackingEndReason
+from app.domain import (
+    COMMODITIES_V2,
+    COMMODITY_LABELS_V2,
+    DEFAULT_MATERIAL,
+    DETECTION_COMMODITIES,
+    MATERIALS_BY_COMMODITY,
+    CareAction,
+    TrackingEndReason,
+)
+from app.models.content import CropProfile
 from app.schemas.base import Envelope, ListEnvelope, PaginationMeta
 from app.schemas.farm import (
     CareLogCreate,
     CareLogOut,
+    CropProfileOut,
     EndTracking,
+    EpisodeOut,
+    EpisodeUpdate,
     FarmCreate,
     FarmOut,
     FarmUpdate,
     HarvestCreate,
     HarvestOut,
+    HarvestUpdate,
     PhotoOut,
     PlantCreate,
+    PlantMaterialOut,
     PlantOut,
     PlantStats,
     PlantTypeOut,
@@ -107,7 +124,7 @@ async def create_plant(
     user: CurrentUser,
     service: PlantServiceDep,
 ) -> Envelope[PlantOut]:
-    plant = await service.create_plant(user.id, farm_id, **payload.model_dump())
+    plant = await service.create_plant(user.id, farm_id, payload)
     return Envelope(data=plant)
 
 
@@ -128,18 +145,84 @@ async def update_plant(
 @router.delete("/plants/{plant_id}", status_code=status.HTTP_204_NO_CONTENT)
 async def archive_plant(plant_id: UUID, user: CurrentUser, service: PlantServiceDep) -> Response:
     """Shorthand for ending tracking with reason ``other`` (design 10.5)."""
-    await service.end_tracking(user.id, plant_id, EndTracking(reason=TrackingEndReason.OTHER))
+    await service.end_tracking(
+        user.id,
+        plant_id,
+        EndTracking(reason=TrackingEndReason.OTHER, note="Dihentikan oleh pengguna."),
+    )
     return Response(status_code=status.HTTP_204_NO_CONTENT)
 
 
+_MATERIAL_LABELS = {
+    "grafted": "Okulasi/sambung",
+    "seed": "Biji",
+    "runner": "Anakan (stolon)",
+    "other": "Lainnya",
+}
+
+
 @router.get("/plant-types")
-async def plant_types() -> ListEnvelope[PlantTypeOut]:
-    """Dropdown of plant types (requirement 1); detection works for some only."""
-    data = [
-        PlantTypeOut(code=code, label=label, detection_supported=code in DETECTION_COMMODITIES)
-        for code, label in PLANT_TYPES.items()
-    ]
+async def plant_types(session: SessionDep) -> ListEnvelope[PlantTypeOut]:
+    """Dropdown of plant types (mango, citrus, strawberry) with the planting materials allowed."""
+    profiles = {
+        (row.commodity_code, row.planting_material): row
+        for row in (await session.execute(select(CropProfile))).scalars()
+    }
+    data = []
+    for code in COMMODITIES_V2:
+        default = DEFAULT_MATERIAL[code]
+        row = profiles.get((code, default))
+        data.append(
+            PlantTypeOut(
+                code=code,
+                label=COMMODITY_LABELS_V2[code],
+                detection_supported=code in DETECTION_COMMODITIES,
+                materials=[
+                    PlantMaterialOut(
+                        code=material,
+                        label=_MATERIAL_LABELS[material],
+                        is_default=material == default,
+                    )
+                    for material in MATERIALS_BY_COMMODITY[code]
+                ],
+                profile_summary=(
+                    f"Mulai berbuah sekitar {row.first_harvest_min_days}-"
+                    f"{row.first_harvest_max_days} hari setelah tanam"
+                    if row
+                    else None
+                ),
+            )
+        )
     return ListEnvelope(data=data, meta=PaginationMeta())
+
+
+@router.get("/crop-profiles")
+async def crop_profiles(session: SessionDep) -> ListEnvelope[CropProfileOut]:
+    """The agronomic numbers behind the harvest estimate, with their source (design 10.8)."""
+    rows = (
+        await session.execute(
+            select(CropProfile).order_by(CropProfile.commodity_code, CropProfile.planting_material)
+        )
+    ).scalars()
+    return ListEnvelope(
+        data=[
+            CropProfileOut(
+                commodity_code=row.commodity_code,
+                planting_material=row.planting_material,
+                first_harvest_min_days=row.first_harvest_min_days,
+                first_harvest_max_days=row.first_harvest_max_days,
+                harvest_cycle_min_days=row.harvest_cycle_min_days,
+                harvest_cycle_max_days=row.harvest_cycle_max_days,
+                productive_years=row.productive_years,
+                harvest_pattern_note=row.harvest_pattern_note,
+                source=row.source,
+                reviewed_by=row.reviewed_by,
+                reviewed_at=row.reviewed_at,
+            )
+            for row in rows
+        ],
+        meta=PaginationMeta(),
+    )
 
 
 @router.get("/plants")
@@ -147,9 +230,13 @@ async def list_my_plants(
     user: CurrentUser,
     service: PlantServiceDep,
     plant_status: Annotated[Literal["active", "ended"], Query(alias="status")] = "active",
+    commodity_code: Annotated[str | None, Query()] = None,
+    outcome: Annotated[Literal["completed", "ended_early", "failed"] | None, Query()] = None,
 ) -> ListEnvelope[PlantOut]:
-    """``status=active``: Tracking Tanaman. ``status=ended``: History Tracking."""
-    plants = await service.list_user_plants(user.id, status=plant_status)
+    """``status=active``: Tracking. ``status=ended``: Riwayat Tanaman (filter ``outcome``)."""
+    plants = await service.list_user_plants(
+        user.id, status=plant_status, commodity_code=commodity_code, outcome=outcome
+    )
     return ListEnvelope(data=plants, meta=PaginationMeta())
 
 
@@ -218,12 +305,68 @@ async def delete_care_log(
     return Response(status_code=status.HTTP_204_NO_CONTENT)
 
 
+@router.get("/plants/{plant_id}/harvests")
+async def list_harvests(
+    plant_id: UUID, user: CurrentUser, service: PlantServiceDep
+) -> ListEnvelope[HarvestOut]:
+    """Every harvest of the plant, numbered "panen ke-n"."""
+    return ListEnvelope(data=await service.list_harvests(user.id, plant_id), meta=PaginationMeta())
+
+
 @router.post("/plants/{plant_id}/harvests", status_code=status.HTTP_201_CREATED)
 async def record_harvest(
     plant_id: UUID, payload: HarvestCreate, user: CurrentUser, service: PlantServiceDep
 ) -> Envelope[HarvestOut]:
+    """Record a harvest; the response carries the recomputed ``next_harvest``."""
     harvest = await service.record_harvest(user.id, plant_id, payload)
     return Envelope(data=harvest)
+
+
+@router.patch("/plants/{plant_id}/harvests/{harvest_id}")
+async def update_harvest(
+    plant_id: UUID,
+    harvest_id: UUID,
+    payload: HarvestUpdate,
+    user: CurrentUser,
+    service: PlantServiceDep,
+) -> Envelope[HarvestOut]:
+    return Envelope(data=await service.update_harvest(user.id, plant_id, harvest_id, payload))
+
+
+@router.delete("/plants/{plant_id}/harvests/{harvest_id}", status_code=status.HTTP_204_NO_CONTENT)
+async def delete_harvest(
+    plant_id: UUID, harvest_id: UUID, user: CurrentUser, service: PlantServiceDep
+) -> Response:
+    await service.delete_harvest(user.id, plant_id, harvest_id)
+    return Response(status_code=status.HTTP_204_NO_CONTENT)
+
+
+@router.get("/plants/{plant_id}/disease-episodes")
+async def list_episodes(
+    plant_id: UUID,
+    user: CurrentUser,
+    plants: PlantServiceDep,
+    episodes: EpisodeServiceDep,
+    episode_status: Annotated[Literal["open", "resolved"] | None, Query(alias="status")] = None,
+) -> ListEnvelope[EpisodeOut]:
+    """The plant's disease episodes, newest first, each with the scans that back it."""
+    plant = await plants.get_plant(user.id, plant_id)
+    return ListEnvelope(
+        data=await episodes.list_out(plant, status=episode_status), meta=PaginationMeta()
+    )
+
+
+@router.patch("/disease-episodes/{episode_id}")
+async def update_episode(
+    episode_id: UUID,
+    payload: EpisodeUpdate,
+    user: CurrentUser,
+    episodes: EpisodeServiceDep,
+) -> Envelope[EpisodeOut]:
+    """ "Tandai sembuh". It never gives back days already added to the running cycle."""
+    _ = payload  # the only allowed transition is open -> resolved
+    episode = await episodes.resolve(user.id, episode_id)
+    return Envelope(data=(await episodes.to_out([episode]))[0])
 
 
 @router.get("/plants/{plant_id}/timeline")

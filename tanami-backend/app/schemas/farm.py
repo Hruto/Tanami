@@ -11,14 +11,16 @@ from pydantic import Field, field_validator, model_validator
 
 from app.core.errors import ValidationError
 from app.domain import (
-    SUPPORTED_COMMODITIES,
+    COMMODITIES_V2,
+    MATERIALS_BY_COMMODITY,
     CareAction,
-    GrowthStage,
-    HarvestOutcome,
     HealthStatus,
     IrrigationSchedule,
+    LifecyclePhase,
     Placement,
+    PlantingMaterial,
     TrackingEndReason,
+    TrackingOutcome,
 )
 from app.schemas.base import ApiModel
 
@@ -127,19 +129,21 @@ class RegionOut(ApiModel):
 
 class PlantCreate(ApiModel):
     label: str = Field(min_length=1, max_length=120)
-    commodity_code: str = "chili"
+    commodity_code: str
+    # Omitted: the default material of the commodity (grafted, or runner for strawberry).
+    planting_material: PlantingMaterial | None = None
     variety: str | None = Field(default=None, max_length=80)
     planted_at: date
-    growth_stage: GrowthStage = GrowthStage.SEEDLING
+    quantity: int = Field(default=1, ge=1, le=100_000)
     irrigation_schedule: IrrigationSchedule = IrrigationSchedule.EVERY_3_5_DAYS
 
     @field_validator("commodity_code")
     @classmethod
     def _commodity(cls, value: str) -> str:
-        if value not in SUPPORTED_COMMODITIES:
+        if value not in COMMODITIES_V2:
             raise ValidationError(
                 "Jenis tanaman tidak ada di daftar.",
-                details={"field": "commodity_code", "supported": list(SUPPORTED_COMMODITIES)},
+                details={"field": "commodity_code", "supported": list(COMMODITIES_V2)},
             )
         return value
 
@@ -161,12 +165,28 @@ class PlantCreate(ApiModel):
             )
         return value
 
+    @model_validator(mode="after")
+    def _material_fits_commodity(self) -> PlantCreate:
+        if (
+            self.planting_material is not None
+            and self.planting_material.value not in MATERIALS_BY_COMMODITY[self.commodity_code]
+        ):
+            raise ValidationError(
+                "Jenis bibit ini tidak dipakai untuk tanaman tersebut.",
+                details={
+                    "field": "planting_material",
+                    "allowed": list(MATERIALS_BY_COMMODITY[self.commodity_code]),
+                },
+            )
+        return self
+
 
 class PlantUpdate(ApiModel):
     label: Annotated[str | None, Field(min_length=1, max_length=120)] = None
     variety: str | None = Field(default=None, max_length=80)
-    growth_stage: GrowthStage | None = None
     planted_at: date | None = None
+    planting_material: PlantingMaterial | None = None
+    quantity: int | None = Field(default=None, ge=1, le=100_000)
     irrigation_schedule: IrrigationSchedule | None = None
 
     @field_validator("label")
@@ -176,7 +196,7 @@ class PlantUpdate(ApiModel):
 
     @model_validator(mode="after")
     def _no_null_required(self) -> PlantUpdate:
-        for name in ("growth_stage", "planted_at", "irrigation_schedule"):
+        for name in ("planted_at", "planting_material", "quantity", "irrigation_schedule"):
             if name in self.model_fields_set and getattr(self, name) is None:
                 raise ValidationError("Kolom ini tidak boleh dikosongkan.", details={"field": name})
         if self.planted_at is not None and self.planted_at > date.today():
@@ -186,69 +206,113 @@ class PlantUpdate(ApiModel):
         return self
 
 
+class DelayItemOut(ApiModel):
+    episode_id: str
+    disease_code: str
+    label: str
+    days: int
+    status: Literal["open", "resolved"]
+
+
+class NextHarvestOut(ApiModel):
+    """The estimated window of the next harvest; always an estimate (design 8.4)."""
+
+    base_start: date
+    base_end: date
+    delay_days: int
+    start: date
+    end: date
+    delays: list[DelayItemOut]
+    is_overdue: bool
+    is_estimate: bool = True
+    delay_capped: bool = False
+
+
+class EndedDiseaseOut(ApiModel):
+    code: str
+    label: str
+
+
 class PlantOut(ApiModel):
     id: str
+    code: str
     farm_id: str
     label: str
     commodity_code: str
     commodity_label: str
     variety: str | None
+    planting_material: PlantingMaterial
+    quantity: int
     planted_at: date
-    # Requirement 1: computed, never entered. Counted to the end date once
-    # tracking has ended.
+    # Computed, never entered; counted to the end date once tracking has ended.
     age_days: int
-    growth_stage: GrowthStage
+    lifecycle_phase: LifecyclePhase
+    productive_until: date
     health_status: HealthStatus
     health_status_reason: str | None = None
-    expected_harvest_min: date | None
-    expected_harvest_max: date | None
+    harvest_count: int = 0
+    last_harvest_at: date | None = None
+    # ``None`` once the productive period is about to run out, and for ended plants.
+    next_harvest: NextHarvestOut | None = None
+    open_episode_count: int = 0
     irrigation_schedule: IrrigationSchedule
     last_watered_at: datetime | None = None
     next_watering_on: date | None = None
     cover_photo_url: str | None = None
     last_scan_at: datetime | None = None
-    # Requirement 2: location shown in the history detail.
+    # Location shown in the history detail.
     farm_name: str
     placement: Placement
     adm4_code: str
     village: str | None = None
-    # Requirement 1-2: tracking end.
+    # Tracking end (design 8.6).
     status: Literal["active", "ended"]
     ended_at: datetime | None
     end_reason: TrackingEndReason | None = None
     end_note: str | None = None
-    final_result: HarvestOutcome | None = None
-    yield_percent: float | None = None
+    end_diseases: list[EndedDiseaseOut] = Field(default_factory=list)
+    end_cause_note: str | None = None
+    outcome: TrackingOutcome | None = None
     created_at: datetime
     updated_at: datetime
+
+
+class PlantMaterialOut(ApiModel):
+    code: str
+    label: str
+    is_default: bool
 
 
 class PlantTypeOut(ApiModel):
     code: str
     label: str
     detection_supported: bool
+    materials: list[PlantMaterialOut]
+    profile_summary: str | None = None
+
+
+class CropProfileOut(ApiModel):
+    commodity_code: str
+    planting_material: str
+    first_harvest_min_days: int
+    first_harvest_max_days: int
+    harvest_cycle_min_days: int
+    harvest_cycle_max_days: int
+    productive_years: int
+    harvest_pattern_note: str | None
+    source: str | None
+    reviewed_by: str | None
+    reviewed_at: date | None
 
 
 class EndTracking(ApiModel):
-    """Requirement 1: end tracking; the plant moves to the history list."""
+    """End tracking before the productive period is over (design 8.6)."""
 
     reason: TrackingEndReason
+    # ``disease``: the diseases the plant was lost to, from its own history, and/or free text.
+    disease_codes: list[str] = Field(default_factory=list, max_length=10)
+    cause_note: str | None = Field(default=None, max_length=1000)
     note: str | None = Field(default=None, max_length=1000)
-    # "Hasil Akhir": either the bucket directly or the yield as % of target,
-    # from which the bucket is derived.
-    final_result: HarvestOutcome | None = None
-    yield_percent: Decimal | None = Field(default=None, ge=0, le=1000)
-
-    @model_validator(mode="after")
-    def _result_for_harvest(self) -> EndTracking:
-        if self.reason is TrackingEndReason.HARVESTED and (
-            self.final_result is None and self.yield_percent is None
-        ):
-            raise ValidationError(
-                "Isi hasil akhir panen (final_result atau yield_percent).",
-                details={"field": "final_result"},
-            )
-        return self
 
 
 class PhotoOut(ApiModel):
@@ -291,39 +355,52 @@ class CareLogOut(ApiModel):
 
 
 class HarvestCreate(ApiModel):
-    harvested_at: datetime
+    """A harvest. ``harvested_at`` is a day (``2026-11-08``); omitted means today."""
+
+    harvested_at: date | datetime | None = None
     quality_note: str | None = Field(default=None, max_length=1000)
     quantity_kg: Decimal | None = Field(default=None, ge=0, le=1_000_000)
-    # Chili is picked many times per season. Only the last picking ends the
-    # block (``growth_stage = finished``); the others mark it ``harvesting``.
-    is_final: bool = False
 
-    @field_validator("harvested_at")
-    @classmethod
-    def _aware_past(cls, value: datetime) -> datetime:
-        if value.tzinfo is None:
-            raise ValidationError(
-                "harvested_at wajib memakai zona waktu (ISO 8601, mis. ...Z).",
-                details={"field": "harvested_at"},
-            )
-        if value > datetime.now(UTC) + timedelta(minutes=5):
-            raise ValidationError(
-                "Tanggal panen tidak boleh di masa depan.", details={"field": "harvested_at"}
-            )
-        return value
+
+class HarvestUpdate(ApiModel):
+    harvested_at: date | datetime | None = None
+    quality_note: str | None = Field(default=None, max_length=1000)
+    quantity_kg: Decimal | None = Field(default=None, ge=0, le=1_000_000)
 
 
 class HarvestOut(ApiModel):
     id: str
     plant_id: str
-    harvested_at: datetime
+    sequence: int
+    harvested_at: date
     quality_note: str | None
     quantity_kg: float | None
     created_at: datetime
+    # The estimate after this change, so the screen can update without a second call.
+    next_harvest: NextHarvestOut | None = None
+
+
+class EpisodeOut(ApiModel):
+    id: str
+    plant_id: str
+    disease_code: str
+    label: str
+    status: Literal["open", "resolved"]
+    opened_at: datetime
+    last_seen_at: datetime
+    delay_days: int
+    resolved_at: datetime | None
+    close_reason: str | None
+    scan_ids: list[str]
+
+
+class EpisodeUpdate(ApiModel):
+    status: Literal["resolved"]
 
 
 class TimelineEntry(ApiModel):
-    kind: str  # scan | harvest | reminder
+    # scan | photo | care | harvest | episode_opened | episode_resolved | reminder | ended
+    kind: str
     occurred_at: datetime
     id: str
     title: str
@@ -336,21 +413,21 @@ class HealthPoint(ApiModel):
     health_status: HealthStatus
 
 
-class RipenessPoint(ApiModel):
+class HarvestPoint(ApiModel):
     date: date
-    stage: str
-    estimated_days_min: int | None
-    estimated_days_max: int | None
+    sequence: int
+    quantity_kg: float | None
 
 
 class EstimateVsActual(ApiModel):
+    sequence: int
     estimated_date_min: date | None
     estimated_date_max: date | None
-    harvested_at: datetime | None
+    harvested_at: date
     within_range: bool | None
 
 
 class PlantStats(ApiModel):
     health_series: list[HealthPoint]
-    ripeness_series: list[RipenessPoint]
+    harvest_series: list[HarvestPoint]
     estimate_vs_actual: list[EstimateVsActual]

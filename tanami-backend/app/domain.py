@@ -284,7 +284,7 @@ PLANT_TYPES: dict[str, str] = {
 COMMODITY_LABELS: dict[str, str] = PLANT_TYPES
 SUPPORTED_COMMODITIES: tuple[str, ...] = tuple(PLANT_TYPES)
 # Commodities the vision service has a model for (design 11.5).
-DETECTION_COMMODITIES: tuple[str, ...] = ("chili",)
+DETECTION_COMMODITIES: tuple[str, ...] = ("mango", "citrus", "strawberry")
 # design 13: one forum category per commodity plus "Umum".
 FORUM_GENERAL_CATEGORY = "general"
 FORUM_CATEGORIES: tuple[str, ...] = (*SUPPORTED_COMMODITIES, FORUM_GENERAL_CATEGORY)
@@ -300,6 +300,23 @@ COMMODITY_LABELS_V2: dict[str, str] = {
 }
 # Prefix of the display code of a plant, e.g. ``MGA-001`` (design 8.2).
 PLANT_CODE_PREFIX: dict[str, str] = {"mango": "MGA", "citrus": "JRK", "strawberry": "STB"}
+
+# Planting materials each commodity may use; ``other`` is counted as the default
+# one when the profile is looked up (design 8.3).
+MATERIALS_BY_COMMODITY: dict[str, tuple[str, ...]] = {
+    "mango": ("grafted", "seed", "other"),
+    "citrus": ("grafted", "seed", "other"),
+    "strawberry": ("runner", "seed", "other"),
+}
+DEFAULT_MATERIAL: dict[str, str] = {"mango": "grafted", "citrus": "grafted", "strawberry": "runner"}
+
+
+def profile_material(commodity_code: str, planting_material: str) -> str:
+    """The profile row to use for a plant: ``other`` falls back to the default material."""
+    if planting_material == PlantingMaterial.OTHER.value:
+        return DEFAULT_MATERIAL[commodity_code]
+    return planting_material
+
 
 TRACKING_END_REASONS_V2: tuple[str, ...] = (
     TrackingEndReason.PRODUCTIVE_PERIOD_OVER.value,

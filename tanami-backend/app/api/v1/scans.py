@@ -3,31 +3,33 @@
 The upload is multipart, but the idempotency key is a header. Both are accepted
 because a retry after a dropped connection sends the same ``client_uuid`` while a
 test client may only set the header; they must agree when both are present.
+
+A scan belongs to a registered plant (``plant_id``). Without one it is a "cek
+cepat": the result comes back with ``saved: false`` and nothing is stored.
 """
 
 from __future__ import annotations
 
-from datetime import datetime
-from typing import Annotated
+from datetime import date, datetime
+from typing import Annotated, Literal
 from uuid import UUID
 
 from fastapi import APIRouter, File, Form, Header, Query, Response, UploadFile, status
 
-from app.api.deps import CurrentUser, RateLimiterDep, ScanServiceDep
+from app.api.deps import CurrentUser, EpisodeServiceDep, RateLimiterDep, ScanServiceDep
 from app.core.errors import Conflict, ValidationError
 from app.core.pagination import encode_cursor, page_request
 from app.domain import ScanType
-from app.models.scan import Scan
 from app.schemas.base import Envelope, ListEnvelope, PaginationMeta
 from app.schemas.scan import (
+    ConfirmDiseaseOut,
     FeedbackCreate,
     FeedbackOut,
-    ScanAttach,
     ScanCreated,
     ScanDetailOut,
-    ScanOut,
+    ScanHistoryItem,
 )
-from app.services.scan import ScanCommand, ScanService, feedback_out
+from app.services.scan import ScanCommand, feedback_out
 
 router = APIRouter(tags=["scans"])
 
@@ -60,15 +62,10 @@ def _resolve_client_uuid(client_uuid: UUID | None, idempotency_key: str | None) 
     return resolved
 
 
-def _scans_out(scan: Scan, service: ScanService) -> ScanOut:
-    """The stored row, without the ``is_duplicate`` hint of the create body."""
-    return ScanOut(**service.scan_fields(scan))
-
-
 @router.post(
     "/scans",
     status_code=status.HTTP_201_CREATED,
-    responses={200: {"description": "Duplikat: client_uuid sudah pernah dikirim."}},
+    responses={200: {"description": "Duplikat (client_uuid sudah pernah dikirim) atau cek cepat."}},
 )
 async def create_scan(
     user: CurrentUser,
@@ -76,17 +73,19 @@ async def create_scan(
     limiter: RateLimiterDep,
     response: Response,
     image: Annotated[UploadFile, File()],
-    scan_type: Annotated[ScanType, Form(alias="type")],
+    scan_type: Annotated[ScanType, Form(alias="type")] = ScanType.DISEASE,
     client_uuid: Annotated[UUID | None, Form()] = None,
     plant_id: Annotated[UUID | None, Form()] = None,
+    commodity_code: Annotated[str | None, Form()] = None,
     captured_at: Annotated[datetime | None, Form()] = None,
     idempotency_key: Annotated[str | None, Header(alias="Idempotency-Key")] = None,
 ) -> Envelope[ScanCreated]:
-    """Analyse one photo.
+    """Analyse one leaf photo.
 
-    ``201`` for a new scan. A resend with the same ``client_uuid`` returns the
-    stored result with ``200`` and never calls the vision service again
-    (design 10.6, 14); ``is_duplicate`` carries the same information in the body.
+    With ``plant_id`` the scan is stored: ``201`` for a new one, ``200`` for a
+    resend with the same ``client_uuid`` (design 10.6, 14; ``is_duplicate``
+    says the same in the body). Without ``plant_id`` it is a "cek cepat" that
+    needs ``commodity_code``, is never stored and always answers ``200``.
     """
     await limiter.check(
         bucket="scan",
@@ -95,7 +94,8 @@ async def create_scan(
         limit=service.settings.scan_rate_limit_per_minute,
         window_seconds=_SCAN_WINDOW_SECONDS,
     )
-    resolved_uuid = _resolve_client_uuid(client_uuid, idempotency_key)
+    quick = plant_id is None
+    resolved_uuid = None if quick else _resolve_client_uuid(client_uuid, idempotency_key)
     raw = await image.read()
 
     created = await service.create(
@@ -106,9 +106,10 @@ async def create_scan(
             client_uuid=resolved_uuid,
             captured_at=captured_at,
             plant_id=plant_id,
+            commodity_code=commodity_code,
         )
     )
-    if created.is_duplicate:
+    if quick or created.is_duplicate:
         response.status_code = status.HTTP_200_OK
     return Envelope(data=created)
 
@@ -118,27 +119,39 @@ async def list_scans(
     user: CurrentUser,
     service: ScanServiceDep,
     plant_id: Annotated[UUID | None, Query()] = None,
-    scan_type: Annotated[ScanType | None, Query(alias="type")] = None,
+    commodity_code: Annotated[str | None, Query()] = None,
+    disease_code: Annotated[str | None, Query()] = None,
+    result_status: Annotated[
+        Literal["confident", "uncertain", "unknown", "invalid_image", "all"] | None,
+        Query(alias="status"),
+    ] = None,
+    date_from: Annotated[date | None, Query(alias="from")] = None,
+    date_to: Annotated[date | None, Query(alias="to")] = None,
     limit: Annotated[int | None, Query(ge=1, le=50)] = None,
     cursor: Annotated[str | None, Query()] = None,
-) -> ListEnvelope[ScanOut]:
+) -> ListEnvelope[ScanHistoryItem]:
+    """Riwayat Scan (design 5.8): filter by plant, commodity, disease, status and day."""
     page = page_request(limit, cursor)
-    scans = await service.list(
+    rows = await service.history(
         user.id,
         plant_id=plant_id,
-        scan_type=scan_type,
+        commodity_code=commodity_code,
+        disease_code=disease_code,
+        status=result_status,
+        date_from=date_from,
+        date_to=date_to,
         limit=page.limit + 1,
         cursor=page.cursor,
     )
-    has_more = len(scans) > page.limit
-    page_scans = scans[: page.limit]
+    has_more = len(rows) > page.limit
+    page_rows = rows[: page.limit]
     next_cursor = (
-        encode_cursor(page_scans[-1].created_at, page_scans[-1].id)
-        if has_more and page_scans
+        encode_cursor(page_rows[-1][0].created_at, page_rows[-1][0].id)
+        if has_more and page_rows
         else None
     )
     return ListEnvelope(
-        data=[_scans_out(scan, service) for scan in page_scans],
+        data=[item for _, item in page_rows],
         meta=PaginationMeta(next_cursor=next_cursor, has_more=has_more),
     )
 
@@ -147,7 +160,7 @@ async def list_scans(
 async def get_scan(
     scan_id: UUID, user: CurrentUser, service: ScanServiceDep
 ) -> Envelope[ScanDetailOut]:
-    """Detail Scan (S12), including the user's verdict if they gave one."""
+    """Detail Scan, including the user's verdict if they gave one."""
     return Envelope(data=await service.get_detail(user.id, scan_id))
 
 
@@ -157,12 +170,26 @@ async def delete_scan(scan_id: UUID, user: CurrentUser, service: ScanServiceDep)
     return Response(status_code=status.HTTP_204_NO_CONTENT)
 
 
-@router.patch("/scans/{scan_id}")
-async def attach_scan(
-    scan_id: UUID, payload: ScanAttach, user: CurrentUser, service: ScanServiceDep
-) -> Envelope[ScanOut]:
-    scan = await service.attach_plant(user.id, scan_id, payload.plant_id)
-    return Envelope(data=_scans_out(scan, service))
+@router.post("/scans/{scan_id}/confirm-disease", status_code=status.HTTP_201_CREATED)
+async def confirm_disease(
+    scan_id: UUID, user: CurrentUser, episodes: EpisodeServiceDep, response: Response
+) -> Envelope[ConfirmDiseaseOut]:
+    """ "Ya, tanaman ini sakit" (design 5.4, 8.5).
+
+    ``201`` opens an episode. ``200`` means the scan joined an episode that was
+    already open (or was confirmed before), which adds no further delay.
+    """
+    result = await episodes.confirm(user.id, scan_id)
+    if not result.is_new:
+        response.status_code = status.HTTP_200_OK
+    out = (await episodes.to_out([result.episode]))[0]
+    return Envelope(
+        data=ConfirmDiseaseOut(
+            is_new=result.is_new,
+            episode=out,
+            next_harvest=await episodes.next_harvest_for(result.plant),
+        )
+    )
 
 
 @router.put("/scans/{scan_id}/feedback")

@@ -8,8 +8,7 @@ absolute harvest dates, which the vision service deliberately does not produce.
 from __future__ import annotations
 
 from datetime import date, datetime
-from typing import Any, Literal
-from uuid import UUID
+from typing import Any
 
 from pydantic import Field
 
@@ -24,6 +23,7 @@ from app.domain import (
     Severity,
 )
 from app.schemas.base import ApiModel
+from app.schemas.farm import EpisodeOut, NextHarvestOut
 
 
 class DiseaseTopOut(ApiModel):
@@ -47,6 +47,8 @@ class AdviceOut(ApiModel):
     disease_name: str | None = None
     # Requirement 3: symptoms and the full reviewed treatment advice.
     symptoms: str | None = None
+    prevention: str | None = None
+    harvest_delay_days: int | None = None
     treatments: dict[str, Any] | None = None
     disease_detail_url: str | None = None
     first_aid: list[str] = Field(default_factory=list)
@@ -104,10 +106,6 @@ class FeedbackCreate(ApiModel):
     comment: str | None = Field(default=None, max_length=1000)
 
 
-class ScanAttach(ApiModel):
-    plant_id: UUID | None
-
-
 class DiseaseOut(ApiModel):
     code: str
     commodity_code: str
@@ -130,20 +128,58 @@ class DiseaseSummaryOut(ApiModel):
     cause_category: CauseCategory
 
 
-class ScanCreated(ApiModel):
-    """The 201 body. Same shape as ``ScanOut`` plus the idempotency hint."""
+class ConfirmationOut(ApiModel):
+    """What the "Apakah tanaman ini memang sakit?" card needs (design 5.4, 8.5)."""
 
-    id: str
+    can_confirm: bool
+    existing_episode_id: str | None = None
+    # Days a confirmation would add to the running cycle right now (0 = nothing).
+    delay_preview_days: int = 0
+
+
+class ScanCreated(ApiModel):
+    """The 201 body of a stored scan, or the 200 body of a "cek cepat" (not stored)."""
+
+    id: str | None
+    saved: bool = True
     type: ScanType
     status: ResultStatus
     model_version: str
-    image_url: str
-    plant_id: str
+    image_url: str | None
+    plant_id: str | None
+    plant_code: str | None = None
     captured_at: datetime
     result: dict[str, Any]
     quality: dict[str, Any]
     created_at: datetime
     is_duplicate: bool = False
+    confirmation: ConfirmationOut | None = None
+    # Open episodes this (healthy) scan closed.
+    closed_episode_ids: list[str] = Field(default_factory=list)
 
 
-DiseaseOrRipeness = Literal["disease", "ripeness"]
+class ScanHistoryItem(ApiModel):
+    """One row of Riwayat Scan (design 10.6)."""
+
+    id: str
+    captured_at: datetime
+    plant_id: str
+    plant_code: str
+    plant_label: str
+    plant_ended: bool
+    commodity_code: str
+    status: ResultStatus
+    disease_code: str | None
+    disease_label: str | None
+    cause_category: CauseCategory | None
+    confidence_percent: int | None
+    is_healthy: bool | None
+    prevention_summary: str | None
+    disease_episode_id: str | None
+    thumbnail_url: str
+
+
+class ConfirmDiseaseOut(ApiModel):
+    is_new: bool
+    episode: EpisodeOut
+    next_harvest: NextHarvestOut | None = None

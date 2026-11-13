@@ -1,9 +1,10 @@
-"""Farm, plant, harvest, timeline and stats business logic."""
+"""Farm, plant, harvest, timeline and stats business logic (design v2)."""
 
 from __future__ import annotations
 
+from collections.abc import Sequence
 from datetime import UTC, date, datetime, timedelta
-from uuid import UUID, uuid4
+from uuid import NAMESPACE_URL, UUID, uuid4, uuid5
 from zoneinfo import ZoneInfo
 
 from sqlalchemy import func, or_, select, update
@@ -12,38 +13,56 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from app.core.config import Settings
 from app.core.errors import NotFound, ValidationError
 from app.domain import (
+    COMMODITY_LABELS_V2,
+    DEFAULT_MATERIAL,
     DISEASE_LABELS,
     IRRIGATION_INTERVAL_DAYS,
-    PLANT_TYPES,
+    MATERIALS_BY_COMMODITY,
+    PLANT_CODE_PREFIX,
     CareAction,
-    GrowthStage,
+    EpisodeCloseReason,
     HealthStatus,
     PushState,
     ReminderStatus,
-    ScanType,
     TrackingEndReason,
-    outcome_for_percent,
 )
-from app.models.content import Region
+from app.models.content import Disease, Region
+from app.models.episode import DiseaseEpisode
 from app.models.farm import Farm, HarvestRecord, Plant
 from app.models.reminder import Reminder
 from app.models.scan import Scan
 from app.models.tracking import CareLog, PlantPhoto
+from app.models.user import User
 from app.providers.storage import StorageProvider
 from app.schemas.farm import (
+    EndedDiseaseOut,
     EndTracking,
     EstimateVsActual,
     FarmOut,
     FarmUpdate,
     HarvestCreate,
     HarvestOut,
+    HarvestPoint,
+    HarvestUpdate,
     HealthPoint,
+    NextHarvestOut,
+    PlantCreate,
     PlantOut,
     PlantStats,
     PlantUpdate,
     RegionOut,
-    RipenessPoint,
     TimelineEntry,
+)
+from app.services import harvest as rules
+from app.services.episode import EpisodeService
+from app.services.estimate import (
+    MAX_DELAY_DAYS_PER_CYCLE,
+    Estimator,
+    PlantFacts,
+    episode_span,
+    local_date,
+    next_harvest_out,
+    noon_utc,
 )
 from app.services.scan import next_health_status
 
@@ -56,9 +75,10 @@ CARE_LABELS: dict[str, str] = {
     CareAction.OTHER.value: "Perawatan lain",
 }
 END_REASON_LABELS: dict[str, str] = {
-    TrackingEndReason.HARVESTED.value: "Dipanen",
-    TrackingEndReason.DIED.value: "Mati",
-    TrackingEndReason.NOT_MAINTAINED.value: "Tidak dirawat lagi",
+    TrackingEndReason.PRODUCTIVE_PERIOD_OVER.value: "Masa produktif selesai",
+    TrackingEndReason.DISEASE.value: "Mati atau dibongkar karena penyakit",
+    TrackingEndReason.CUT_DOWN.value: "Ditebang atau dibongkar",
+    TrackingEndReason.DIED_OTHER.value: "Mati bukan karena penyakit",
     TrackingEndReason.OTHER.value: "Alasan lain",
 }
 
@@ -100,6 +120,63 @@ def next_watering_on(plant: Plant, last_watered: datetime | None, tz: ZoneInfo) 
         return None
     base = (last_watered or plant.created_at).astimezone(tz).date()
     return base + timedelta(days=interval)
+
+
+async def end_plant(
+    session: AsyncSession,
+    settings: Settings,
+    plant: Plant,
+    *,
+    reason: str,
+    note: str | None = None,
+    disease_codes: Sequence[str] | None = None,
+    cause_note: str | None = None,
+    now: datetime | None = None,
+) -> None:
+    """End tracking: status akhir, close open episodes, stop reminders (design 8.6).
+
+    The one place that ends a plant, whether the user did it, the farm was
+    archived, or the productive period ran out. It does not commit.
+    """
+    moment = now or datetime.now(UTC)
+    harvest_count = int(
+        (
+            await session.execute(
+                select(func.count(HarvestRecord.id)).where(HarvestRecord.plant_id == plant.id)
+            )
+        ).scalar_one()
+    )
+    plant.ended_at = moment
+    plant.end_reason = reason
+    plant.end_note = note
+    plant.end_disease_codes = (
+        list(disease_codes) if reason == TrackingEndReason.DISEASE.value and disease_codes else None
+    )
+    plant.end_cause_note = (cause_note or "").strip() or None
+    plant.outcome = rules.tracking_outcome(reason, harvest_count).value
+    await EpisodeService(session, settings).close_open(
+        plant.id, EpisodeCloseReason.TRACKING_ENDED, at=moment
+    )
+    await stop_plant_reminders(session, plant.id)
+
+
+async def complete_productive_period(
+    session: AsyncSession, settings: Settings, *, today: date
+) -> list[Plant]:
+    """Daily job: end tracking of plants whose productive period is over (design 5.6)."""
+    plants = list(
+        (
+            await session.execute(
+                select(Plant).where(Plant.ended_at.is_(None), Plant.productive_until <= today)
+            )
+        ).scalars()
+    )
+    for plant in plants:
+        await end_plant(
+            session, settings, plant, reason=TrackingEndReason.PRODUCTIVE_PERIOD_OVER.value
+        )
+    await session.commit()
+    return plants
 
 
 class FarmService:
@@ -187,10 +264,14 @@ class FarmService:
             )
         ).scalars()
         for plant in plants:
-            plant.ended_at = now
-            plant.end_reason = TrackingEndReason.OTHER.value
-            plant.end_note = "Kebun diarsipkan."
-            await stop_plant_reminders(self.session, plant.id)
+            await end_plant(
+                self.session,
+                self.settings,
+                plant,
+                reason=TrackingEndReason.OTHER.value,
+                note="Kebun diarsipkan.",
+                now=now,
+            )
         await self.session.commit()
 
     def _farm_out(self, farm: Farm, plant_count: int, village: str | None) -> FarmOut:
@@ -217,6 +298,8 @@ class PlantService:
         self.session = session
         self.settings = settings
         self.storage = storage
+        self.estimator = Estimator(session, settings)
+        self.tz = ZoneInfo(settings.timezone)
 
     # ------------------------------------------------------------------ #
     # Plants
@@ -234,15 +317,27 @@ class PlantService:
         plants = list((await self.session.execute(query.order_by(Plant.created_at))).scalars())
         return await self._plants_out(plants)
 
-    async def list_user_plants(self, user_id: UUID, *, status: str) -> list[PlantOut]:
+    async def list_user_plants(
+        self,
+        user_id: UUID,
+        *,
+        status: str,
+        commodity_code: str | None = None,
+        outcome: str | None = None,
+    ) -> list[PlantOut]:
         """Every plant of the user across gardens.
 
-        ``status=active`` is the tracking list, ``status=ended`` the history
-        list (requirement 2), most recently ended first.
+        ``status=active`` is the tracking list, ``status=ended`` Riwayat Tanaman,
+        most recently ended first (design 5.7).
         """
-        query = select(Plant).join(Farm, Farm.id == Plant.farm_id).where(Farm.user_id == user_id)
+        query = select(Plant).where(Plant.user_id == user_id)
+        if commodity_code is not None:
+            query = query.where(Plant.commodity_code == commodity_code)
         if status == "ended":
-            query = query.where(Plant.ended_at.is_not(None)).order_by(Plant.ended_at.desc())
+            query = query.where(Plant.ended_at.is_not(None))
+            if outcome is not None:
+                query = query.where(Plant.outcome == outcome)
+            query = query.order_by(Plant.ended_at.desc())
         else:
             query = query.where(Plant.ended_at.is_(None)).order_by(Plant.created_at)
         plants = list((await self.session.execute(query)).scalars())
@@ -250,29 +345,13 @@ class PlantService:
 
     async def get_plant(self, user_id: UUID, plant_id: UUID) -> Plant:
         plant = await self.session.get(Plant, plant_id)
-        if plant is None:
-            raise NotFound("Tanaman tidak ditemukan.")
-        farm = await self.session.get(Farm, plant.farm_id)
-        if farm is None or farm.user_id != user_id:
+        if plant is None or plant.user_id != user_id:
+            # Same answer for "missing" and "someone else's".
             raise NotFound("Tanaman tidak ditemukan.")
         return plant
 
     async def get_plant_out(self, user_id: UUID, plant_id: UUID) -> PlantOut:
         return await self._plant_out(await self.get_plant(user_id, plant_id))
-
-    async def create_plant(self, user_id: UUID, farm_id: UUID, **fields: object) -> PlantOut:
-        farm = await self.session.get(Farm, farm_id)
-        if farm is None or farm.user_id != user_id:
-            raise NotFound("Lahan tidak ditemukan.")
-        if farm.archived_at is not None:
-            raise ValidationError("Lahan ini sudah diarsipkan.", details={"field": "farm_id"})
-
-        plant = Plant(
-            id=uuid4(), farm_id=farm_id, health_status=HealthStatus.UNKNOWN.value, **fields
-        )
-        self.session.add(plant)
-        await self.session.commit()
-        return await self._plant_out(plant)
 
     async def get_active_plant(self, user_id: UUID, plant_id: UUID) -> Plant:
         """A plant that can still be changed: history entries are read-only."""
@@ -283,66 +362,180 @@ class PlantService:
             )
         return plant
 
+    async def create_plant(self, user_id: UUID, farm_id: UUID, payload: PlantCreate) -> PlantOut:
+        farm = await self.session.get(Farm, farm_id)
+        if farm is None or farm.user_id != user_id:
+            raise NotFound("Lahan tidak ditemukan.")
+        if farm.archived_at is not None:
+            raise ValidationError("Lahan ini sudah diarsipkan.", details={"field": "farm_id"})
+
+        material = (
+            payload.planting_material.value
+            if payload.planting_material
+            else DEFAULT_MATERIAL[payload.commodity_code]
+        )
+        until = await self._productive_until(payload.commodity_code, material, payload.planted_at)
+
+        plant = Plant(
+            id=uuid4(),
+            farm_id=farm_id,
+            user_id=user_id,
+            code=await self._next_code(user_id, payload.commodity_code),
+            commodity_code=payload.commodity_code,
+            planting_material=material,
+            variety=payload.variety,
+            label=payload.label,
+            planted_at=payload.planted_at,
+            quantity=payload.quantity,
+            productive_until=until,
+            health_status=HealthStatus.UNKNOWN.value,
+            irrigation_schedule=payload.irrigation_schedule.value,
+        )
+        self.session.add(plant)
+        await self.session.commit()
+        return await self._plant_out(plant)
+
     async def update_plant(self, user_id: UUID, plant_id: UUID, payload: PlantUpdate) -> PlantOut:
         plant = await self.get_active_plant(user_id, plant_id)
-        for key, value in payload.model_dump(exclude_unset=True).items():
+        data = payload.model_dump(exclude_unset=True)
+        if "planting_material" in data:
+            material = data["planting_material"].value
+            if material not in MATERIALS_BY_COMMODITY[plant.commodity_code]:
+                raise ValidationError(
+                    "Jenis bibit ini tidak dipakai untuk tanaman tersebut.",
+                    details={"field": "planting_material"},
+                )
+            data["planting_material"] = material
+        if "irrigation_schedule" in data:
+            data["irrigation_schedule"] = data["irrigation_schedule"].value
+
+        if "planted_at" in data or "planting_material" in data:
+            planted_at = data.get("planted_at", plant.planted_at)
+            first = (
+                await self.session.execute(
+                    select(func.min(HarvestRecord.harvested_at)).where(
+                        HarvestRecord.plant_id == plant.id
+                    )
+                )
+            ).scalar_one()
+            if first is not None and planted_at > local_date(first, self.tz):
+                raise ValidationError(
+                    "Tanggal tanam tidak boleh setelah panen pertama.",
+                    details={"field": "planted_at"},
+                )
+            plant.productive_until = await self._productive_until(
+                plant.commodity_code,
+                data.get("planting_material", plant.planting_material),
+                planted_at,
+            )
+        for key, value in data.items():
             setattr(plant, key, value)
         await self.session.commit()
         return await self._plant_out(plant)
 
     async def end_tracking(self, user_id: UUID, plant_id: UUID, payload: EndTracking) -> PlantOut:
-        """Requirement 1: end tracking; the plant moves to the history list.
-
-        Its unread reminders are dismissed and no new ones are generated
-        (requirement 7, "Penghentian Notifikasi"); its data stays.
-        """
+        """End tracking before the productive period is over (design 8.6)."""
         plant = await self.get_active_plant(user_id, plant_id)
-        plant.ended_at = datetime.now(UTC)
-        plant.end_reason = payload.reason.value
-        plant.end_note = payload.note
-        plant.yield_percent = payload.yield_percent
-        result = payload.final_result
-        if result is None and payload.yield_percent is not None:
-            result = outcome_for_percent(float(payload.yield_percent))
-        plant.final_result = result.value if result else None
-        if payload.reason is TrackingEndReason.HARVESTED:
-            plant.growth_stage = GrowthStage.FINISHED.value
-        plant.expected_harvest_min = None
-        plant.expected_harvest_max = None
-        await stop_plant_reminders(self.session, plant.id)
+        reason = payload.reason.value
+        codes = list(dict.fromkeys(payload.disease_codes))
+        problem = rules.end_request_error(
+            reason=reason, disease_codes=codes, cause_note=payload.cause_note, note=payload.note
+        )
+        if problem:
+            raise ValidationError(problem, details={"field": "reason"})
+        if codes:
+            known = set(
+                (
+                    await self.session.execute(
+                        select(Disease.code).where(
+                            Disease.code.in_(codes), Disease.commodity_code == plant.commodity_code
+                        )
+                    )
+                ).scalars()
+            )
+            unknown = [code for code in codes if code not in known]
+            if unknown:
+                raise ValidationError(
+                    "Ada penyakit yang tidak dikenal untuk jenis tanaman ini.",
+                    details={"field": "disease_codes", "unknown": unknown},
+                )
+        await end_plant(
+            self.session,
+            self.settings,
+            plant,
+            reason=reason,
+            note=payload.note,
+            disease_codes=codes,
+            cause_note=payload.cause_note,
+        )
         await self.session.commit()
         return await self._plant_out(plant)
+
+    # ------------------------------------------------------------------ #
+    # Harvests (panen ke-n)
+    # ------------------------------------------------------------------ #
+    async def list_harvests(self, user_id: UUID, plant_id: UUID) -> list[HarvestOut]:
+        plant = await self.get_plant(user_id, plant_id)
+        return [self._harvest_out(row, None) for row in await self._harvest_rows(plant.id)]
 
     async def record_harvest(
         self, user_id: UUID, plant_id: UUID, payload: HarvestCreate
     ) -> HarvestOut:
         plant = await self.get_active_plant(user_id, plant_id)
-        harvest = HarvestRecord(
+        rows = await self._harvest_rows(plant.id)
+        day = self._harvest_day(payload.harvested_at)
+        previous = local_date(rows[-1].harvested_at, self.tz) if rows else None
+        self._check_harvest_day(day, plant, previous=previous, following=None)
+
+        record = HarvestRecord(
             id=uuid4(),
             plant_id=plant.id,
             recorded_by=user_id,
-            harvested_at=payload.harvested_at.astimezone(UTC),
+            harvested_at=noon_utc(day, self.tz),
+            sequence=len(rows) + 1,
             quality_note=payload.quality_note,
             quantity_kg=payload.quantity_kg,
         )
-        self.session.add(harvest)
-        plant.growth_stage = (
-            GrowthStage.FINISHED.value if payload.is_final else GrowthStage.HARVESTING.value
-        )
-        if payload.is_final:
-            # Nothing left to ripen: stop the harvest_soon reminders.
-            plant.expected_harvest_min = None
-            plant.expected_harvest_max = None
+        self.session.add(record)
         await self.session.commit()
+        return await self._harvest_out_with_estimate(plant, record)
 
-        return HarvestOut(
-            id=str(harvest.id),
-            plant_id=str(harvest.plant_id),
-            harvested_at=harvest.harvested_at,
-            quality_note=harvest.quality_note,
-            quantity_kg=float(harvest.quantity_kg) if harvest.quantity_kg is not None else None,
-            created_at=harvest.created_at,
-        )
+    async def update_harvest(
+        self, user_id: UUID, plant_id: UUID, harvest_id: UUID, payload: HarvestUpdate
+    ) -> HarvestOut:
+        plant = await self.get_active_plant(user_id, plant_id)
+        rows = await self._harvest_rows(plant.id)
+        record = next((row for row in rows if row.id == harvest_id), None)
+        if record is None:
+            raise NotFound("Catatan panen tidak ditemukan.")
+        data = payload.model_dump(exclude_unset=True)
+        if data.get("harvested_at") is not None:
+            day = self._harvest_day(data["harvested_at"])
+            index = rows.index(record)
+            previous = local_date(rows[index - 1].harvested_at, self.tz) if index > 0 else None
+            following = (
+                local_date(rows[index + 1].harvested_at, self.tz) if index + 1 < len(rows) else None
+            )
+            self._check_harvest_day(day, plant, previous=previous, following=following)
+            record.harvested_at = noon_utc(day, self.tz)
+        if "quality_note" in data:
+            record.quality_note = data["quality_note"]
+        if "quantity_kg" in data:
+            record.quantity_kg = data["quantity_kg"]
+        await self.session.flush()
+        await self._renumber(plant.id)
+        await self.session.commit()
+        return await self._harvest_out_with_estimate(plant, record)
+
+    async def delete_harvest(self, user_id: UUID, plant_id: UUID, harvest_id: UUID) -> None:
+        plant = await self.get_active_plant(user_id, plant_id)
+        record = await self.session.get(HarvestRecord, harvest_id)
+        if record is None or record.plant_id != plant.id:
+            raise NotFound("Catatan panen tidak ditemukan.")
+        await self.session.delete(record)
+        await self.session.flush()
+        await self._renumber(plant.id)
+        await self.session.commit()
 
     # ------------------------------------------------------------------ #
     # Timeline and stats
@@ -357,17 +550,12 @@ class PlantService:
             )
         ).scalars()
         for scan in scans:
-            if scan.scan_type == ScanType.DISEASE.value:
-                top = scan.result.get("top")
-                code = top.get("disease_code") if isinstance(top, dict) else None
-                title = (
-                    f"Scan daun: {DISEASE_LABELS.get(str(code), 'Tidak teridentifikasi')}"
-                    if code
-                    else "Scan daun: belum bisa dipastikan"
-                )
-            else:
-                stage = scan.result.get("stage_label") or "Belum bisa dipastikan"
-                title = f"Scan buah: {stage}"
+            top = scan.result.get("top")
+            code = top.get("disease_code") if isinstance(top, dict) else None
+            label = (top.get("label") if isinstance(top, dict) else None) or DISEASE_LABELS.get(
+                str(code), "Tidak teridentifikasi"
+            )
+            title = f"Scan daun: {label}" if code else "Scan daun: belum bisa dipastikan"
             entries.append(
                 TimelineEntry(
                     kind="scan",
@@ -375,18 +563,17 @@ class PlantService:
                     id=str(scan.id),
                     title=title,
                     subtitle=scan.status,
-                    payload={"scan_type": scan.scan_type, "status": scan.status},
+                    payload={
+                        "status": scan.status,
+                        "disease_code": scan.disease_code,
+                        "disease_episode_id": str(scan.disease_episode_id)
+                        if scan.disease_episode_id
+                        else None,
+                    },
                 )
             )
 
-        harvests = (
-            await self.session.execute(
-                select(HarvestRecord)
-                .where(HarvestRecord.plant_id == plant.id)
-                .order_by(HarvestRecord.harvested_at.desc())
-            )
-        ).scalars()
-        for harvest in harvests:
+        for harvest in await self._harvest_rows(plant.id):
             quantity = (
                 f"{float(harvest.quantity_kg):g} kg" if harvest.quantity_kg is not None else None
             )
@@ -395,11 +582,51 @@ class PlantService:
                     kind="harvest",
                     occurred_at=harvest.harvested_at,
                     id=str(harvest.id),
-                    title="Panen dicatat",
+                    title=f"Panen ke-{harvest.sequence}",
                     subtitle=quantity,
-                    payload={},
+                    payload={"sequence": harvest.sequence},
                 )
             )
+
+        episode_list = list(
+            (
+                await self.session.execute(
+                    select(DiseaseEpisode).where(DiseaseEpisode.plant_id == plant.id)
+                )
+            ).scalars()
+        )
+        names = await self.estimator.disease_names([e.disease_code for e in episode_list])
+        for episode in episode_list:
+            name = names.get(episode.disease_code, episode.disease_code)
+            entries.append(
+                TimelineEntry(
+                    kind="episode_opened",
+                    occurred_at=episode.opened_at,
+                    id=str(episode.id),
+                    title=f"Penyakit dikonfirmasi: {name}",
+                    subtitle=(
+                        f"Perkiraan panen mundur {episode.delay_days} hari"
+                        if episode.delay_days
+                        else None
+                    ),
+                    payload={
+                        "disease_code": episode.disease_code,
+                        "delay_days": episode.delay_days,
+                    },
+                )
+            )
+            if episode.resolved_at is not None:
+                entries.append(
+                    TimelineEntry(
+                        kind="episode_resolved",
+                        occurred_at=episode.resolved_at,
+                        # A different id from the "opened" entry keeps the paging key unique.
+                        id=str(uuid5(NAMESPACE_URL, f"episode-resolved:{episode.id}")),
+                        title=f"Penyakit sembuh: {name}",
+                        subtitle=episode.close_reason,
+                        payload={"episode_id": str(episode.id)},
+                    )
+                )
 
         reminders = (
             await self.session.execute(
@@ -423,8 +650,6 @@ class PlantService:
                 )
             )
 
-        # Sorted on the same (time, id) key the cursor compares, so two events
-        # at the same instant can never fall between two pages.
         photos = (
             await self.session.execute(select(PlantPhoto).where(PlantPhoto.plant_id == plant.id))
         ).scalars()
@@ -467,7 +692,7 @@ class PlantService:
                     id=str(plant.id),
                     title="Tracking diakhiri",
                     subtitle=END_REASON_LABELS.get(plant.end_reason or "", plant.end_reason),
-                    payload={"final_result": plant.final_result, "note": plant.end_note},
+                    payload={"outcome": plant.outcome, "note": plant.end_note},
                 )
             )
 
@@ -490,13 +715,11 @@ class PlantService:
             scan_query = scan_query.where(Scan.captured_at <= end)
         scans = list((await self.session.execute(scan_query)).scalars())
 
-        # The same state machine that sets ``plants.health_status`` (design 8.2),
+        # The same state machine that sets ``plants.health_status`` (design 8.7),
         # replayed point by point, so the chart and the badge never disagree.
         health_series: list[HealthPoint] = []
         current = HealthStatus.UNKNOWN.value
         for scan in scans:
-            if scan.scan_type != ScanType.DISEASE.value:
-                continue
             top = scan.result.get("top")
             cause = top.get("cause_category") if isinstance(top, dict) else None
             severity = scan.result.get("severity")
@@ -510,64 +733,146 @@ class PlantService:
                 HealthPoint(date=scan.captured_at.date(), health_status=HealthStatus(current))
             )
 
-        ripeness_series: list[RipenessPoint] = []
-        for scan in scans:
-            if scan.scan_type != ScanType.RIPENESS.value:
-                continue
-            stage = scan.result.get("stage")
-            if not isinstance(stage, str):
-                continue
-            days_min = scan.result.get("estimated_days_min")
-            days_max = scan.result.get("estimated_days_max")
-            ripeness_series.append(
-                RipenessPoint(
-                    date=scan.captured_at.date(),
-                    stage=stage,
-                    estimated_days_min=days_min if isinstance(days_min, int) else None,
-                    estimated_days_max=days_max if isinstance(days_max, int) else None,
-                )
+        harvests = await self._harvest_rows(plant.id)
+        harvest_series = [
+            HarvestPoint(
+                date=local_date(row.harvested_at, self.tz),
+                sequence=row.sequence,
+                quantity_kg=float(row.quantity_kg) if row.quantity_kg is not None else None,
             )
+            for row in harvests
+        ]
 
-        harvests = list(
-            (
-                await self.session.execute(
-                    select(HarvestRecord)
-                    .where(HarvestRecord.plant_id == plant.id)
-                    .order_by(HarvestRecord.harvested_at)
-                )
-            ).scalars()
-        )
-
+        facts = await self.estimator.facts_for(plant)
         estimate_vs_actual: list[EstimateVsActual] = []
-        # Pair each harvest with the last ripeness estimate taken before it.
-        for harvest in harvests:
-            prior = [
-                scan
-                for scan in scans
-                if scan.scan_type == ScanType.RIPENESS.value
-                and scan.captured_at <= harvest.harvested_at
-                and isinstance(scan.result.get("estimated_harvest_date_min"), str)
-            ]
-            if not prior:
-                continue
-            last = prior[-1]
-            est_min = date.fromisoformat(str(last.result["estimated_harvest_date_min"]))
-            est_max = date.fromisoformat(str(last.result["estimated_harvest_date_max"]))
-            actual = harvest.harvested_at.date()
-            estimate_vs_actual.append(
-                EstimateVsActual(
-                    estimated_date_min=est_min,
-                    estimated_date_max=est_max,
-                    harvested_at=harvest.harvested_at,
-                    within_range=est_min <= actual <= est_max,
+        if facts.profile is not None:
+            for index, row in enumerate(harvests):
+                actual = local_date(row.harvested_at, self.tz)
+                # What was expected at the time: only what was known on that day.
+                spans = [
+                    rules.EpisodeSpan(
+                        span.episode_id,
+                        span.disease_code,
+                        span.opened_on,
+                        span.resolved_on
+                        if span.resolved_on and span.resolved_on <= actual
+                        else None,
+                        span.delay_days,
+                    )
+                    for span in (episode_span(e, self.tz) for e in facts.episodes)
+                    if span.opened_on <= actual
+                ]
+                window = rules.next_harvest(
+                    planted_at=plant.planted_at,
+                    harvest_dates=[
+                        local_date(prior.harvested_at, self.tz) for prior in harvests[:index]
+                    ],
+                    episodes=spans,
+                    profile=facts.profile,
+                    today=actual,
+                    max_delay_days=MAX_DELAY_DAYS_PER_CYCLE,
                 )
-            )
+                estimate_vs_actual.append(
+                    EstimateVsActual(
+                        sequence=row.sequence,
+                        estimated_date_min=window.start if window else None,
+                        estimated_date_max=window.end if window else None,
+                        harvested_at=actual,
+                        within_range=(window.start <= actual <= window.end) if window else None,
+                    )
+                )
 
         return PlantStats(
             health_series=health_series,
-            ripeness_series=ripeness_series,
+            harvest_series=harvest_series,
             estimate_vs_actual=estimate_vs_actual,
         )
+
+    # ------------------------------------------------------------------ #
+    # Internals
+    # ------------------------------------------------------------------ #
+    async def _productive_until(
+        self, commodity_code: str, planting_material: str, planted_at: date
+    ) -> date:
+        profile = await self.estimator.profile_for(commodity_code, planting_material)
+        if profile is None:
+            raise ValidationError(
+                "Profil tanaman untuk jenis dan bibit ini belum tersedia.",
+                details={"field": "planting_material"},
+            )
+        until = rules.productive_until(planted_at, profile.productive_years)
+        if until <= self.estimator.today():
+            raise ValidationError(
+                "Tanaman dengan tanggal tanam ini sudah melewati masa produktif.",
+                details={"field": "planted_at", "productive_until": until.isoformat()},
+            )
+        return until
+
+    async def _next_code(self, user_id: UUID, commodity_code: str) -> str:
+        """``MGA-001``: the per-user counter is locked and never reused (design 8.2)."""
+        user = (
+            await self.session.execute(select(User).where(User.id == user_id).with_for_update())
+        ).scalar_one()
+        counters = dict(user.plant_code_seq or {})
+        number = int(counters.get(commodity_code, 0)) + 1
+        counters[commodity_code] = number
+        user.plant_code_seq = counters
+        return f"{PLANT_CODE_PREFIX[commodity_code]}-{number:03d}"
+
+    async def _harvest_rows(self, plant_id: UUID) -> list[HarvestRecord]:
+        rows = await self.session.execute(
+            select(HarvestRecord)
+            .where(HarvestRecord.plant_id == plant_id)
+            .order_by(HarvestRecord.harvested_at, HarvestRecord.created_at, HarvestRecord.id)
+        )
+        return list(rows.scalars())
+
+    async def _renumber(self, plant_id: UUID) -> None:
+        """Panen ke-n follows the harvest date; the unique key is checked at commit."""
+        for number, row in enumerate(await self._harvest_rows(plant_id), start=1):
+            if row.sequence != number:
+                row.sequence = number
+
+    def _harvest_day(self, value: date | datetime | None) -> date:
+        if value is None:
+            return self.estimator.today()
+        if isinstance(value, datetime):
+            if value.tzinfo is None:
+                raise ValidationError(
+                    "harvested_at wajib memakai zona waktu atau berupa tanggal (YYYY-MM-DD).",
+                    details={"field": "harvested_at"},
+                )
+            return value.astimezone(self.tz).date()
+        return value
+
+    def _check_harvest_day(
+        self, day: date, plant: Plant, *, previous: date | None, following: date | None
+    ) -> None:
+        problem = rules.harvest_date_error(
+            day, planted_at=plant.planted_at, today=self.estimator.today(), previous=previous
+        )
+        if problem is None and following is not None and day > following:
+            problem = "Tanggal panen tidak boleh setelah panen berikutnya."
+        if problem:
+            raise ValidationError(problem, details={"field": "harvested_at"})
+
+    def _harvest_out(self, row: HarvestRecord, estimate: NextHarvestOut | None) -> HarvestOut:
+        return HarvestOut(
+            id=str(row.id),
+            plant_id=str(row.plant_id),
+            sequence=row.sequence,
+            harvested_at=local_date(row.harvested_at, self.tz),
+            quality_note=row.quality_note,
+            quantity_kg=float(row.quantity_kg) if row.quantity_kg is not None else None,
+            created_at=row.created_at,
+            next_harvest=estimate,
+        )
+
+    async def _harvest_out_with_estimate(self, plant: Plant, row: HarvestRecord) -> HarvestOut:
+        facts = await self.estimator.facts_for(plant)
+        delays = facts.next_harvest.delays if facts.next_harvest else ()
+        names = await self.estimator.disease_names([item.disease_code for item in delays])
+        return self._harvest_out(row, next_harvest_out(facts.next_harvest, names))
 
     async def _extras(self, plants: list[Plant]) -> dict[UUID, dict[str, object]]:
         """Everything ``PlantOut`` needs beyond the row, in a few batched queries."""
@@ -617,37 +922,55 @@ class PlantService:
 
     async def _plants_out(self, plants: list[Plant]) -> list[PlantOut]:
         extras = await self._extras(plants)
-        return [self._plant_out_with(plant, extras[plant.id]) for plant in plants]
+        facts = await self.estimator.facts(plants)
+        wanted: set[str] = set()
+        for plant in plants:
+            item = facts[plant.id]
+            wanted.update(plant.end_disease_codes or [])
+            if item.next_harvest:
+                wanted.update(delay.disease_code for delay in item.next_harvest.delays)
+        names = await self.estimator.disease_names(sorted(wanted))
+        return [
+            self._plant_out_with(plant, extras[plant.id], facts[plant.id], names)
+            for plant in plants
+        ]
 
     async def _plant_out(self, plant: Plant) -> PlantOut:
         return (await self._plants_out([plant]))[0]
 
-    def _plant_out_with(self, plant: Plant, extra: dict[str, object]) -> PlantOut:
+    def _plant_out_with(
+        self, plant: Plant, extra: dict[str, object], facts: PlantFacts, names: dict[str, str]
+    ) -> PlantOut:
         farm = extra["farm"]
         assert isinstance(farm, Farm)  # noqa: S101 - built by _extras
         last_scan = extra["last_scan"] if isinstance(extra["last_scan"], datetime) else None
         last_water = extra["last_water"] if isinstance(extra["last_water"], datetime) else None
         cover = extra["cover"] if isinstance(extra["cover"], str) else None
         village = extra["village"] if isinstance(extra["village"], str) else None
-        tz = ZoneInfo(self.settings.timezone)
-        end_day = (plant.ended_at or datetime.now(UTC)).astimezone(tz).date()
+        end_day = (plant.ended_at or datetime.now(UTC)).astimezone(self.tz).date()
         return PlantOut(
             id=str(plant.id),
+            code=plant.code,
             farm_id=str(plant.farm_id),
             label=plant.label,
             commodity_code=plant.commodity_code,
-            commodity_label=PLANT_TYPES.get(plant.commodity_code, plant.commodity_code),
+            commodity_label=COMMODITY_LABELS_V2.get(plant.commodity_code, plant.commodity_code),
             variety=plant.variety,
+            planting_material=plant.planting_material,
+            quantity=plant.quantity,
             planted_at=plant.planted_at,
-            age_days=max((end_day - plant.planted_at).days, 0),
-            growth_stage=plant.growth_stage,
+            age_days=rules.age_days(plant.planted_at, end_day),
+            lifecycle_phase=facts.phase,
+            productive_until=plant.productive_until,
             health_status=plant.health_status,
             health_status_reason=self._health_reason(plant, last_scan),
-            expected_harvest_min=plant.expected_harvest_min,
-            expected_harvest_max=plant.expected_harvest_max,
+            harvest_count=facts.harvest_count,
+            last_harvest_at=facts.last_harvest,
+            next_harvest=next_harvest_out(facts.next_harvest, names),
+            open_episode_count=facts.open_episode_count,
             irrigation_schedule=plant.irrigation_schedule,
             last_watered_at=last_water,
-            next_watering_on=next_watering_on(plant, last_water, tz),
+            next_watering_on=next_watering_on(plant, last_water, self.tz),
             cover_photo_url=self.storage.public_url(cover) if cover and self.storage else None,
             last_scan_at=last_scan,
             farm_name=farm.name,
@@ -658,8 +981,12 @@ class PlantService:
             ended_at=plant.ended_at,
             end_reason=plant.end_reason,
             end_note=plant.end_note,
-            final_result=plant.final_result,
-            yield_percent=float(plant.yield_percent) if plant.yield_percent is not None else None,
+            end_diseases=[
+                EndedDiseaseOut(code=code, label=names.get(code, code))
+                for code in (plant.end_disease_codes or [])
+            ],
+            end_cause_note=plant.end_cause_note,
+            outcome=plant.outcome,
             created_at=plant.created_at,
             updated_at=plant.updated_at,
         )
