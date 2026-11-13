@@ -36,7 +36,12 @@ from app.core.rate_limit import RateLimiter  # noqa: E402
 from app.core.state import AppState  # noqa: E402
 from app.data.seed import seed_reference_data  # noqa: E402
 from app.db.session import create_engine, create_session_factory  # noqa: E402
-from app.domain import DISEASE_LABELS, CauseCategory  # noqa: E402
+from app.domain import (  # noqa: E402
+    COMMODITIES_V2,
+    COMMODITY_LABELS_V2,
+    DISEASE_LABELS,
+    CauseCategory,
+)
 from app.main import create_app  # noqa: E402
 from app.models.user import User  # noqa: E402
 from app.providers.push import LogPushProvider  # noqa: E402
@@ -113,7 +118,7 @@ class DemoVision:
         image: bytes,  # noqa: ARG002 - protocol signature
         content_type: str,  # noqa: ARG002 - protocol signature
         client_uuid: str,  # noqa: ARG002 - protocol signature
-        commodity_code: str,  # noqa: ARG002 - protocol signature
+        commodity_code: str,
     ) -> VisionResult:
         if scan_type == "ripeness":
             stage = self.rng.choice(["unripe", "turning", "ripe"])
@@ -127,7 +132,7 @@ class DemoVision:
                 "estimate_confidence": "medium",
                 "note": f"Perkiraan panen {low}-{low + 4} hari lagi.",
             }
-            return self._wrap("ripeness", "confident", result, 0.88)
+            return self._wrap("ripeness", "confident", result, 0.88, commodity_code)
 
         code = self.forced.pop(0) if self.forced else self.rng.choice(WEIGHTED_CODES)
         roll = self.rng.random()
@@ -150,17 +155,23 @@ class DemoVision:
             "is_healthy": None if top is None else code == "healthy",
             "severity": None if top is None or code == "healthy" else "moderate",
         }
-        return self._wrap("disease", status, result, None if top is None else confidence)
+        return self._wrap(
+            "disease", status, result, None if top is None else confidence, commodity_code
+        )
 
     @staticmethod
     def _wrap(
-        scan_type: str, status: str, result: dict[str, object], confidence: float | None
+        scan_type: str,
+        status: str,
+        result: dict[str, object],
+        confidence: float | None,
+        commodity_code: str,
     ) -> VisionResult:
         return VisionResult(
             scan_type=scan_type,
             status=status,
-            model_version=f"{scan_type}-chili-demo",
-            commodity_code="chili",
+            model_version=f"{scan_type}-stub-demo",
+            commodity_code=commodity_code,
             confidence=confidence,
             quality={"exposure": "ok", "blur": "ok"},
             result=result,
@@ -298,14 +309,14 @@ async def populate(state: AppState) -> None:
             )
             for number in range(rng.randint(1, 3)):
                 planted = date.today() - timedelta(days=rng.randint(25, 120))
+                commodity = rng.choice(COMMODITIES_V2)
                 plant = await _ok(
                     await http.post(
                         f"/api/v1/farms/{farm['id']}/plants",
                         json={
-                            "label": f"Cabai rawit {number + 1}",
-                            "commodity_code": "chili",
+                            "label": f"{COMMODITY_LABELS_V2[commodity]} {number + 1}",
+                            "commodity_code": commodity,
                             "planted_at": planted.isoformat(),
-                            "growth_stage": "fruiting",
                         },
                         headers=headers,
                     )
@@ -336,8 +347,8 @@ async def populate(state: AppState) -> None:
                         await http.post(
                             f"/api/v1/plants/{plant['id']}/end",
                             json={
-                                "reason": "harvested",
-                                "yield_percent": rng.choice([12, 45, 64, 82, 95, 118]),
+                                "reason": rng.choice(["cut_down", "other"]),
+                                "note": "Demo: tracking dihentikan setelah panen terakhir.",
                             },
                             headers=headers,
                         )
@@ -360,7 +371,7 @@ async def populate(state: AppState) -> None:
 
 
 POSTS = (
-    ("Daun cabai menguning dari bawah", "Sudah dua minggu daun bawah menguning. Apa kurang pupuk?"),
+    ("Daun mangga menguning dari bawah", "Sudah dua minggu daun bawah menguning. Apa kurang pupuk?"),
     ("Bercak hitam di buah menjelang panen", "Buah yang hampir merah ada lekukan hitam basah."),
     ("Jadwal siram saat kemarau", "Kebun saya di Gianyar, sekarang siram tiap hari. Kebanyakan?"),
     ("Jual bibit unggul murah, hubungi WA", "Bibit super panen 3x lipat, transfer dulu ya."),
@@ -387,12 +398,18 @@ async def _feedback_forum_broadcasts(
         )
 
     posts = []
-    for (title, body), (_, headers) in zip(POSTS, farmers, strict=False):
+    for index, ((title, body), (_, headers)) in enumerate(zip(POSTS, farmers, strict=False)):
         posts.append(
             await _ok(
                 await http.post(
                     "/api/v1/forum/posts",
-                    json={"commodity_code": "chili", "title": title, "body": body},
+                    json={
+                        # FORUM_CATEGORIES is still the v0.3 vegetable list (design v2
+                        # work in progress), so the demo posts use what it accepts.
+                        "commodity_code": ("strawberry", "general")[index % 2],
+                        "title": title,
+                        "body": body,
+                    },
                     headers=headers,
                 )
             )
