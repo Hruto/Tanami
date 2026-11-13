@@ -38,7 +38,7 @@ from sqlalchemy.ext.asyncio import AsyncEngine, AsyncSession, async_sessionmaker
 from tests.helpers import FakeVision, FakeWeather
 
 ROOT = Path(__file__).resolve().parents[1]
-REFERENCE_TABLES = {"diseases", "regions", "alembic_version"}
+REFERENCE_TABLES = {"diseases", "regions", "crop_profiles", "alembic_version"}
 
 
 def _bootstrap_database(tmp_path_factory: pytest.TempPathFactory) -> str:

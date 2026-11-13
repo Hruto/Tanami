@@ -22,10 +22,13 @@ unlinked scan is still stored, listed and can receive feedback.
 from __future__ import annotations
 
 import time
+from collections.abc import Sequence
 from dataclasses import dataclass
 from datetime import UTC, date, datetime, timedelta
+from datetime import time as dtime
 from typing import Any
 from uuid import UUID, uuid4
+from zoneinfo import ZoneInfo
 
 from sqlalchemy import and_, or_, select
 from sqlalchemy.exc import IntegrityError
@@ -37,10 +40,10 @@ from app.core.logging import get_logger
 from app.core.metrics import SCAN_LATENCY, SCANS_TOTAL
 from app.core.pagination import Cursor
 from app.domain import (
-    DETECTION_COMMODITIES,
+    COMMODITIES_V2,
     DISEASE_LABELS,
-    RIPENESS_LABELS,
     CauseCategory,
+    EpisodeCloseReason,
     HealthStatus,
     ResultStatus,
     ScanType,
@@ -52,7 +55,8 @@ from app.models.scan import Scan, ScanFeedback
 from app.providers.images import ValidatedImage, new_object_key, validate_and_normalise
 from app.providers.storage import StorageProvider
 from app.providers.vision import VisionClient
-from app.schemas.scan import FeedbackOut, ScanCreated, ScanDetailOut
+from app.schemas.scan import FeedbackOut, ScanCreated, ScanDetailOut, ScanHistoryItem
+from app.services.episode import EpisodeService
 
 logger = get_logger("scan")
 
@@ -67,9 +71,12 @@ class ScanCommand:
     user_id: UUID
     scan_type: ScanType
     image: bytes
-    client_uuid: UUID
+    # Stored scans need one (idempotency); a "cek cepat" has none.
+    client_uuid: UUID | None
     captured_at: datetime | None
+    # A registered, active plant. ``None`` means "cek cepat": the result is shown, not stored.
     plant_id: UUID | None
+    commodity_code: str | None = None
 
 
 # --------------------------------------------------------------------------- #
@@ -146,7 +153,12 @@ class ScanService:
     # Create
     # ------------------------------------------------------------------ #
     async def create(self, command: ScanCommand) -> ScanCreated:
+        if command.plant_id is None:
+            return await self._quick(command)
+
         started = time.perf_counter()
+        if command.client_uuid is None:
+            raise ValidationError("client_uuid wajib diisi.", details={"field": "client_uuid"})
         existing = await self._find_by_client_uuid(command.user_id, command.client_uuid)
         if existing is not None:
             if existing.scan_type != command.scan_type.value:
@@ -154,14 +166,8 @@ class ScanService:
                     "client_uuid ini sudah dipakai untuk jenis scan lain.",
                     details={"field": "client_uuid", "existing_type": existing.scan_type},
                 )
-            return self._to_created(existing, is_duplicate=True)
+            return await self._to_created(existing, is_duplicate=True)
 
-        # Every stored scan belongs to a registered plant (design v2). The
-        # "cek cepat" path that stores nothing is added with the scan endpoint.
-        if command.plant_id is None:
-            raise ValidationError(
-                "Pilih tanaman yang akan diperiksa.", details={"field": "plant_id"}
-            )
         plant = await self._resolve_plant(command.user_id, command.plant_id)
         captured_at = self._captured_at(command.captured_at)
         validated = self._validate_image(command.image)
@@ -176,11 +182,7 @@ class ScanService:
                 image=validated.data,
                 content_type=validated.content_type,
                 client_uuid=str(command.client_uuid),
-                commodity_code=(
-                    plant.commodity_code
-                    if plant.commodity_code in DETECTION_COMMODITIES
-                    else "chili"
-                ),
+                commodity_code=plant.commodity_code,
             )
         except Exception:
             # Never leave an image behind for a scan that does not exist.
@@ -189,12 +191,11 @@ class ScanService:
 
         disease = await self._known_disease(command.scan_type, prediction.status, prediction.result)
         result = self._enrich_result(
-            scan_type=command.scan_type,
             status=prediction.status,
             result=prediction.result,
             quality=prediction.quality,
-            captured_at=captured_at,
             disease=disease,
+            commodity_code=plant.commodity_code,
         )
 
         scan = Scan(
@@ -212,7 +213,7 @@ class ScanService:
             disease_code=disease.code if disease else None,
             quality=prediction.quality,
             confidence=prediction.confidence,
-            commodity_code=prediction.commodity_code,
+            commodity_code=plant.commodity_code,
             inference_ms=prediction.inference_ms,
         )
         self.session.add(scan)
@@ -227,10 +228,10 @@ class ScanService:
             winner = await self._find_by_client_uuid(command.user_id, command.client_uuid)
             if winner is None:
                 raise
-            return self._to_created(winner, is_duplicate=True)
+            return await self._to_created(winner, is_duplicate=True)
 
         await self.refresh_plant(plant)
-
+        closed = await self._close_on_healthy_scan(plant, scan, disease)
         await self.session.commit()
 
         SCANS_TOTAL.labels(scan_type=scan.scan_type, status=scan.status).inc()
@@ -241,9 +242,53 @@ class ScanService:
             scan_type=scan.scan_type,
             status=scan.status,
             model_version=scan.model_version,
-            plant_id=str(scan.plant_id) if scan.plant_id else None,
+            plant_id=str(scan.plant_id),
         )
-        return self._to_created(scan, is_duplicate=False)
+        return await self._to_created(scan, is_duplicate=False, closed=closed)
+
+    async def _quick(self, command: ScanCommand) -> ScanCreated:
+        """ "Cek cepat": analyse a photo without a plant and store nothing (design 5.4)."""
+        started = time.perf_counter()
+        code = command.commodity_code
+        if code not in COMMODITIES_V2:
+            raise ValidationError(
+                "Pilih jenis tanaman untuk cek cepat.",
+                details={"field": "commodity_code", "supported": list(COMMODITIES_V2)},
+            )
+        validated = self._validate_image(command.image)
+        prediction = await self.vision.predict(
+            scan_type=command.scan_type.value,
+            image=validated.data,
+            content_type=validated.content_type,
+            client_uuid=str(uuid4()),
+            commodity_code=code,
+        )
+        disease = await self._known_disease(command.scan_type, prediction.status, prediction.result)
+        result = self._enrich_result(
+            status=prediction.status,
+            result=prediction.result,
+            quality=prediction.quality,
+            disease=disease,
+            commodity_code=code,
+        )
+        SCANS_TOTAL.labels(scan_type=command.scan_type.value, status=prediction.status).inc()
+        SCAN_LATENCY.labels(scan_type=command.scan_type.value).observe(
+            time.perf_counter() - started
+        )
+        now = datetime.now(UTC)
+        return ScanCreated(
+            id=None,
+            saved=False,
+            type=command.scan_type,
+            status=ResultStatus(prediction.status),
+            model_version=prediction.model_version,
+            image_url=None,
+            plant_id=None,
+            captured_at=now,
+            result=result,
+            quality=dict(prediction.quality),
+            created_at=now,
+        )
 
     # ------------------------------------------------------------------ #
     # Read
@@ -261,37 +306,103 @@ class ScanService:
         ).scalar_one_or_none()
         return self.detail_out(scan, feedback)
 
-    async def list(
+    async def history(
         self,
         user_id: UUID,
         *,
         plant_id: UUID | None = None,
-        scan_type: ScanType | None = None,
+        commodity_code: str | None = None,
+        disease_code: str | None = None,
+        status: str | None = None,
+        date_from: date | None = None,
+        date_to: date | None = None,
         limit: int,
         cursor: Cursor | None,
-    ) -> list[Scan]:
-        """Newest first, keyset-paginated on ``(created_at, id)``.
+    ) -> list[tuple[Scan, ScanHistoryItem]]:
+        """Riwayat Scan: newest first, keyset-paginated on ``(created_at, id)``.
 
-        ``limit`` is the caller's page size plus one: the extra row is how the
-        route learns whether another page exists without a second count query.
+        ``invalid_image`` is hidden unless ``status`` asks for it or is ``all``
+        (design 5.8). ``limit`` is the page size plus one, so the route learns
+        whether another page exists without a count query.
         """
-        statement = select(Scan).where(Scan.user_id == user_id)
+        statement = (
+            select(
+                Scan,
+                Plant.code,
+                Plant.label,
+                Plant.ended_at,
+                Disease.name_id,
+                Disease.cause_category,
+                Disease.prevention,
+            )
+            .join(Plant, Plant.id == Scan.plant_id)
+            .outerjoin(Disease, Disease.code == Scan.disease_code)
+            .where(Scan.user_id == user_id)
+        )
         if plant_id is not None:
             statement = statement.where(Scan.plant_id == plant_id)
-        if scan_type is not None:
-            statement = statement.where(Scan.scan_type == scan_type.value)
+        if commodity_code is not None:
+            statement = statement.where(Scan.commodity_code == commodity_code)
+        if disease_code is not None:
+            statement = statement.where(Scan.disease_code == disease_code)
+        if status is None:
+            statement = statement.where(Scan.status != ResultStatus.INVALID_IMAGE.value)
+        elif status != "all":
+            statement = statement.where(Scan.status == status)
+        tz = ZoneInfo(self.settings.timezone)
+        if date_from is not None:
+            statement = statement.where(
+                Scan.captured_at >= datetime.combine(date_from, dtime.min, tzinfo=tz)
+            )
+        if date_to is not None:
+            statement = statement.where(
+                Scan.captured_at
+                < datetime.combine(date_to + timedelta(days=1), dtime.min, tzinfo=tz)
+            )
         if cursor is not None:
             statement = statement.where(
                 or_(
                     Scan.created_at < cursor.created_at,
-                    and_(
-                        Scan.created_at == cursor.created_at,
-                        Scan.id < cursor.last_id,
-                    ),
+                    and_(Scan.created_at == cursor.created_at, Scan.id < cursor.last_id),
                 )
             )
         statement = statement.order_by(Scan.created_at.desc(), Scan.id.desc()).limit(limit)
-        return list((await self.session.execute(statement)).scalars())
+        rows = (await self.session.execute(statement)).all()
+        return [
+            (row[0], self._history_item(row[0], row[1], row[2], row[3], row[4], row[5], row[6]))
+            for row in rows
+        ]
+
+    def _history_item(
+        self,
+        scan: Scan,
+        plant_code: str,
+        plant_label: str,
+        plant_ended_at: datetime | None,
+        disease_name: str | None,
+        cause: str | None,
+        prevention: str | None,
+    ) -> ScanHistoryItem:
+        percent = scan.result.get("confidence_percent")
+        healthy = scan.result.get("is_healthy")
+        return ScanHistoryItem(
+            id=str(scan.id),
+            captured_at=scan.captured_at,
+            plant_id=str(scan.plant_id),
+            plant_code=plant_code,
+            plant_label=plant_label,
+            plant_ended=plant_ended_at is not None,
+            commodity_code=scan.commodity_code,
+            status=ResultStatus(scan.status),
+            disease_code=scan.disease_code,
+            disease_label=disease_name,
+            cause_category=CauseCategory(cause) if cause else None,
+            confidence_percent=percent if isinstance(percent, int) else None,
+            is_healthy=healthy if isinstance(healthy, bool) else None,
+            prevention_summary=_summarise(prevention),
+            disease_episode_id=str(scan.disease_episode_id) if scan.disease_episode_id else None,
+            thumbnail_url=self.storage.public_url(scan.image_key),
+        )
 
     # ------------------------------------------------------------------ #
     # Mutations
@@ -342,23 +453,8 @@ class ScanService:
         await self.session.refresh(feedback)
         return feedback
 
-    async def attach_plant(self, user_id: UUID, scan_id: UUID, plant_id: UUID | None) -> Scan:
-        scan = await self.get(user_id, scan_id)
-        previous_plant_id = scan.plant_id
-        plant = await self._resolve_plant(user_id, plant_id) if plant_id else None
-        scan.plant_id = plant.id if plant else None
-        await self.session.flush()
-
-        # Both the old and the new plant may have changed status.
-        for affected_id in {previous_plant_id, scan.plant_id} - {None}:
-            affected = await self.session.get(Plant, affected_id)
-            if affected is not None:
-                await self.refresh_plant(affected)
-        await self.session.commit()
-        return scan
-
     async def refresh_plant(self, plant: Plant) -> None:
-        """Recompute ``health_status`` and the harvest window from stored scans."""
+        """Recompute ``health_status`` from the stored scans, in capture order (design 8.7)."""
         disease_rows = (
             await self.session.execute(
                 select(Scan.status, Scan.result)
@@ -370,23 +466,19 @@ class ScanService:
         history = [(str(status), dict(result)) for status, result in reversed(disease_rows)]
         plant.health_status = replay_health_status(history)
 
-        ripeness_rows = (
-            await self.session.execute(
-                select(Scan.result)
-                .where(Scan.plant_id == plant.id, Scan.scan_type == ScanType.RIPENESS.value)
-                .order_by(Scan.captured_at.desc(), Scan.created_at.desc())
-                .limit(10)
-            )
-        ).scalars()
-        window: tuple[date, date] | None = None
-        for result in ripeness_rows:
-            start = result.get("estimated_harvest_date_min")
-            end = result.get("estimated_harvest_date_max")
-            if isinstance(start, str) and isinstance(end, str):
-                window = (date.fromisoformat(start), date.fromisoformat(end))
-                break
-        plant.expected_harvest_min = window[0] if window else None
-        plant.expected_harvest_max = window[1] if window else None
+    async def _close_on_healthy_scan(
+        self, plant: Plant, scan: Scan, disease: Disease | None
+    ) -> Sequence[UUID]:
+        """A confident healthy scan closes the episodes opened before it (design 5.5)."""
+        if (
+            scan.status != ResultStatus.CONFIDENT.value
+            or disease is None
+            or disease.cause_category != CauseCategory.HEALTHY.value
+        ):
+            return []
+        return await EpisodeService(self.session, self.settings).close_open(
+            plant.id, EpisodeCloseReason.HEALTHY_SCAN, opened_before=scan.captured_at
+        )
 
     # ------------------------------------------------------------------ #
     # Mapping
@@ -401,8 +493,28 @@ class ScanService:
             feedback=feedback_out(feedback),
         )
 
-    def _to_created(self, scan: Scan, *, is_duplicate: bool) -> ScanCreated:
-        return ScanCreated(**self.scan_fields(scan), is_duplicate=is_duplicate)
+    async def _to_created(
+        self, scan: Scan, *, is_duplicate: bool, closed: Sequence[UUID] = ()
+    ) -> ScanCreated:
+        plant = await self.session.get(Plant, scan.plant_id)
+        disease = None
+        if scan.disease_code:
+            disease = (
+                await self.session.execute(select(Disease).where(Disease.code == scan.disease_code))
+            ).scalar_one_or_none()
+        confirmation = (
+            await EpisodeService(self.session, self.settings).confirmation_for(scan, plant, disease)
+            if plant is not None
+            else None
+        )
+        return ScanCreated(
+            **self.scan_fields(scan),
+            saved=True,
+            plant_code=plant.code if plant else None,
+            is_duplicate=is_duplicate,
+            confirmation=confirmation,
+            closed_episode_ids=[str(item) for item in closed],
+        )
 
     # ------------------------------------------------------------------ #
     # Internals
@@ -480,42 +592,23 @@ class ScanService:
     def _enrich_result(
         self,
         *,
-        scan_type: ScanType,
         status: str,
         result: dict[str, object],
         quality: dict[str, object],
-        captured_at: datetime,
         disease: Disease | None,
+        commodity_code: str,
     ) -> dict[str, object]:
         """Add what the vision contract deliberately leaves to the backend."""
         enriched = dict(result)
-        if scan_type is ScanType.DISEASE:
-            top = enriched.get("top")
-            confidence = top.get("confidence") if isinstance(top, dict) else None
-            # Requirement 3 shows the confidence as a percentage.
-            enriched["confidence_percent"] = (
-                round(float(confidence) * 100) if isinstance(confidence, int | float) else None
-            )
-            enriched["advice"] = (
-                advice_from_knowledge_base(disease, status=status) if disease else None
-            )
-            enriched["quality"] = quality
-            return enriched
-
-        stage = enriched.get("stage")
-        if isinstance(stage, str) and not enriched.get("stage_label"):
-            enriched["stage_label"] = RIPENESS_LABELS.get(stage, stage)
-        days_min = enriched.get("estimated_days_min")
-        days_max = enriched.get("estimated_days_max")
-        if isinstance(days_min, int) and isinstance(days_max, int):
-            # The estimate is relative to when the photo was taken, not when an
-            # offline queue finally delivered it (design 12.4).
-            base = captured_at.date()
-            enriched["estimated_harvest_date_min"] = (base + timedelta(days=days_min)).isoformat()
-            enriched["estimated_harvest_date_max"] = (base + timedelta(days=days_max)).isoformat()
-        else:
-            enriched["estimated_harvest_date_min"] = None
-            enriched["estimated_harvest_date_max"] = None
+        top = enriched.get("top")
+        confidence = top.get("confidence") if isinstance(top, dict) else None
+        # The result card shows the confidence as a percentage.
+        enriched["confidence_percent"] = (
+            round(float(confidence) * 100) if isinstance(confidence, int | float) else None
+        )
+        enriched["commodity_code"] = commodity_code
+        enriched["advice"] = advice_from_knowledge_base(disease, status=status) if disease else None
+        enriched["quality"] = quality
         return enriched
 
 
@@ -559,6 +652,8 @@ def advice_from_knowledge_base(disease: Disease, *, status: str) -> dict[str, ob
         "summary": summary,
         "disease_name": disease.name_id,
         "symptoms": disease.symptoms,
+        "prevention": disease.prevention,
+        "harvest_delay_days": disease.harvest_delay_days,
         "treatments": treatments,
         "disease_detail_url": f"/diseases/{disease.code}",
         "first_aid": first_aid,
@@ -581,8 +676,14 @@ def disease_label(code: str) -> str:
     return DISEASE_LABELS.get(code, code)
 
 
-def ripeness_label(stage: str) -> str:
-    return RIPENESS_LABELS.get(stage, stage)
+def _summarise(text: str | None, limit: int = 140) -> str | None:
+    """The first sentence of reviewed prevention text, cut to ``limit`` characters."""
+    if not text:
+        return None
+    first = text.strip().split(". ")[0].strip()
+    if not first.endswith((".", "!", "?")):
+        first += "."
+    return first if len(first) <= limit else first[: limit - 1].rstrip() + "…"
 
 
 __all__ = [
@@ -593,5 +694,4 @@ __all__ = [
     "feedback_out",
     "next_health_status",
     "replay_health_status",
-    "ripeness_label",
 ]
