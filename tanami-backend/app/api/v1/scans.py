@@ -101,7 +101,9 @@ async def create_scan(
     created = await service.create(
         ScanCommand(
             user_id=user.id,
-            scan_type=scan_type,
+            # design 10.6 v2: every scan is a disease scan. A v0.3 client that
+            # still sends "ripeness" must not break, so the value is ignored.
+            scan_type=ScanType.DISEASE if scan_type is ScanType.RIPENESS else scan_type,
             image=raw,
             client_uuid=resolved_uuid,
             captured_at=captured_at,

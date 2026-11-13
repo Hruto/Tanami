@@ -371,7 +371,10 @@ async def populate(state: AppState) -> None:
 
 
 POSTS = (
-    ("Daun mangga menguning dari bawah", "Sudah dua minggu daun bawah menguning. Apa kurang pupuk?"),
+    (
+        "Daun mangga menguning dari bawah",
+        "Sudah dua minggu daun bawah menguning. Apa kurang pupuk?",
+    ),
     ("Bercak hitam di buah menjelang panen", "Buah yang hampir merah ada lekukan hitam basah."),
     ("Jadwal siram saat kemarau", "Kebun saya di Gianyar, sekarang siram tiap hari. Kebanyakan?"),
     ("Jual bibit unggul murah, hubungi WA", "Bibit super panen 3x lipat, transfer dulu ya."),
@@ -404,9 +407,8 @@ async def _feedback_forum_broadcasts(
                 await http.post(
                     "/api/v1/forum/posts",
                     json={
-                        # FORUM_CATEGORIES is still the v0.3 vegetable list (design v2
-                        # work in progress), so the demo posts use what it accepts.
-                        "commodity_code": ("strawberry", "general")[index % 2],
+                        # design v2: one category per commodity of this release.
+                        "commodity_code": COMMODITIES_V2[index % len(COMMODITIES_V2)],
                         "title": title,
                         "body": body,
                     },

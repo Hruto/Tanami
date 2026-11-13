@@ -13,6 +13,7 @@ from app.core.errors import ValidationError
 from app.domain import (
     COMMODITIES_V2,
     MATERIALS_BY_COMMODITY,
+    TRACKING_END_REASONS_V2,
     CareAction,
     HealthStatus,
     IrrigationSchedule,
@@ -313,6 +314,19 @@ class EndTracking(ApiModel):
     disease_codes: list[str] = Field(default_factory=list, max_length=10)
     cause_note: str | None = Field(default=None, max_length=1000)
     note: str | None = Field(default=None, max_length=1000)
+
+    @field_validator("reason")
+    @classmethod
+    def _v2_reason(cls, value: TrackingEndReason) -> TrackingEndReason:
+        # design 8.2: ``harvested``/``died``/``not_maintained`` are v0.3 values kept
+        # only so old rows can be read; a request may never use them (10.2 wants 400,
+        # not a check-constraint violation on write).
+        if value.value not in TRACKING_END_REASONS_V2:
+            raise ValidationError(
+                "Alasan mengakhiri tracking tidak dikenal.",
+                details={"field": "reason", "allowed": list(TRACKING_END_REASONS_V2)},
+            )
+        return value
 
 
 class PhotoOut(ApiModel):
