@@ -29,7 +29,7 @@ from app.core.errors import Conflict, Forbidden, NotFound, ValidationError
 from app.core.logging import get_logger
 from app.core.pagination import Cursor
 from app.domain import (
-    COMMODITY_LABELS,
+    COMMODITY_LABELS_V2,
     FORUM_GENERAL_CATEGORY,
     PostStatus,
     ReportReason,
@@ -244,9 +244,11 @@ class ForumService:
             )
         ).all()
         counts = {code: int(count) for code, count in rows}
+        # design 10.9 v2: one category per supported commodity plus "Umum". The
+        # legacy commodity list (chili, tomato, ...) is no longer a category set.
         categories: list[dict[str, Any]] = [
             {"commodity_code": code, "label": label, "post_count": counts.get(code, 0)}
-            for code, label in COMMODITY_LABELS.items()
+            for code, label in COMMODITY_LABELS_V2.items()
         ]
         categories.append(
             {

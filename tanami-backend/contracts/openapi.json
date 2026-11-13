@@ -159,17 +159,16 @@
             ],
             "title": "Client Uuid"
           },
-          "detection_plant_id": {
+          "commodity_code": {
             "anyOf": [
               {
-                "format": "uuid",
                 "type": "string"
               },
               {
                 "type": "null"
               }
             ],
-            "title": "Detection Plant Id"
+            "title": "Commodity Code"
           },
           "image": {
             "contentMediaType": "application/octet-stream",
@@ -189,12 +188,12 @@
             "title": "Plant Id"
           },
           "type": {
-            "$ref": "#/components/schemas/ScanType"
+            "$ref": "#/components/schemas/ScanType",
+            "default": "disease"
           }
         },
         "required": [
-          "image",
-          "type"
+          "image"
         ],
         "title": "Body_create_scan_api_v1_scans_post",
         "type": "object"
@@ -386,6 +385,158 @@
         "title": "CauseCategory",
         "type": "string"
       },
+      "ConfirmDiseaseOut": {
+        "additionalProperties": false,
+        "properties": {
+          "episode": {
+            "$ref": "#/components/schemas/EpisodeOut"
+          },
+          "is_new": {
+            "title": "Is New",
+            "type": "boolean"
+          },
+          "next_harvest": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/NextHarvestOut"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          }
+        },
+        "required": [
+          "is_new",
+          "episode"
+        ],
+        "title": "ConfirmDiseaseOut",
+        "type": "object"
+      },
+      "ConfirmationOut": {
+        "additionalProperties": false,
+        "description": "What the \"Apakah tanaman ini memang sakit?\" card needs (design 5.4, 8.5).",
+        "properties": {
+          "can_confirm": {
+            "title": "Can Confirm",
+            "type": "boolean"
+          },
+          "delay_preview_days": {
+            "default": 0,
+            "title": "Delay Preview Days",
+            "type": "integer"
+          },
+          "existing_episode_id": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Existing Episode Id"
+          }
+        },
+        "required": [
+          "can_confirm"
+        ],
+        "title": "ConfirmationOut",
+        "type": "object"
+      },
+      "CropProfileOut": {
+        "additionalProperties": false,
+        "properties": {
+          "commodity_code": {
+            "title": "Commodity Code",
+            "type": "string"
+          },
+          "first_harvest_max_days": {
+            "title": "First Harvest Max Days",
+            "type": "integer"
+          },
+          "first_harvest_min_days": {
+            "title": "First Harvest Min Days",
+            "type": "integer"
+          },
+          "harvest_cycle_max_days": {
+            "title": "Harvest Cycle Max Days",
+            "type": "integer"
+          },
+          "harvest_cycle_min_days": {
+            "title": "Harvest Cycle Min Days",
+            "type": "integer"
+          },
+          "harvest_pattern_note": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Harvest Pattern Note"
+          },
+          "planting_material": {
+            "title": "Planting Material",
+            "type": "string"
+          },
+          "productive_years": {
+            "title": "Productive Years",
+            "type": "integer"
+          },
+          "reviewed_at": {
+            "anyOf": [
+              {
+                "format": "date",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Reviewed At"
+          },
+          "reviewed_by": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Reviewed By"
+          },
+          "source": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Source"
+          }
+        },
+        "required": [
+          "commodity_code",
+          "planting_material",
+          "first_harvest_min_days",
+          "first_harvest_max_days",
+          "harvest_cycle_min_days",
+          "harvest_cycle_max_days",
+          "productive_years",
+          "harvest_pattern_note",
+          "source",
+          "reviewed_by",
+          "reviewed_at"
+        ],
+        "title": "CropProfileOut",
+        "type": "object"
+      },
       "DailyScans": {
         "additionalProperties": false,
         "properties": {
@@ -411,13 +562,47 @@
         "title": "DailyScans",
         "type": "object"
       },
+      "DelayItemOut": {
+        "additionalProperties": false,
+        "properties": {
+          "days": {
+            "title": "Days",
+            "type": "integer"
+          },
+          "disease_code": {
+            "title": "Disease Code",
+            "type": "string"
+          },
+          "episode_id": {
+            "title": "Episode Id",
+            "type": "string"
+          },
+          "label": {
+            "title": "Label",
+            "type": "string"
+          },
+          "status": {
+            "enum": [
+              "open",
+              "resolved"
+            ],
+            "title": "Status",
+            "type": "string"
+          }
+        },
+        "required": [
+          "episode_id",
+          "disease_code",
+          "label",
+          "days",
+          "status"
+        ],
+        "title": "DelayItemOut",
+        "type": "object"
+      },
       "DetectionCounts": {
         "additionalProperties": false,
         "properties": {
-          "active_detection_plants": {
-            "title": "Active Detection Plants",
-            "type": "integer"
-          },
           "scans_7d": {
             "title": "Scans 7D",
             "type": "integer"
@@ -428,329 +613,10 @@
           }
         },
         "required": [
-          "active_detection_plants",
           "scans_total",
           "scans_7d"
         ],
         "title": "DetectionCounts",
-        "type": "object"
-      },
-      "DetectionEnd": {
-        "additionalProperties": false,
-        "properties": {
-          "note": {
-            "anyOf": [
-              {
-                "maxLength": 1000,
-                "type": "string"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "title": "Note"
-          }
-        },
-        "title": "DetectionEnd",
-        "type": "object"
-      },
-      "DetectionPlantCreate": {
-        "additionalProperties": false,
-        "description": "Requirement 3: the user only types a name; the photo is the first scan.",
-        "properties": {
-          "commodity_code": {
-            "default": "chili",
-            "title": "Commodity Code",
-            "type": "string"
-          },
-          "name": {
-            "maxLength": 120,
-            "minLength": 1,
-            "title": "Name",
-            "type": "string"
-          },
-          "plant_id": {
-            "anyOf": [
-              {
-                "format": "uuid",
-                "type": "string"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "title": "Plant Id"
-          }
-        },
-        "required": [
-          "name"
-        ],
-        "title": "DetectionPlantCreate",
-        "type": "object"
-      },
-      "DetectionPlantDetailOut": {
-        "additionalProperties": false,
-        "description": "Requirement 3-4: every check of this plant, newest first.",
-        "properties": {
-          "commodity_code": {
-            "title": "Commodity Code",
-            "type": "string"
-          },
-          "cover_image_url": {
-            "anyOf": [
-              {
-                "type": "string"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "title": "Cover Image Url"
-          },
-          "created_at": {
-            "format": "date-time",
-            "title": "Created At",
-            "type": "string"
-          },
-          "end_note": {
-            "anyOf": [
-              {
-                "type": "string"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "title": "End Note"
-          },
-          "ended_at": {
-            "anyOf": [
-              {
-                "format": "date-time",
-                "type": "string"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "title": "Ended At"
-          },
-          "id": {
-            "title": "Id",
-            "type": "string"
-          },
-          "last_result": {
-            "anyOf": [
-              {
-                "additionalProperties": true,
-                "type": "object"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "title": "Last Result"
-          },
-          "name": {
-            "title": "Name",
-            "type": "string"
-          },
-          "plant_id": {
-            "anyOf": [
-              {
-                "type": "string"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "title": "Plant Id"
-          },
-          "scan_count": {
-            "title": "Scan Count",
-            "type": "integer"
-          },
-          "scans": {
-            "items": {
-              "$ref": "#/components/schemas/ScanOut"
-            },
-            "title": "Scans",
-            "type": "array"
-          },
-          "status": {
-            "enum": [
-              "active",
-              "ended"
-            ],
-            "title": "Status",
-            "type": "string"
-          },
-          "updated_at": {
-            "format": "date-time",
-            "title": "Updated At",
-            "type": "string"
-          }
-        },
-        "required": [
-          "id",
-          "name",
-          "commodity_code",
-          "plant_id",
-          "status",
-          "ended_at",
-          "end_note",
-          "cover_image_url",
-          "scan_count",
-          "last_result",
-          "created_at",
-          "updated_at",
-          "scans"
-        ],
-        "title": "DetectionPlantDetailOut",
-        "type": "object"
-      },
-      "DetectionPlantOut": {
-        "additionalProperties": false,
-        "properties": {
-          "commodity_code": {
-            "title": "Commodity Code",
-            "type": "string"
-          },
-          "cover_image_url": {
-            "anyOf": [
-              {
-                "type": "string"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "title": "Cover Image Url"
-          },
-          "created_at": {
-            "format": "date-time",
-            "title": "Created At",
-            "type": "string"
-          },
-          "end_note": {
-            "anyOf": [
-              {
-                "type": "string"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "title": "End Note"
-          },
-          "ended_at": {
-            "anyOf": [
-              {
-                "format": "date-time",
-                "type": "string"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "title": "Ended At"
-          },
-          "id": {
-            "title": "Id",
-            "type": "string"
-          },
-          "last_result": {
-            "anyOf": [
-              {
-                "additionalProperties": true,
-                "type": "object"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "title": "Last Result"
-          },
-          "name": {
-            "title": "Name",
-            "type": "string"
-          },
-          "plant_id": {
-            "anyOf": [
-              {
-                "type": "string"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "title": "Plant Id"
-          },
-          "scan_count": {
-            "title": "Scan Count",
-            "type": "integer"
-          },
-          "status": {
-            "enum": [
-              "active",
-              "ended"
-            ],
-            "title": "Status",
-            "type": "string"
-          },
-          "updated_at": {
-            "format": "date-time",
-            "title": "Updated At",
-            "type": "string"
-          }
-        },
-        "required": [
-          "id",
-          "name",
-          "commodity_code",
-          "plant_id",
-          "status",
-          "ended_at",
-          "end_note",
-          "cover_image_url",
-          "scan_count",
-          "last_result",
-          "created_at",
-          "updated_at"
-        ],
-        "title": "DetectionPlantOut",
-        "type": "object"
-      },
-      "DetectionPlantUpdate": {
-        "additionalProperties": false,
-        "properties": {
-          "name": {
-            "anyOf": [
-              {
-                "maxLength": 120,
-                "minLength": 1,
-                "type": "string"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "title": "Name"
-          },
-          "plant_id": {
-            "anyOf": [
-              {
-                "format": "uuid",
-                "type": "string"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "title": "Plant Id"
-          }
-        },
-        "title": "DetectionPlantUpdate",
         "type": "object"
       },
       "DeviceCreate": {
@@ -1176,17 +1042,27 @@
       },
       "EndTracking": {
         "additionalProperties": false,
-        "description": "Requirement 1: end tracking; the plant moves to the history list.",
+        "description": "End tracking before the productive period is over (design 8.6).",
         "properties": {
-          "final_result": {
+          "cause_note": {
             "anyOf": [
               {
-                "$ref": "#/components/schemas/HarvestOutcome"
+                "maxLength": 1000,
+                "type": "string"
               },
               {
                 "type": "null"
               }
-            ]
+            ],
+            "title": "Cause Note"
+          },
+          "disease_codes": {
+            "items": {
+              "type": "string"
+            },
+            "maxItems": 10,
+            "title": "Disease Codes",
+            "type": "array"
           },
           "note": {
             "anyOf": [
@@ -1202,28 +1078,31 @@
           },
           "reason": {
             "$ref": "#/components/schemas/TrackingEndReason"
-          },
-          "yield_percent": {
-            "anyOf": [
-              {
-                "maximum": 1000.0,
-                "minimum": 0.0,
-                "type": "number"
-              },
-              {
-                "type": "string"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "title": "Yield Percent"
           }
         },
         "required": [
           "reason"
         ],
         "title": "EndTracking",
+        "type": "object"
+      },
+      "EndedDiseaseOut": {
+        "additionalProperties": false,
+        "properties": {
+          "code": {
+            "title": "Code",
+            "type": "string"
+          },
+          "label": {
+            "title": "Label",
+            "type": "string"
+          }
+        },
+        "required": [
+          "code",
+          "label"
+        ],
+        "title": "EndedDiseaseOut",
         "type": "object"
       },
       "Envelope_AdminOverviewOut_": {
@@ -1265,30 +1144,17 @@
         "title": "Envelope[CareLogOut]",
         "type": "object"
       },
-      "Envelope_DetectionPlantDetailOut_": {
+      "Envelope_ConfirmDiseaseOut_": {
         "additionalProperties": false,
         "properties": {
           "data": {
-            "$ref": "#/components/schemas/DetectionPlantDetailOut"
+            "$ref": "#/components/schemas/ConfirmDiseaseOut"
           }
         },
         "required": [
           "data"
         ],
-        "title": "Envelope[DetectionPlantDetailOut]",
-        "type": "object"
-      },
-      "Envelope_DetectionPlantOut_": {
-        "additionalProperties": false,
-        "properties": {
-          "data": {
-            "$ref": "#/components/schemas/DetectionPlantOut"
-          }
-        },
-        "required": [
-          "data"
-        ],
-        "title": "Envelope[DetectionPlantOut]",
+        "title": "Envelope[ConfirmDiseaseOut]",
         "type": "object"
       },
       "Envelope_DeviceOut_": {
@@ -1328,6 +1194,19 @@
           "data"
         ],
         "title": "Envelope[DiseaseOut]",
+        "type": "object"
+      },
+      "Envelope_EpisodeOut_": {
+        "additionalProperties": false,
+        "properties": {
+          "data": {
+            "$ref": "#/components/schemas/EpisodeOut"
+          }
+        },
+        "required": [
+          "data"
+        ],
+        "title": "Envelope[EpisodeOut]",
         "type": "object"
       },
       "Envelope_FarmOut_": {
@@ -1564,19 +1443,6 @@
         "title": "Envelope[ScanDetailOut]",
         "type": "object"
       },
-      "Envelope_ScanOut_": {
-        "additionalProperties": false,
-        "properties": {
-          "data": {
-            "$ref": "#/components/schemas/ScanOut"
-          }
-        },
-        "required": [
-          "data"
-        ],
-        "title": "Envelope[ScanOut]",
-        "type": "object"
-      },
       "Envelope_StaffUserOut_": {
         "additionalProperties": false,
         "properties": {
@@ -1678,6 +1544,109 @@
         "title": "Envelope[dict[str, str]]",
         "type": "object"
       },
+      "EpisodeOut": {
+        "additionalProperties": false,
+        "properties": {
+          "close_reason": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Close Reason"
+          },
+          "delay_days": {
+            "title": "Delay Days",
+            "type": "integer"
+          },
+          "disease_code": {
+            "title": "Disease Code",
+            "type": "string"
+          },
+          "id": {
+            "title": "Id",
+            "type": "string"
+          },
+          "label": {
+            "title": "Label",
+            "type": "string"
+          },
+          "last_seen_at": {
+            "format": "date-time",
+            "title": "Last Seen At",
+            "type": "string"
+          },
+          "opened_at": {
+            "format": "date-time",
+            "title": "Opened At",
+            "type": "string"
+          },
+          "plant_id": {
+            "title": "Plant Id",
+            "type": "string"
+          },
+          "resolved_at": {
+            "anyOf": [
+              {
+                "format": "date-time",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Resolved At"
+          },
+          "scan_ids": {
+            "items": {
+              "type": "string"
+            },
+            "title": "Scan Ids",
+            "type": "array"
+          },
+          "status": {
+            "enum": [
+              "open",
+              "resolved"
+            ],
+            "title": "Status",
+            "type": "string"
+          }
+        },
+        "required": [
+          "id",
+          "plant_id",
+          "disease_code",
+          "label",
+          "status",
+          "opened_at",
+          "last_seen_at",
+          "delay_days",
+          "resolved_at",
+          "close_reason",
+          "scan_ids"
+        ],
+        "title": "EpisodeOut",
+        "type": "object"
+      },
+      "EpisodeUpdate": {
+        "additionalProperties": false,
+        "properties": {
+          "status": {
+            "const": "resolved",
+            "title": "Status",
+            "type": "string"
+          }
+        },
+        "required": [
+          "status"
+        ],
+        "title": "EpisodeUpdate",
+        "type": "object"
+      },
       "EstimateVsActual": {
         "additionalProperties": false,
         "properties": {
@@ -1706,16 +1675,13 @@
             "title": "Estimated Date Min"
           },
           "harvested_at": {
-            "anyOf": [
-              {
-                "format": "date-time",
-                "type": "string"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "title": "Harvested At"
+            "format": "date",
+            "title": "Harvested At",
+            "type": "string"
+          },
+          "sequence": {
+            "title": "Sequence",
+            "type": "integer"
           },
           "within_range": {
             "anyOf": [
@@ -1730,6 +1696,7 @@
           }
         },
         "required": [
+          "sequence",
           "estimated_date_min",
           "estimated_date_max",
           "harvested_at",
@@ -2289,7 +2256,7 @@
             "type": "string"
           },
           "commodity_code": {
-            "default": "chili",
+            "default": "mango",
             "title": "Commodity Code",
             "type": "string"
           },
@@ -2630,18 +2597,6 @@
         "title": "GeneralReminderCreate",
         "type": "object"
       },
-      "GrowthStage": {
-        "enum": [
-          "seedling",
-          "vegetative",
-          "flowering",
-          "fruiting",
-          "harvesting",
-          "finished"
-        ],
-        "title": "GrowthStage",
-        "type": "string"
-      },
       "HTTPValidationError": {
         "properties": {
           "detail": {
@@ -2657,16 +2612,23 @@
       },
       "HarvestCreate": {
         "additionalProperties": false,
+        "description": "A harvest. ``harvested_at`` is a day (``2026-11-08``); omitted means today.",
         "properties": {
           "harvested_at": {
-            "format": "date-time",
-            "title": "Harvested At",
-            "type": "string"
-          },
-          "is_final": {
-            "default": false,
-            "title": "Is Final",
-            "type": "boolean"
+            "anyOf": [
+              {
+                "format": "date",
+                "type": "string"
+              },
+              {
+                "format": "date-time",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Harvested At"
           },
           "quality_note": {
             "anyOf": [
@@ -2697,9 +2659,6 @@
             "title": "Quantity Kg"
           }
         },
-        "required": [
-          "harvested_at"
-        ],
         "title": "HarvestCreate",
         "type": "object"
       },
@@ -2712,13 +2671,23 @@
             "type": "string"
           },
           "harvested_at": {
-            "format": "date-time",
+            "format": "date",
             "title": "Harvested At",
             "type": "string"
           },
           "id": {
             "title": "Id",
             "type": "string"
+          },
+          "next_harvest": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/NextHarvestOut"
+              },
+              {
+                "type": "null"
+              }
+            ]
           },
           "plant_id": {
             "title": "Plant Id",
@@ -2745,11 +2714,16 @@
               }
             ],
             "title": "Quantity Kg"
+          },
+          "sequence": {
+            "title": "Sequence",
+            "type": "integer"
           }
         },
         "required": [
           "id",
           "plant_id",
+          "sequence",
           "harvested_at",
           "quality_note",
           "quantity_kg",
@@ -2758,16 +2732,88 @@
         "title": "HarvestOut",
         "type": "object"
       },
-      "HarvestOutcome": {
-        "description": "Final result of a tracked plant (requirement 1, \"Hasil Akhir\").",
-        "enum": [
-          "failed",
-          "suboptimal",
-          "normal",
-          "bumper"
+      "HarvestPoint": {
+        "additionalProperties": false,
+        "properties": {
+          "date": {
+            "format": "date",
+            "title": "Date",
+            "type": "string"
+          },
+          "quantity_kg": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Quantity Kg"
+          },
+          "sequence": {
+            "title": "Sequence",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "date",
+          "sequence",
+          "quantity_kg"
         ],
-        "title": "HarvestOutcome",
-        "type": "string"
+        "title": "HarvestPoint",
+        "type": "object"
+      },
+      "HarvestUpdate": {
+        "additionalProperties": false,
+        "properties": {
+          "harvested_at": {
+            "anyOf": [
+              {
+                "format": "date",
+                "type": "string"
+              },
+              {
+                "format": "date-time",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Harvested At"
+          },
+          "quality_note": {
+            "anyOf": [
+              {
+                "maxLength": 1000,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Quality Note"
+          },
+          "quantity_kg": {
+            "anyOf": [
+              {
+                "maximum": 1000000.0,
+                "minimum": 0.0,
+                "type": "number"
+              },
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Quantity Kg"
+          }
+        },
+        "title": "HarvestUpdate",
+        "type": "object"
       },
       "HealthPoint": {
         "additionalProperties": false,
@@ -2851,6 +2897,14 @@
         "title": "IrrigationSchedule",
         "type": "string"
       },
+      "LifecyclePhase": {
+        "enum": [
+          "juvenile",
+          "productive"
+        ],
+        "title": "LifecyclePhase",
+        "type": "string"
+      },
       "ListEnvelope_BroadcastHistoryItem_": {
         "additionalProperties": false,
         "properties": {
@@ -2893,12 +2947,12 @@
         "title": "ListEnvelope[CareLogOut]",
         "type": "object"
       },
-      "ListEnvelope_DetectionPlantOut_": {
+      "ListEnvelope_CropProfileOut_": {
         "additionalProperties": false,
         "properties": {
           "data": {
             "items": {
-              "$ref": "#/components/schemas/DetectionPlantOut"
+              "$ref": "#/components/schemas/CropProfileOut"
             },
             "title": "Data",
             "type": "array"
@@ -2911,7 +2965,7 @@
           "data",
           "meta"
         ],
-        "title": "ListEnvelope[DetectionPlantOut]",
+        "title": "ListEnvelope[CropProfileOut]",
         "type": "object"
       },
       "ListEnvelope_DeviceOut_": {
@@ -2975,6 +3029,27 @@
           "meta"
         ],
         "title": "ListEnvelope[DiseaseSummaryOut]",
+        "type": "object"
+      },
+      "ListEnvelope_EpisodeOut_": {
+        "additionalProperties": false,
+        "properties": {
+          "data": {
+            "items": {
+              "$ref": "#/components/schemas/EpisodeOut"
+            },
+            "title": "Data",
+            "type": "array"
+          },
+          "meta": {
+            "$ref": "#/components/schemas/PaginationMeta"
+          }
+        },
+        "required": [
+          "data",
+          "meta"
+        ],
+        "title": "ListEnvelope[EpisodeOut]",
         "type": "object"
       },
       "ListEnvelope_FarmOut_": {
@@ -3080,6 +3155,27 @@
           "meta"
         ],
         "title": "ListEnvelope[ForumPostOut]",
+        "type": "object"
+      },
+      "ListEnvelope_HarvestOut_": {
+        "additionalProperties": false,
+        "properties": {
+          "data": {
+            "items": {
+              "$ref": "#/components/schemas/HarvestOut"
+            },
+            "title": "Data",
+            "type": "array"
+          },
+          "meta": {
+            "$ref": "#/components/schemas/PaginationMeta"
+          }
+        },
+        "required": [
+          "data",
+          "meta"
+        ],
+        "title": "ListEnvelope[HarvestOut]",
         "type": "object"
       },
       "ListEnvelope_PhotoOut_": {
@@ -3208,12 +3304,12 @@
         "title": "ListEnvelope[ReportedTargetOut]",
         "type": "object"
       },
-      "ListEnvelope_ScanOut_": {
+      "ListEnvelope_ScanHistoryItem_": {
         "additionalProperties": false,
         "properties": {
           "data": {
             "items": {
-              "$ref": "#/components/schemas/ScanOut"
+              "$ref": "#/components/schemas/ScanHistoryItem"
             },
             "title": "Data",
             "type": "array"
@@ -3226,7 +3322,7 @@
           "data",
           "meta"
         ],
-        "title": "ListEnvelope[ScanOut]",
+        "title": "ListEnvelope[ScanHistoryItem]",
         "type": "object"
       },
       "ListEnvelope_StaffUserOut_": {
@@ -3335,6 +3431,68 @@
           "status"
         ],
         "title": "ModerationStatusUpdate",
+        "type": "object"
+      },
+      "NextHarvestOut": {
+        "additionalProperties": false,
+        "description": "The estimated window of the next harvest; always an estimate (design 8.4).",
+        "properties": {
+          "base_end": {
+            "format": "date",
+            "title": "Base End",
+            "type": "string"
+          },
+          "base_start": {
+            "format": "date",
+            "title": "Base Start",
+            "type": "string"
+          },
+          "delay_capped": {
+            "default": false,
+            "title": "Delay Capped",
+            "type": "boolean"
+          },
+          "delay_days": {
+            "title": "Delay Days",
+            "type": "integer"
+          },
+          "delays": {
+            "items": {
+              "$ref": "#/components/schemas/DelayItemOut"
+            },
+            "title": "Delays",
+            "type": "array"
+          },
+          "end": {
+            "format": "date",
+            "title": "End",
+            "type": "string"
+          },
+          "is_estimate": {
+            "default": true,
+            "title": "Is Estimate",
+            "type": "boolean"
+          },
+          "is_overdue": {
+            "title": "Is Overdue",
+            "type": "boolean"
+          },
+          "start": {
+            "format": "date",
+            "title": "Start",
+            "type": "string"
+          }
+        },
+        "required": [
+          "base_start",
+          "base_end",
+          "delay_days",
+          "start",
+          "end",
+          "delays",
+          "is_overdue"
+        ],
+        "title": "NextHarvestOut",
         "type": "object"
       },
       "NotificationSettingsOut": {
@@ -3593,13 +3751,8 @@
         "additionalProperties": false,
         "properties": {
           "commodity_code": {
-            "default": "chili",
             "title": "Commodity Code",
             "type": "string"
-          },
-          "growth_stage": {
-            "$ref": "#/components/schemas/GrowthStage",
-            "default": "seedling"
           },
           "irrigation_schedule": {
             "$ref": "#/components/schemas/IrrigationSchedule",
@@ -3616,6 +3769,23 @@
             "title": "Planted At",
             "type": "string"
           },
+          "planting_material": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/PlantingMaterial"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "quantity": {
+            "default": 1,
+            "maximum": 100000.0,
+            "minimum": 1.0,
+            "title": "Quantity",
+            "type": "integer"
+          },
           "variety": {
             "anyOf": [
               {
@@ -3631,9 +3801,34 @@
         },
         "required": [
           "label",
+          "commodity_code",
           "planted_at"
         ],
         "title": "PlantCreate",
+        "type": "object"
+      },
+      "PlantMaterialOut": {
+        "additionalProperties": false,
+        "properties": {
+          "code": {
+            "title": "Code",
+            "type": "string"
+          },
+          "is_default": {
+            "title": "Is Default",
+            "type": "boolean"
+          },
+          "label": {
+            "title": "Label",
+            "type": "string"
+          }
+        },
+        "required": [
+          "code",
+          "label",
+          "is_default"
+        ],
+        "title": "PlantMaterialOut",
         "type": "object"
       },
       "PlantOut": {
@@ -3646,6 +3841,10 @@
           "age_days": {
             "title": "Age Days",
             "type": "integer"
+          },
+          "code": {
+            "title": "Code",
+            "type": "string"
           },
           "commodity_code": {
             "title": "Commodity Code",
@@ -3670,6 +3869,24 @@
             "format": "date-time",
             "title": "Created At",
             "type": "string"
+          },
+          "end_cause_note": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "End Cause Note"
+          },
+          "end_diseases": {
+            "items": {
+              "$ref": "#/components/schemas/EndedDiseaseOut"
+            },
+            "title": "End Diseases",
+            "type": "array"
           },
           "end_note": {
             "anyOf": [
@@ -3704,30 +3921,6 @@
             ],
             "title": "Ended At"
           },
-          "expected_harvest_max": {
-            "anyOf": [
-              {
-                "format": "date",
-                "type": "string"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "title": "Expected Harvest Max"
-          },
-          "expected_harvest_min": {
-            "anyOf": [
-              {
-                "format": "date",
-                "type": "string"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "title": "Expected Harvest Min"
-          },
           "farm_id": {
             "title": "Farm Id",
             "type": "string"
@@ -3736,18 +3929,10 @@
             "title": "Farm Name",
             "type": "string"
           },
-          "final_result": {
-            "anyOf": [
-              {
-                "$ref": "#/components/schemas/HarvestOutcome"
-              },
-              {
-                "type": "null"
-              }
-            ]
-          },
-          "growth_stage": {
-            "$ref": "#/components/schemas/GrowthStage"
+          "harvest_count": {
+            "default": 0,
+            "title": "Harvest Count",
+            "type": "integer"
           },
           "health_status": {
             "$ref": "#/components/schemas/HealthStatus"
@@ -3774,6 +3959,18 @@
             "title": "Label",
             "type": "string"
           },
+          "last_harvest_at": {
+            "anyOf": [
+              {
+                "format": "date",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Last Harvest At"
+          },
           "last_scan_at": {
             "anyOf": [
               {
@@ -3798,6 +3995,19 @@
             ],
             "title": "Last Watered At"
           },
+          "lifecycle_phase": {
+            "$ref": "#/components/schemas/LifecyclePhase"
+          },
+          "next_harvest": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/NextHarvestOut"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
           "next_watering_on": {
             "anyOf": [
               {
@@ -3810,6 +4020,21 @@
             ],
             "title": "Next Watering On"
           },
+          "open_episode_count": {
+            "default": 0,
+            "title": "Open Episode Count",
+            "type": "integer"
+          },
+          "outcome": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/TrackingOutcome"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
           "placement": {
             "$ref": "#/components/schemas/Placement"
           },
@@ -3817,6 +4042,18 @@
             "format": "date",
             "title": "Planted At",
             "type": "string"
+          },
+          "planting_material": {
+            "$ref": "#/components/schemas/PlantingMaterial"
+          },
+          "productive_until": {
+            "format": "date",
+            "title": "Productive Until",
+            "type": "string"
+          },
+          "quantity": {
+            "title": "Quantity",
+            "type": "integer"
           },
           "status": {
             "enum": [
@@ -3852,32 +4089,23 @@
               }
             ],
             "title": "Village"
-          },
-          "yield_percent": {
-            "anyOf": [
-              {
-                "type": "number"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "title": "Yield Percent"
           }
         },
         "required": [
           "id",
+          "code",
           "farm_id",
           "label",
           "commodity_code",
           "commodity_label",
           "variety",
+          "planting_material",
+          "quantity",
           "planted_at",
           "age_days",
-          "growth_stage",
+          "lifecycle_phase",
+          "productive_until",
           "health_status",
-          "expected_harvest_min",
-          "expected_harvest_max",
           "irrigation_schedule",
           "farm_name",
           "placement",
@@ -3900,24 +4128,24 @@
             "title": "Estimate Vs Actual",
             "type": "array"
           },
+          "harvest_series": {
+            "items": {
+              "$ref": "#/components/schemas/HarvestPoint"
+            },
+            "title": "Harvest Series",
+            "type": "array"
+          },
           "health_series": {
             "items": {
               "$ref": "#/components/schemas/HealthPoint"
             },
             "title": "Health Series",
             "type": "array"
-          },
-          "ripeness_series": {
-            "items": {
-              "$ref": "#/components/schemas/RipenessPoint"
-            },
-            "title": "Ripeness Series",
-            "type": "array"
           }
         },
         "required": [
           "health_series",
-          "ripeness_series",
+          "harvest_series",
           "estimate_vs_actual"
         ],
         "title": "PlantStats",
@@ -3937,12 +4165,31 @@
           "label": {
             "title": "Label",
             "type": "string"
+          },
+          "materials": {
+            "items": {
+              "$ref": "#/components/schemas/PlantMaterialOut"
+            },
+            "title": "Materials",
+            "type": "array"
+          },
+          "profile_summary": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Profile Summary"
           }
         },
         "required": [
           "code",
           "label",
-          "detection_supported"
+          "detection_supported",
+          "materials"
         ],
         "title": "PlantTypeOut",
         "type": "object"
@@ -3950,16 +4197,6 @@
       "PlantUpdate": {
         "additionalProperties": false,
         "properties": {
-          "growth_stage": {
-            "anyOf": [
-              {
-                "$ref": "#/components/schemas/GrowthStage"
-              },
-              {
-                "type": "null"
-              }
-            ]
-          },
           "irrigation_schedule": {
             "anyOf": [
               {
@@ -3995,6 +4232,29 @@
             ],
             "title": "Planted At"
           },
+          "planting_material": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/PlantingMaterial"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "quantity": {
+            "anyOf": [
+              {
+                "maximum": 100000.0,
+                "minimum": 1.0,
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Quantity"
+          },
           "variety": {
             "anyOf": [
               {
@@ -4010,6 +4270,16 @@
         },
         "title": "PlantUpdate",
         "type": "object"
+      },
+      "PlantingMaterial": {
+        "enum": [
+          "grafted",
+          "seed",
+          "runner",
+          "other"
+        ],
+        "title": "PlantingMaterial",
+        "type": "string"
       },
       "Platform": {
         "enum": [
@@ -4278,6 +4548,10 @@
           "heavy_rain_harvest",
           "harvest_soon",
           "heat_stress",
+          "harvest_due",
+          "harvest_check",
+          "productive_ending",
+          "tracking_completed",
           "scan_followup",
           "general"
         ],
@@ -4408,50 +4682,6 @@
         "title": "ResultStatus",
         "type": "string"
       },
-      "RipenessPoint": {
-        "additionalProperties": false,
-        "properties": {
-          "date": {
-            "format": "date",
-            "title": "Date",
-            "type": "string"
-          },
-          "estimated_days_max": {
-            "anyOf": [
-              {
-                "type": "integer"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "title": "Estimated Days Max"
-          },
-          "estimated_days_min": {
-            "anyOf": [
-              {
-                "type": "integer"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "title": "Estimated Days Min"
-          },
-          "stage": {
-            "title": "Stage",
-            "type": "string"
-          }
-        },
-        "required": [
-          "date",
-          "stage",
-          "estimated_days_min",
-          "estimated_days_max"
-        ],
-        "title": "RipenessPoint",
-        "type": "object"
-      },
       "RoleUpdate": {
         "additionalProperties": false,
         "description": "design 13: ``expert`` after PM verification, ``moderator`` by appointment.",
@@ -4466,43 +4696,38 @@
         "title": "RoleUpdate",
         "type": "object"
       },
-      "ScanAttach": {
-        "additionalProperties": false,
-        "properties": {
-          "plant_id": {
-            "anyOf": [
-              {
-                "format": "uuid",
-                "type": "string"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "title": "Plant Id"
-          }
-        },
-        "required": [
-          "plant_id"
-        ],
-        "title": "ScanAttach",
-        "type": "object"
-      },
       "ScanCreated": {
         "additionalProperties": false,
-        "description": "The 201 body. Same shape as ``ScanOut`` plus the idempotency hint.",
+        "description": "The 201 body of a stored scan, or the 200 body of a \"cek cepat\" (not stored).",
         "properties": {
           "captured_at": {
             "format": "date-time",
             "title": "Captured At",
             "type": "string"
           },
+          "closed_episode_ids": {
+            "items": {
+              "type": "string"
+            },
+            "title": "Closed Episode Ids",
+            "type": "array"
+          },
+          "confirmation": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/ConfirmationOut"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
           "created_at": {
             "format": "date-time",
             "title": "Created At",
             "type": "string"
           },
-          "detection_plant_id": {
+          "id": {
             "anyOf": [
               {
                 "type": "string"
@@ -4511,15 +4736,18 @@
                 "type": "null"
               }
             ],
-            "title": "Detection Plant Id"
-          },
-          "id": {
-            "title": "Id",
-            "type": "string"
+            "title": "Id"
           },
           "image_url": {
-            "title": "Image Url",
-            "type": "string"
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Image Url"
           },
           "is_duplicate": {
             "default": false,
@@ -4529,6 +4757,17 @@
           "model_version": {
             "title": "Model Version",
             "type": "string"
+          },
+          "plant_code": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Plant Code"
           },
           "plant_id": {
             "anyOf": [
@@ -4550,6 +4789,11 @@
             "additionalProperties": true,
             "title": "Result",
             "type": "object"
+          },
+          "saved": {
+            "default": true,
+            "title": "Saved",
+            "type": "boolean"
           },
           "status": {
             "$ref": "#/components/schemas/ResultStatus"
@@ -4590,17 +4834,6 @@
             "title": "Created At",
             "type": "string"
           },
-          "detection_plant_id": {
-            "anyOf": [
-              {
-                "type": "string"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "title": "Detection Plant Id"
-          },
           "feedback": {
             "anyOf": [
               {
@@ -4624,15 +4857,8 @@
             "type": "string"
           },
           "plant_id": {
-            "anyOf": [
-              {
-                "type": "string"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "title": "Plant Id"
+            "title": "Plant Id",
+            "type": "string"
           },
           "quality": {
             "additionalProperties": true,
@@ -4667,20 +4893,41 @@
         "title": "ScanDetailOut",
         "type": "object"
       },
-      "ScanOut": {
+      "ScanHistoryItem": {
         "additionalProperties": false,
+        "description": "One row of Riwayat Scan (design 10.6).",
         "properties": {
           "captured_at": {
             "format": "date-time",
             "title": "Captured At",
             "type": "string"
           },
-          "created_at": {
-            "format": "date-time",
-            "title": "Created At",
+          "cause_category": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/CauseCategory"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "commodity_code": {
+            "title": "Commodity Code",
             "type": "string"
           },
-          "detection_plant_id": {
+          "confidence_percent": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Confidence Percent"
+          },
+          "disease_code": {
             "anyOf": [
               {
                 "type": "string"
@@ -4689,21 +4936,62 @@
                 "type": "null"
               }
             ],
-            "title": "Detection Plant Id"
+            "title": "Disease Code"
+          },
+          "disease_episode_id": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Disease Episode Id"
+          },
+          "disease_label": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Disease Label"
           },
           "id": {
             "title": "Id",
             "type": "string"
           },
-          "image_url": {
-            "title": "Image Url",
+          "is_healthy": {
+            "anyOf": [
+              {
+                "type": "boolean"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Is Healthy"
+          },
+          "plant_code": {
+            "title": "Plant Code",
             "type": "string"
           },
-          "model_version": {
-            "title": "Model Version",
-            "type": "string"
+          "plant_ended": {
+            "title": "Plant Ended",
+            "type": "boolean"
           },
           "plant_id": {
+            "title": "Plant Id",
+            "type": "string"
+          },
+          "plant_label": {
+            "title": "Plant Label",
+            "type": "string"
+          },
+          "prevention_summary": {
             "anyOf": [
               {
                 "type": "string"
@@ -4712,38 +5000,35 @@
                 "type": "null"
               }
             ],
-            "title": "Plant Id"
-          },
-          "quality": {
-            "additionalProperties": true,
-            "title": "Quality",
-            "type": "object"
-          },
-          "result": {
-            "additionalProperties": true,
-            "title": "Result",
-            "type": "object"
+            "title": "Prevention Summary"
           },
           "status": {
             "$ref": "#/components/schemas/ResultStatus"
           },
-          "type": {
-            "$ref": "#/components/schemas/ScanType"
+          "thumbnail_url": {
+            "title": "Thumbnail Url",
+            "type": "string"
           }
         },
         "required": [
           "id",
-          "type",
-          "status",
-          "model_version",
-          "image_url",
-          "plant_id",
           "captured_at",
-          "result",
-          "quality",
-          "created_at"
+          "plant_id",
+          "plant_code",
+          "plant_label",
+          "plant_ended",
+          "commodity_code",
+          "status",
+          "disease_code",
+          "disease_label",
+          "cause_category",
+          "confidence_percent",
+          "is_healthy",
+          "prevention_summary",
+          "disease_episode_id",
+          "thumbnail_url"
         ],
-        "title": "ScanOut",
+        "title": "ScanHistoryItem",
         "type": "object"
       },
       "ScanType": {
@@ -4913,14 +5198,28 @@
         "type": "object"
       },
       "TrackingEndReason": {
-        "description": "Why tracking of a plant ended (requirement 1, 2).",
+        "description": "Why tracking of a plant ended (requirement 1, 2; design 8.2 v2).\n\n``HARVESTED``, ``DIED`` and ``NOT_MAINTAINED`` are the v0.3 values, kept only\nuntil migration 0005 rewrites stored rows; nothing new may use them.",
         "enum": [
+          "productive_period_over",
+          "disease",
+          "cut_down",
+          "died_other",
+          "other",
           "harvested",
           "died",
-          "not_maintained",
-          "other"
+          "not_maintained"
         ],
         "title": "TrackingEndReason",
+        "type": "string"
+      },
+      "TrackingOutcome": {
+        "description": "How a plant's tracking ended (design 8.6).",
+        "enum": [
+          "completed",
+          "ended_early",
+          "failed"
+        ],
+        "title": "TrackingOutcome",
         "type": "string"
       },
       "TreatmentStep": {
@@ -5974,379 +6273,25 @@
         ]
       }
     },
-    "/api/v1/detection-plants": {
+    "/api/v1/crop-profiles": {
       "get": {
-        "description": "``active``: Daftar Tanaman Deteksi. ``ended``: History Deteksi Penyakit.",
-        "operationId": "list_detection_plants_api_v1_detection_plants_get",
-        "parameters": [
-          {
-            "in": "query",
-            "name": "status",
-            "required": false,
-            "schema": {
-              "default": "active",
-              "enum": [
-                "active",
-                "ended"
-              ],
-              "title": "Status",
-              "type": "string"
-            }
-          },
-          {
-            "in": "header",
-            "name": "authorization",
-            "required": false,
-            "schema": {
-              "anyOf": [
-                {
-                  "type": "string"
-                },
-                {
-                  "type": "null"
-                }
-              ],
-              "title": "Authorization"
-            }
-          }
-        ],
+        "description": "The agronomic numbers behind the harvest estimate, with their source (design 10.8).",
+        "operationId": "crop_profiles_api_v1_crop_profiles_get",
         "responses": {
           "200": {
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/ListEnvelope_DetectionPlantOut_"
+                  "$ref": "#/components/schemas/ListEnvelope_CropProfileOut_"
                 }
               }
             },
             "description": "Successful Response"
-          },
-          "422": {
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/HTTPValidationError"
-                }
-              }
-            },
-            "description": "Validation Error"
           }
         },
-        "summary": "List Detection Plants",
+        "summary": "Crop Profiles",
         "tags": [
-          "detections"
-        ]
-      },
-      "post": {
-        "operationId": "create_detection_plant_api_v1_detection_plants_post",
-        "parameters": [
-          {
-            "in": "header",
-            "name": "authorization",
-            "required": false,
-            "schema": {
-              "anyOf": [
-                {
-                  "type": "string"
-                },
-                {
-                  "type": "null"
-                }
-              ],
-              "title": "Authorization"
-            }
-          }
-        ],
-        "requestBody": {
-          "content": {
-            "application/json": {
-              "schema": {
-                "$ref": "#/components/schemas/DetectionPlantCreate"
-              }
-            }
-          },
-          "required": true
-        },
-        "responses": {
-          "201": {
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/Envelope_DetectionPlantOut_"
-                }
-              }
-            },
-            "description": "Successful Response"
-          },
-          "422": {
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/HTTPValidationError"
-                }
-              }
-            },
-            "description": "Validation Error"
-          }
-        },
-        "summary": "Create Detection Plant",
-        "tags": [
-          "detections"
-        ]
-      }
-    },
-    "/api/v1/detection-plants/{detection_id}": {
-      "get": {
-        "description": "Detail with every check (photo, disease, confidence, symptoms, advice).",
-        "operationId": "get_detection_plant_api_v1_detection_plants__detection_id__get",
-        "parameters": [
-          {
-            "in": "path",
-            "name": "detection_id",
-            "required": true,
-            "schema": {
-              "format": "uuid",
-              "title": "Detection Id",
-              "type": "string"
-            }
-          },
-          {
-            "in": "header",
-            "name": "authorization",
-            "required": false,
-            "schema": {
-              "anyOf": [
-                {
-                  "type": "string"
-                },
-                {
-                  "type": "null"
-                }
-              ],
-              "title": "Authorization"
-            }
-          }
-        ],
-        "responses": {
-          "200": {
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/Envelope_DetectionPlantDetailOut_"
-                }
-              }
-            },
-            "description": "Successful Response"
-          },
-          "422": {
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/HTTPValidationError"
-                }
-              }
-            },
-            "description": "Validation Error"
-          }
-        },
-        "summary": "Get Detection Plant",
-        "tags": [
-          "detections"
-        ]
-      },
-      "patch": {
-        "operationId": "update_detection_plant_api_v1_detection_plants__detection_id__patch",
-        "parameters": [
-          {
-            "in": "path",
-            "name": "detection_id",
-            "required": true,
-            "schema": {
-              "format": "uuid",
-              "title": "Detection Id",
-              "type": "string"
-            }
-          },
-          {
-            "in": "header",
-            "name": "authorization",
-            "required": false,
-            "schema": {
-              "anyOf": [
-                {
-                  "type": "string"
-                },
-                {
-                  "type": "null"
-                }
-              ],
-              "title": "Authorization"
-            }
-          }
-        ],
-        "requestBody": {
-          "content": {
-            "application/json": {
-              "schema": {
-                "$ref": "#/components/schemas/DetectionPlantUpdate"
-              }
-            }
-          },
-          "required": true
-        },
-        "responses": {
-          "200": {
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/Envelope_DetectionPlantOut_"
-                }
-              }
-            },
-            "description": "Successful Response"
-          },
-          "422": {
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/HTTPValidationError"
-                }
-              }
-            },
-            "description": "Validation Error"
-          }
-        },
-        "summary": "Update Detection Plant",
-        "tags": [
-          "detections"
-        ]
-      }
-    },
-    "/api/v1/detection-plants/{detection_id}/end": {
-      "post": {
-        "operationId": "end_detection_api_v1_detection_plants__detection_id__end_post",
-        "parameters": [
-          {
-            "in": "path",
-            "name": "detection_id",
-            "required": true,
-            "schema": {
-              "format": "uuid",
-              "title": "Detection Id",
-              "type": "string"
-            }
-          },
-          {
-            "in": "header",
-            "name": "authorization",
-            "required": false,
-            "schema": {
-              "anyOf": [
-                {
-                  "type": "string"
-                },
-                {
-                  "type": "null"
-                }
-              ],
-              "title": "Authorization"
-            }
-          }
-        ],
-        "requestBody": {
-          "content": {
-            "application/json": {
-              "schema": {
-                "$ref": "#/components/schemas/DetectionEnd"
-              }
-            }
-          },
-          "required": true
-        },
-        "responses": {
-          "200": {
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/Envelope_DetectionPlantOut_"
-                }
-              }
-            },
-            "description": "Successful Response"
-          },
-          "422": {
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/HTTPValidationError"
-                }
-              }
-            },
-            "description": "Validation Error"
-          }
-        },
-        "summary": "End Detection",
-        "tags": [
-          "detections"
-        ]
-      }
-    },
-    "/api/v1/detection-plants/{detection_id}/reactivate": {
-      "post": {
-        "operationId": "reactivate_detection_api_v1_detection_plants__detection_id__reactivate_post",
-        "parameters": [
-          {
-            "in": "path",
-            "name": "detection_id",
-            "required": true,
-            "schema": {
-              "format": "uuid",
-              "title": "Detection Id",
-              "type": "string"
-            }
-          },
-          {
-            "in": "header",
-            "name": "authorization",
-            "required": false,
-            "schema": {
-              "anyOf": [
-                {
-                  "type": "string"
-                },
-                {
-                  "type": "null"
-                }
-              ],
-              "title": "Authorization"
-            }
-          }
-        ],
-        "responses": {
-          "200": {
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/Envelope_DetectionPlantOut_"
-                }
-              }
-            },
-            "description": "Successful Response"
-          },
-          "422": {
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/HTTPValidationError"
-                }
-              }
-            },
-            "description": "Validation Error"
-          }
-        },
-        "summary": "Reactivate Detection",
-        "tags": [
-          "detections"
+          "farms"
         ]
       }
     },
@@ -6506,6 +6451,76 @@
         "summary": "Delete Device",
         "tags": [
           "auth"
+        ]
+      }
+    },
+    "/api/v1/disease-episodes/{episode_id}": {
+      "patch": {
+        "description": "\"Tandai sembuh\". It never gives back days already added to the running cycle.",
+        "operationId": "update_episode_api_v1_disease_episodes__episode_id__patch",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "episode_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Episode Id",
+              "type": "string"
+            }
+          },
+          {
+            "in": "header",
+            "name": "authorization",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Authorization"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/EpisodeUpdate"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Envelope_EpisodeOut_"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Update Episode",
+        "tags": [
+          "farms"
         ]
       }
     },
@@ -8109,7 +8124,7 @@
     },
     "/api/v1/plant-types": {
       "get": {
-        "description": "Dropdown of plant types (requirement 1); detection works for some only.",
+        "description": "Dropdown of plant types (mango, citrus, strawberry) with the planting materials allowed.",
         "operationId": "plant_types_api_v1_plant_types_get",
         "responses": {
           "200": {
@@ -8131,7 +8146,7 @@
     },
     "/api/v1/plants": {
       "get": {
-        "description": "``status=active``: Tracking Tanaman. ``status=ended``: History Tracking.",
+        "description": "``status=active``: Tracking. ``status=ended``: Riwayat Tanaman (filter ``outcome``).",
         "operationId": "list_my_plants_api_v1_plants_get",
         "parameters": [
           {
@@ -8146,6 +8161,43 @@
               ],
               "title": "Status",
               "type": "string"
+            }
+          },
+          {
+            "in": "query",
+            "name": "commodity_code",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Commodity Code"
+            }
+          },
+          {
+            "in": "query",
+            "name": "outcome",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "enum": [
+                    "completed",
+                    "ended_early",
+                    "failed"
+                  ],
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Outcome"
             }
           },
           {
@@ -8575,6 +8627,86 @@
         ]
       }
     },
+    "/api/v1/plants/{plant_id}/disease-episodes": {
+      "get": {
+        "description": "The plant's disease episodes, newest first, each with the scans that back it.",
+        "operationId": "list_episodes_api_v1_plants__plant_id__disease_episodes_get",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "plant_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Plant Id",
+              "type": "string"
+            }
+          },
+          {
+            "in": "query",
+            "name": "status",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "enum": [
+                    "open",
+                    "resolved"
+                  ],
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Status"
+            }
+          },
+          {
+            "in": "header",
+            "name": "authorization",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Authorization"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ListEnvelope_EpisodeOut_"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "List Episodes",
+        "tags": [
+          "farms"
+        ]
+      }
+    },
     "/api/v1/plants/{plant_id}/end": {
       "post": {
         "description": "Requirement 1: end tracking; reminders for this plant stop.",
@@ -8646,7 +8778,66 @@
       }
     },
     "/api/v1/plants/{plant_id}/harvests": {
+      "get": {
+        "description": "Every harvest of the plant, numbered \"panen ke-n\".",
+        "operationId": "list_harvests_api_v1_plants__plant_id__harvests_get",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "plant_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Plant Id",
+              "type": "string"
+            }
+          },
+          {
+            "in": "header",
+            "name": "authorization",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Authorization"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ListEnvelope_HarvestOut_"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "List Harvests",
+        "tags": [
+          "farms"
+        ]
+      },
       "post": {
+        "description": "Record a harvest; the response carries the recomputed ``next_harvest``.",
         "operationId": "record_harvest_api_v1_plants__plant_id__harvests_post",
         "parameters": [
           {
@@ -8709,6 +8900,145 @@
           }
         },
         "summary": "Record Harvest",
+        "tags": [
+          "farms"
+        ]
+      }
+    },
+    "/api/v1/plants/{plant_id}/harvests/{harvest_id}": {
+      "delete": {
+        "operationId": "delete_harvest_api_v1_plants__plant_id__harvests__harvest_id__delete",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "plant_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Plant Id",
+              "type": "string"
+            }
+          },
+          {
+            "in": "path",
+            "name": "harvest_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Harvest Id",
+              "type": "string"
+            }
+          },
+          {
+            "in": "header",
+            "name": "authorization",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Authorization"
+            }
+          }
+        ],
+        "responses": {
+          "204": {
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Delete Harvest",
+        "tags": [
+          "farms"
+        ]
+      },
+      "patch": {
+        "operationId": "update_harvest_api_v1_plants__plant_id__harvests__harvest_id__patch",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "plant_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Plant Id",
+              "type": "string"
+            }
+          },
+          {
+            "in": "path",
+            "name": "harvest_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Harvest Id",
+              "type": "string"
+            }
+          },
+          {
+            "in": "header",
+            "name": "authorization",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Authorization"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/HarvestUpdate"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Envelope_HarvestOut_"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Update Harvest",
         "tags": [
           "farms"
         ]
@@ -9586,6 +9916,7 @@
     },
     "/api/v1/scans": {
       "get": {
+        "description": "Riwayat Scan (design 5.8): filter by plant, commodity, disease, status and day.",
         "operationId": "list_scans_api_v1_scans_get",
         "parameters": [
           {
@@ -9607,35 +9938,91 @@
           },
           {
             "in": "query",
-            "name": "detection_plant_id",
+            "name": "commodity_code",
             "required": false,
             "schema": {
               "anyOf": [
                 {
-                  "format": "uuid",
                   "type": "string"
                 },
                 {
                   "type": "null"
                 }
               ],
-              "title": "Detection Plant Id"
+              "title": "Commodity Code"
             }
           },
           {
             "in": "query",
-            "name": "type",
+            "name": "disease_code",
             "required": false,
             "schema": {
               "anyOf": [
                 {
-                  "$ref": "#/components/schemas/ScanType"
+                  "type": "string"
                 },
                 {
                   "type": "null"
                 }
               ],
-              "title": "Type"
+              "title": "Disease Code"
+            }
+          },
+          {
+            "in": "query",
+            "name": "status",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "enum": [
+                    "confident",
+                    "uncertain",
+                    "unknown",
+                    "invalid_image",
+                    "all"
+                  ],
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Status"
+            }
+          },
+          {
+            "in": "query",
+            "name": "from",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "format": "date",
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "From"
+            }
+          },
+          {
+            "in": "query",
+            "name": "to",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "format": "date",
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "To"
             }
           },
           {
@@ -9694,7 +10081,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/ListEnvelope_ScanOut_"
+                  "$ref": "#/components/schemas/ListEnvelope_ScanHistoryItem_"
                 }
               }
             },
@@ -9717,7 +10104,7 @@
         ]
       },
       "post": {
-        "description": "Analyse one photo.\n\n``201`` for a new scan. A resend with the same ``client_uuid`` returns the\nstored result with ``200`` and never calls the vision service again\n(design 10.6, 14); ``is_duplicate`` carries the same information in the body.",
+        "description": "Analyse one leaf photo.\n\nWith ``plant_id`` the scan is stored: ``201`` for a new one, ``200`` for a\nresend with the same ``client_uuid`` (design 10.6, 14; ``is_duplicate``\nsays the same in the body). Without ``plant_id`` it is a \"cek cepat\" that\nneeds ``commodity_code``, is never stored and always answers ``200``.",
         "operationId": "create_scan_api_v1_scans_post",
         "parameters": [
           {
@@ -9765,7 +10152,7 @@
         },
         "responses": {
           "200": {
-            "description": "Duplikat: client_uuid sudah pernah dikirim."
+            "description": "Duplikat (client_uuid sudah pernah dikirim) atau cek cepat."
           },
           "201": {
             "content": {
@@ -9846,7 +10233,7 @@
         ]
       },
       "get": {
-        "description": "Detail Scan (S12), including the user's verdict if they gave one.",
+        "description": "Detail Scan, including the user's verdict if they gave one.",
         "operationId": "get_scan_api_v1_scans__scan_id__get",
         "parameters": [
           {
@@ -9902,9 +10289,12 @@
         "tags": [
           "scans"
         ]
-      },
-      "patch": {
-        "operationId": "attach_scan_api_v1_scans__scan_id__patch",
+      }
+    },
+    "/api/v1/scans/{scan_id}/confirm-disease": {
+      "post": {
+        "description": "\"Ya, tanaman ini sakit\" (design 5.4, 8.5).\n\n``201`` opens an episode. ``200`` means the scan joined an episode that was\nalready open (or was confirmed before), which adds no further delay.",
+        "operationId": "confirm_disease_api_v1_scans__scan_id__confirm_disease_post",
         "parameters": [
           {
             "in": "path",
@@ -9933,22 +10323,12 @@
             }
           }
         ],
-        "requestBody": {
-          "content": {
-            "application/json": {
-              "schema": {
-                "$ref": "#/components/schemas/ScanAttach"
-              }
-            }
-          },
-          "required": true
-        },
         "responses": {
-          "200": {
+          "201": {
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/Envelope_ScanOut_"
+                  "$ref": "#/components/schemas/Envelope_ConfirmDiseaseOut_"
                 }
               }
             },
@@ -9965,7 +10345,7 @@
             "description": "Validation Error"
           }
         },
-        "summary": "Attach Scan",
+        "summary": "Confirm Disease",
         "tags": [
           "scans"
         ]

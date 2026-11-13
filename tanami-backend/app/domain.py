@@ -287,7 +287,6 @@ SUPPORTED_COMMODITIES: tuple[str, ...] = tuple(PLANT_TYPES)
 DETECTION_COMMODITIES: tuple[str, ...] = ("mango", "citrus", "strawberry")
 # design 13: one forum category per commodity plus "Umum".
 FORUM_GENERAL_CATEGORY = "general"
-FORUM_CATEGORIES: tuple[str, ...] = (*SUPPORTED_COMMODITIES, FORUM_GENERAL_CATEGORY)
 
 # --- design v2 (mango, citrus, strawberry) ------------------------------------
 # The stored-value constraints below use these, not the legacy enums above, so the
@@ -298,6 +297,9 @@ COMMODITY_LABELS_V2: dict[str, str] = {
     "citrus": "Jeruk",
     "strawberry": "Stroberi",
 }
+
+# design 13 v2: forum categories follow the commodities of this release, plus "Umum".
+FORUM_CATEGORIES: tuple[str, ...] = (*COMMODITIES_V2, FORUM_GENERAL_CATEGORY)
 # Prefix of the display code of a plant, e.g. ``MGA-001`` (design 8.2).
 PLANT_CODE_PREFIX: dict[str, str] = {"mango": "MGA", "citrus": "JRK", "strawberry": "STB"}
 

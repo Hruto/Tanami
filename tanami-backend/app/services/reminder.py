@@ -691,9 +691,12 @@ async def load_plant_contexts(
             Plant.label,
             Plant.farm_id,
             Plant.health_status,
-            Plant.expected_harvest_min,
-            Plant.expected_harvest_max,
-            Plant.growth_stage,
+            # v2 (design 9.2) has no stored growth_stage / expected_harvest_*:
+            # phase and the harvest window are derived from ``crop_profiles`` +
+            # harvest records (8.4). The v0.3 harvest rules below still read
+            # those two fields, so an estimate is not passed here; the rules
+            # that need it simply do not fire until they are ported to
+            # ``harvest_due``/``harvest_check`` (design 12.1).
             Farm.user_id,
             last_scan.c.last_scan_at,
         )
@@ -739,9 +742,7 @@ async def load_plant_contexts(
             farm_id=row.farm_id,
             label=row.label,
             health_status=row.health_status,
-            expected_harvest_min=row.expected_harvest_min,
-            expected_harvest_max=row.expected_harvest_max,
-            growth_stage=row.growth_stage,
+            expected_harvest_min=None,
             last_scan_at=row.last_scan_at,
             had_fungal_issue=row.id in fungal_plants,
         )
