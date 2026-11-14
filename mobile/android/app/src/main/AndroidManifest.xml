@@ -1,4 +1,7 @@
 <manifest xmlns:android="http://schemas.android.com/apk/res/android">
+    <!-- The app talks to the Tanami API over HTTP(S) in every build, not only
+         in debug, so the permission belongs in the main manifest. -->
+    <uses-permission android:name="android.permission.INTERNET"/>
     <application
         android:label="Tanami"
         android:name="${applicationName}"
