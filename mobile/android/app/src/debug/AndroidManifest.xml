@@ -4,4 +4,8 @@
          to allow setting breakpoints, to provide hot reload, etc.
     -->
     <uses-permission android:name="android.permission.INTERNET"/>
+    <!-- The local API is plain http:// on 10.0.2.2 or a LAN address, which
+         Android 9+ blocks by default. Cleartext stays a debug-only concession:
+         release builds must use https. -->
+    <application android:usesCleartextTraffic="true"/>
 </manifest>
