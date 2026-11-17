@@ -43,19 +43,28 @@ Content-Type: application/json
 Respons memuat `age_days` (dihitung dari `nursery_started_at`), `commodity_label`,
 `placement`, dan `cover_photo_url`.
 
-Foto sampul diunggah segera setelah create (dua panggilan, satu layar):
+Untuk form **Tambah Tanaman** yang mengirim foto sekaligus, pakai endpoint
+multipart (satu panggilan). Foto yang dikirim langsung menjadi sampul:
 
 ```http
-POST /api/v1/plants/{id}/photos
+POST /api/v1/farms/{farm_id}/plants/with-photo
 Content-Type: multipart/form-data
 
-image=@daun.jpg
-caption=Foto awal
+label=Pohon Mangga
+variety=Mangga Arumanis
+nursery_started_at=2026-11-01
+placement=indoor
+irrigation_schedule=every_3_5_days
+photo=@daun.jpg
 ```
 
-Foto pertama otomatis menjadi sampul (`cover_photo_url`). Endpoint foto
-pertumbuhan tetap tersedia untuk foto berikutnya. Pilihan "ambil foto / galeri"
-ada di sisi aplikasi; backend menerima file JPG/PNG sampai 2 MB.
+`photo` opsional. Gambar divalidasi sebelum tanaman dibuat: foto rusak/terlalu
+besar ditolak dan **tidak** meninggalkan tanaman yatim. Respons sudah memuat
+`cover_photo_url`. Endpoint JSON `/plants` (tanpa foto) tetap ada untuk klien
+yang tidak mengirim gambar; endpoint `POST /plants/{id}/photos` tetap dipakai
+untuk foto pertumbuhan berikutnya. Pilihan "ambil foto / galeri" ada di sisi
+aplikasi; backend hanya menerima file JPG/PNG (batas ukuran & resolusi sesuai
+`settings`).
 
 ## Aturan yang perlu diketahui frontend
 

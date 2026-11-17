@@ -36,6 +36,7 @@ DESIGN_ENDPOINTS: list[tuple[str, str]] = [
     ("patch", "/farms/{farm_id}"),
     ("get", "/farms/{farm_id}/plants"),
     ("post", "/farms/{farm_id}/plants"),
+    ("post", "/farms/{farm_id}/plants/with-photo"),
     ("get", "/plants/{plant_id}"),
     ("patch", "/plants/{plant_id}"),
     ("post", "/plants/{plant_id}/harvests"),

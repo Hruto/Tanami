@@ -6,7 +6,7 @@ from datetime import date, timedelta
 
 from httpx import AsyncClient
 
-from tests.helpers import auth_headers, create_farm, register
+from tests.helpers import auth_headers, create_farm, image_bytes, register
 
 TODAY = date.today()
 
@@ -127,3 +127,44 @@ async def test_endpoint_progress_dan_saran_irigasi_indoor(client: AsyncClient) -
     advice = await client.get(f"/api/v1/plants/{plant['id']}/irrigation-advice", headers=headers)
     assert advice.status_code == 200, advice.text
     assert advice.json()["data"]["weather_used"] is False
+
+
+async def test_create_tanaman_dengan_thumbnail_satu_panggilan(client: AsyncClient) -> None:
+    """Form Tambah Tanaman: satu kirim, foto langsung jadi thumbnail."""
+    headers = auth_headers(await register(client))
+    farm = await create_farm(client, headers)
+    response = await client.post(
+        f"/api/v1/farms/{farm['id']}/plants/with-photo",
+        data={
+            "label": "Pohon Mangga",
+            "variety": "Mangga Arumanis",
+            "nursery_started_at": (TODAY - timedelta(days=7)).isoformat(),
+            "placement": "indoor",
+            "irrigation_schedule": "daily",
+        },
+        files={"photo": ("thumb.jpg", image_bytes(), "image/jpeg")},
+        headers=headers,
+    )
+    assert response.status_code == 201, response.text
+    plant = response.json()["data"]
+    assert plant["cover_photo_url"] is not None
+    photos = await client.get(f"/api/v1/plants/{plant['id']}/photos", headers=headers)
+    assert len(photos.json()["data"]) == 1
+
+
+async def test_thumbnail_rusak_tidak_membuat_tanaman(client: AsyncClient) -> None:
+    headers = auth_headers(await register(client))
+    farm = await create_farm(client, headers)
+    response = await client.post(
+        f"/api/v1/farms/{farm['id']}/plants/with-photo",
+        data={
+            "label": "Pohon Mangga",
+            "variety": "Mangga Arumanis",
+            "nursery_started_at": (TODAY - timedelta(days=7)).isoformat(),
+        },
+        files={"photo": ("rusak.jpg", b"bukan gambar", "image/jpeg")},
+        headers=headers,
+    )
+    assert response.status_code in (400, 422), response.text
+    plants = await client.get(f"/api/v1/farms/{farm['id']}/plants", headers=headers)
+    assert plants.json()["data"] == []

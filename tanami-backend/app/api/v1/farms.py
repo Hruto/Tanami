@@ -16,6 +16,7 @@ from app.api.deps import (
     PlantServiceDep,
     RegionServiceDep,
     SessionDep,
+    SettingsDep,
     TrackingServiceDep,
     WeatherServiceDep,
 )
@@ -26,8 +27,12 @@ from app.domain import (
     DETECTION_COMMODITIES,
     MATERIALS_BY_COMMODITY,
     CareAction,
+    IrrigationSchedule,
+    Placement,
+    PlantingMaterial,
 )
 from app.models.content import CropProfile
+from app.providers.images import validate_and_normalise
 from app.schemas.base import Envelope, ListEnvelope, PaginationMeta
 from app.schemas.farm import (
     CareLogCreate,
@@ -123,6 +128,53 @@ async def create_plant(
     service: PlantServiceDep,
 ) -> Envelope[PlantOut]:
     plant = await service.create_plant(user.id, farm_id, payload)
+    return Envelope(data=plant)
+
+
+@router.post("/farms/{farm_id}/plants/with-photo", status_code=status.HTTP_201_CREATED)
+async def create_plant_with_photo(
+    farm_id: UUID,
+    label: Annotated[str, Form()],
+    variety: Annotated[str, Form()],
+    nursery_started_at: Annotated[date, Form()],
+    user: CurrentUser,
+    service: PlantServiceDep,
+    tracking: TrackingServiceDep,
+    settings: SettingsDep,
+    photo: Annotated[UploadFile | None, File()] = None,
+    planted_at: Annotated[date | None, Form()] = None,
+    placement: Annotated[Placement, Form()] = Placement.OUTDOOR,
+    irrigation_schedule: Annotated[IrrigationSchedule, Form()] = IrrigationSchedule.EVERY_3_5_DAYS,
+    quantity: Annotated[int, Form()] = 1,
+    planting_material: Annotated[PlantingMaterial | None, Form()] = None,
+) -> Envelope[PlantOut]:
+    """Form Tambah Tanaman: satu kirim; foto pertama langsung jadi thumbnail.
+
+    Gambar divalidasi **sebelum** tanaman dibuat agar foto rusak tidak
+    meninggalkan tanaman yatim di database.
+    """
+    raw = await photo.read() if photo is not None else None
+    if raw is not None:
+        validate_and_normalise(
+            raw,
+            max_bytes=settings.max_scan_upload_bytes,
+            max_side=settings.max_image_side,
+            max_pixels=settings.max_image_pixels,
+        )
+    payload = PlantCreate(
+        label=label,
+        variety=variety,
+        nursery_started_at=nursery_started_at,
+        planted_at=planted_at,
+        placement=placement,
+        irrigation_schedule=irrigation_schedule,
+        quantity=quantity,
+        planting_material=planting_material,
+    )
+    plant = await service.create_plant(user.id, farm_id, payload)
+    if raw is not None:
+        await tracking.add_photo(user.id, UUID(plant.id), raw=raw, caption=None, taken_at=None)
+        plant = await service.get_plant_out(user.id, UUID(plant.id))
     return Envelope(data=plant)
 
 

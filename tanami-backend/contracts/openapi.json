@@ -133,6 +133,77 @@
         "title": "Body_add_photo_api_v1_plants__plant_id__photos_post",
         "type": "object"
       },
+      "Body_create_plant_with_photo_api_v1_farms__farm_id__plants_with_photo_post": {
+        "properties": {
+          "irrigation_schedule": {
+            "$ref": "#/components/schemas/IrrigationSchedule",
+            "default": "every_3_5_days"
+          },
+          "label": {
+            "title": "Label",
+            "type": "string"
+          },
+          "nursery_started_at": {
+            "format": "date",
+            "title": "Nursery Started At",
+            "type": "string"
+          },
+          "photo": {
+            "anyOf": [
+              {
+                "contentMediaType": "application/octet-stream",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Photo"
+          },
+          "placement": {
+            "$ref": "#/components/schemas/Placement",
+            "default": "outdoor"
+          },
+          "planted_at": {
+            "anyOf": [
+              {
+                "format": "date",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Planted At"
+          },
+          "planting_material": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/PlantingMaterial"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "quantity": {
+            "default": 1,
+            "title": "Quantity",
+            "type": "integer"
+          },
+          "variety": {
+            "title": "Variety",
+            "type": "string"
+          }
+        },
+        "required": [
+          "label",
+          "variety",
+          "nursery_started_at"
+        ],
+        "title": "Body_create_plant_with_photo_api_v1_farms__farm_id__plants_with_photo_post",
+        "type": "object"
+      },
       "Body_create_scan_api_v1_scans_post": {
         "properties": {
           "captured_at": {
@@ -7314,6 +7385,76 @@
           }
         },
         "summary": "Create Plant",
+        "tags": [
+          "farms"
+        ]
+      }
+    },
+    "/api/v1/farms/{farm_id}/plants/with-photo": {
+      "post": {
+        "description": "Form Tambah Tanaman: satu kirim; foto pertama langsung jadi thumbnail.\n\nGambar divalidasi **sebelum** tanaman dibuat agar foto rusak tidak\nmeninggalkan tanaman yatim di database.",
+        "operationId": "create_plant_with_photo_api_v1_farms__farm_id__plants_with_photo_post",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "farm_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Farm Id",
+              "type": "string"
+            }
+          },
+          {
+            "in": "header",
+            "name": "authorization",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Authorization"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "multipart/form-data": {
+              "schema": {
+                "$ref": "#/components/schemas/Body_create_plant_with_photo_api_v1_farms__farm_id__plants_with_photo_post"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "201": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Envelope_PlantOut_"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Create Plant With Photo",
         "tags": [
           "farms"
         ]
