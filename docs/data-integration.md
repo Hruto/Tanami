@@ -3,6 +3,8 @@
 Dokumen ini menjawab: **"database software dan database ML itu disatukan gimana?"**
 Status: **proposal desain** — tabel `ml_*` di bawah belum ada di migrasi saat ini.
 Bagian yang sudah ada di kode diberi tanda ✅; yang baru diberi tanda 🆕.
+Terkait `design.md` 8.3 (profil tanaman), 8.5 (delay), 11.1/11.2 (kontrak &
+status), 11.5 (kelas & dataset), 16 (struktur proyek), dan 17 (keputusan terbuka).
 
 ## 1. Fakta kondisi saat ini
 
@@ -11,7 +13,7 @@ Bagian yang sudah ada di kode diberi tanda ✅; yang baru diberi tanda 🆕.
 | Backend ✅ | `tanami-backend/app/models/*.py` | PostgreSQL async (SQLAlchemy), migrasi `0001`–`0006` | 20+ tabel: `plants`, `scans`, `disease_episodes`, `crop_profiles`, `diseases`, `harvest_records`, dll. |
 | Vision service ✅ | root `app/` (FastAPI) | **tidak ada** | Baca manifest dari folder `models/`, prediksi via ONNX/stub, tidak menyimpan hasil ke DB. |
 | Manifest model ✅ | `models/*/manifest.json` | file | `disease-chili-v0.2.0-rc1`, `ripeness-chili-v0.2.0-rc1`, `commodity_code = chili`, 7 label. |
-| Backend ↔ vision ✅ | `tanami-backend/app/providers/vision.py` | HTTP + `Bearer` token | `POST` predict dengan `image`, `type`, `commodity_code`, `client_uuid`; `GET /readyz`; retry 502/503/504. |
+| Backend ↔ vision ✅ | `tanami-backend/app/providers/vision.py` | HTTP + `Bearer` token | `POST /v1/predict` dengan `image`, `type`, `commodity_code`, `client_uuid`, header `Idempotency-Key`; `GET /readyz`; timeout 6s, retry 2× untuk 502/503/504; port 8001. |
 | Desain ML v2 🆕 | `design (3).md` → akan masuk `design.md` | belum | Model per tanaman, 5 kategori, fitur EfficientNet + handmade, ML klasik, artefak di Drive. |
 
 Masalah yang perlu dibereskan:
@@ -55,7 +57,7 @@ Aturan:
 | `crop_profiles` | `commodity_code`, `first_harvest_min_days`, `first_harvest_max_days`, `harvest_cycle_days`, `productive_years`, `source`, `reviewed_by` | Sumber estimasi umur & fase. Diisi dari pedoman + data lapangan. |
 | `diseases` | `code`, `label`, `harvest_delay_days` | Master kode penyakit backend. Akan jadi target pemetaan label ML. |
 | `disease_episodes` | `plant_id`, `disease_code`, `started_at`, `ended_at` | Catatan penyakit yang mempengaruhi delay panen. |
-| `scans` | `plant_id`, `status`, `model_version`, `result`, `raw` | Tempat hasil prediksi disimpan. `raw` menyimpan response mentah vision. |
+| `scans` | `plant_id`, `status`, `model_version`, `result`, `raw`, `client_uuid` | Tempat hasil prediksi disimpan. `raw` menyimpan response mentah vision; `client_uuid` dipakai sebagai idempotensi. |
 
 ### 3.2 🆕 Tabel baru (usulan migrasi `0007_ml_integration.py`)
 
@@ -122,10 +124,18 @@ tanpa mengganti jawaban yang dipakai aplikasi (backend sudah punya field
 | `jamur` | `jamur` | `anthracnose`, `cercospora_leaf_spot` | late blight masuk sini (oomycete) |
 | `bakteri` | `bakteri` | `bacterial_wilt` | + `citrus_canker`, `greening` kalau didukung |
 | `virus` | `virus` | `leaf_curl_virus`, `mosaic_virus` | perlu kode baru di `diseases` |
-| `lainnya` | `lainnya` | `pest_damage`, `nutrient_deficiency`, `other` | keranjang sampah resmi |
+| `lainnya` | `lainnya` | `pest_damage`, `nutrient_deficiency`, `unknown` | keranjang sampah resmi. `unknown` adalah `CauseCategory` yang sudah ada; kalau mau kode baru `other`, enum harus diubah dulu |
 
 Mapping ini **versi-terikat**: jangan pernah menimpa mapping model lama. Model
 `disease-chili-v0.2.0-rc1` tetap memakai 7 label aslinya sampai di-retire.
+Nilai `backend_category` harus mengikuti enum yang sudah ada di layanan vision
+(`healthy | fungus | bacteria | virus | pest | nutrient_deficiency | unknown`) —
+jangan mengarang kategori baru tanpa mengubah enum dan kontrak.
+
+⚠️ **Konflik yang belum disepakati:** `design.md` 11.2 menyatakan backend yang
+menentukan `status`, tetapi `app/services/decision.py` di layanan vision yang
+menentukannya (`confident ≥ 0,75`, `uncertain ≥ 0,50`, kualitas gambar menang).
+Pilih satu sumber kebenaran sebelum langkah 6 di bawah dijalankan.
 
 ### 3.4 Penyelarasan komoditas — keputusan yang harus diambil
 
@@ -151,7 +161,9 @@ daftar komoditas ada di `tanami-backend/app/domain.py::COMMODITIES_V2`.
 1. Klien create tanaman dengan `variety` → backend menebak `commodity_code`
    (`commodity_from_variety`) dan menyimpannya di `plants`.
 2. Klien kirim foto untuk scan → `ScanService` mengirim `(image, commodity_code,
-   client_uuid)` lewat `VisionClient`.
+   client_uuid)` lewat `VisionClient` ke `POST /v1/predict` (port 8001).
+   Endpoint vision punya default `commodity_code = chili`; backend wajib selalu
+   mengirim nilai eksplisit supaya default lama tidak terpakai.
 3. Vision memilih model aktif di `ml_models` berdasarkan `(scan_type,
    commodity_code, status='active')`, memuat artefak dari `artifact_uri`.
 4. Model menghasilkan `model_code` + `confidence`. Kalau `confidence < ambang`,
@@ -187,5 +199,7 @@ daftar komoditas ada di `tanami-backend/app/domain.py::COMMODITIES_V2`.
 - [ ] Label model lama masih bisa dibaca (mapping versi-terikat)
 - [ ] `ml_models.artifact_uri` tidak menunjuk ke file lokal yang hilang
 - [ ] Kontrak `openapi.json` diregenerasi setelah endpoint berubah
+- [ ] Sumber kebenaran `status` (backend vs vision) sudah disepakati
+- [ ] `design.md` 8.3, 11.5, 16, dan 17 ikut diperbarui kalau keputusan berubah
 - [ ] `design.md` memuat desain software + ML + keputusan komoditas
 - [ ] Class diagram sesuai daftar class hasil `grep`

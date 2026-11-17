@@ -1081,6 +1081,10 @@ src/
 data/  notebooks/  src/  configs/  reports/   # reports/datasets.md wajib (sumber, lisensi, split)
 ```
 
+> Rencana notebook v2 (`leaf_project/v2/`, 00_audit … 05_app) ada di bagian 19.
+> Daftar model aktif/shadow dan pemetaan label disimpan di database backend
+> (usulan `ml_models`/`ml_labels`, lihat `docs/data-integration.md`).
+
 ---
 
 ## 17. Pertanyaan Terbuka (perlu keputusan tim)
@@ -1102,6 +1106,9 @@ data/  notebooks/  src/  configs/  reports/   # reports/datasets.md wajib (sumbe
 | 13 | Mencocokkan perkiraan panen mangga/jeruk ke bulan musim per daerah? | Pasca-MVP. |
 | 14 | Apakah tanaman yang lewat masa produktif benar-benar diakhiri otomatis, atau cukup ditandai "lewat masa produktif" dan pengguna yang mengakhiri? | v2: otomatis (permintaan tim). Dapat ditinjau ulang setelah uji pengguna. |
 | 15 | Perlukah scan penyakit buah/bunga (mis. antraknosa buah mangga, busuk abu-abu stroberi)? | Pasca-MVP; dataset daun lebih tersedia. |
+| 16 | Mode ketat atau longgar untuk aturan masuk tanaman di desain ML v2 (19.4)? | **Terbuka (ML + Ahli).** Flag `ALLOW_MISSING_CLASSES` disiapkan supaya bisa diganti. |
+| 17 | Bolehkah `rembg` + EfficientNet-B0 dipakai sebagai **ekstraksi fitur** (bukan fine-tuning)? | **Terbuka (Dosen + ML).** Fallback: segmentasi HSV/Otsu/GrabCut + fitur handmade saja. |
+| 18 | Komoditas desain ML v2 (tomat/pepaya/zukini/jeruk) vs backend v2 (mangga/jeruk/stroberi) tidak sejalan. Tambah komoditas di backend, batasi ML ke `citrus`, atau deteksi hanya untuk model yang siap? | **Terbuka (PM + Backend + ML).** Lihat `docs/data-integration.md` §3.4. |
 
 ---
 
@@ -1120,7 +1127,9 @@ data/  notebooks/  src/  configs/  reports/   # reports/datasets.md wajib (sumbe
 ## 19. Deteksi Penyakit — Desain ML v2 (per-tanaman, DL + ML klasik)
 
 Bagian ini adalah desain yang dikirim tim ML (Memet, draft 1, 17 Nov 2026),
-disatukan ke dokumen ini tanpa mengubah kontrak di bagian 11.
+disatukan ke dokumen ini tanpa mengubah kontrak di bagian 11. Bagian ini juga
+berkaitan dengan 8.3 (profil tanaman), 8.5 (delay penyakit), 11.5 (kelas &
+dataset), 16 (struktur proyek), dan 17 (keputusan terbuka).
 
 **Istilah yang diselaraskan:**
 - "tanaman" di sisi ML = `commodity_code` di backend (lihat 8.2 / `domain.py`).
@@ -1315,7 +1324,7 @@ Kode saat ini masih v0.3. Pekerjaan per tim:
 | Tim | Pekerjaan |
 |---|---|
 | **Backend** | Migrasi `0005`: tabel `crop_profiles` dan `disease_episodes`; ubah `plants` (kolom baru/dihapus 9.2), `harvest_records.sequence`, `scans.plant_id` NOT NULL + `disease_episode_id`, `diseases.harvest_delay_days`; hapus `detection_plants` (scan lama tanpa tanaman: dibuatkan tanaman dari detection plant yang tertaut, sisanya dihapus atau diarsipkan; data uji boleh dibuang). Layanan `harvest_estimate` dan `disease_episode` dengan tes unit untuk semua aturan 8.4-8.6. Endpoint 10.5/10.6/10.8/10.10 baru; hapus `/detection-plants*`. Pengingat baru 12.1 dan job `complete_productive_period`. Seed `crop_profiles` dan basis penyakit 11.5. Perbarui `contracts/openapi.json` dan tes kontrak. |
-| **Vision/ML** | `POST /predict` menerima `commodity_code`; manifest model per jenis; kelas 11.5; `invalid_reason`. Kumpulkan dan dokumentasikan dataset (`reports/datasets.md`), set uji lapangan, kalibrasi, laporan metrik per jenis. Pensiunkan model cabai dan ripeness. |
+| **Vision/ML** | `POST /v1/predict` menerima `commodity_code` (default lama `chili`); manifest model per jenis; kelas 11.5; `invalid_reason`. Service berjalan di port 8001, stateless tanpa database; model aktif + shadow dimuat lewat `ModelRegistry`, reload via `POST /v1/models/reload`. Kumpulkan dan dokumentasikan dataset (`reports/datasets.md`), set uji lapangan, kalibrasi, laporan metrik per jenis. Pensiunkan model cabai dan ripeness. |
 | **Frontend (`tanami-app`)** | Navigasi 5 tab baru (bagian 4); layar S06, S07, S10-S18; Kartu Perkiraan Panen, Timeline Fase, Kartu Konfirmasi Penyakit, Lencana Status Akhir, filter Riwayat Scan; hapus layar Daftar/History Deteksi; antrean offline untuk catatan panen. |
 | **Admin (`tanami-admin`)** | Ringkasan dengan status akhir dan statistik per jenis; Basis penyakit dengan filter jenis dan `harvest_delay_days`; layar Profil tanaman; `allowed_labels` per jenis di Tinjauan deteksi. |
 | **Dokumen** | `tqa.md` dan `architecture.md` sudah selaras dengan v2. Dokumen implementasi (`tanami-backend/README.md`, `tanami-backend/docs/data-model.md`, `contracts/API.md`, `models/README.md`, `tanami-admin/README.md`) diberi catatan status dan isinya diperbarui bersamaan dengan perubahan kodenya. Nomor bagian 1-18 sengaja dipertahankan agar referensi "design 10.6", "design 12.4", dll. di kode tetap menunjuk topik yang sama. Dokumen pendukung baru: `api-changelog.md`, `class-diagram.md`, `data-integration.md`, `panduan-dokumentasi.md`. Bagian 19 ditambahkan (bukan menggantikan nomor lama). |

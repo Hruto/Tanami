@@ -206,8 +206,9 @@ classDiagram
         +predict(commodity_code, image)
     }
     class VisionClient {
-        +predict()
-        +ready()
+        +predict() POST /v1/predict
+        +ready() GET /readyz
+        +timeout: 6s, retries: 2
     }
     class StorageProvider {
         <<Protocol>>
@@ -313,11 +314,33 @@ classDiagram
     ApiModel <|-- ReadyResponse
 ```
 
-Perlu diingat: manifest yang **sedang aktif** di repo masih
+**Detail layanan vision (dari kode, bukan dugaan):**
+
+- `POST /v1/predict` — multipart `type` (`disease`|`ripeness`), `image`,
+  `commodity_code` (default `chili`), `client_uuid`; header `Idempotency-Key`
+  dan `Authorization: Bearer …`. Respons envelope `{ "data": … }` atau
+  `{ "error": … }`.
+- `GET /healthz`, `/readyz`, `/livez`, `/metrics`, `GET /v1/models`,
+  `POST /v1/models/reload` (admin). Listen di port **8001**.
+- `ModelRegistry` memuat model **primary + shadow** (`LoadedModel.is_shadow`);
+  model shadow dijalankan tapi tidak memengaruhi respons.
+- `decide_status()` di `app/services/decision.py` menentukan
+  `confident | uncertain | unknown | invalid_image` dengan ambang
+  `confident = 0,75`, `uncertain = 0,50`, dan kualitas gambar menang atas
+  confidence. `build_disease_result()` / `build_ripeness_result()` menyusun
+  `result`. ⚠️ `design.md` 11.2 menyatakan **backend** yang menentukan status;
+  implementasi sekarang menentukannya di **vision service**. Ini harus
+  disepakati sebelum integrasi.
+- `assess_quality()` (varians Laplacian + luminance) dan `decode_and_prepare()`
+  membuang EXIF lalu resize ke `input_size` manifest.
+
+Manifest yang **sedang aktif** di repo masih
 `disease-chili-v0.2.0-rc1` / `ripeness-chili-v0.2.0-rc1`, dengan label
 `healthy, anthracnose, cercospora_leaf_spot, bacterial_wilt, leaf_curl_virus,
-pest_damage, nutrient_deficiency` dan `commodity_code = chili`. Desain ML v2
-Memet belum diimplementasikan di sini. Lihat `docs/data-integration.md`.
+pest_damage, nutrient_deficiency` (disease, 7) dan `unripe, turning, ripe,
+overripe` (ripeness, 4), `commodity_code = chili`. `StubPredictor` deterministik
+dan ditolak di production; produksi memakai `OnnxPredictor`. Desain ML v2 Memet
+belum diimplementasikan di sini. Lihat `docs/data-integration.md`.
 
 ## 5. Kenapa ini OOP, bukan DFD
 
