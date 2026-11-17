@@ -800,6 +800,8 @@ Aplikasi web terpisah untuk staf; akun petani ditolak saat masuk. Menu yang tamp
 
 Bagian ini mengikat ML, backend, dan frontend. Mengubahnya memerlukan persetujuan ketiganya.
 
+> Rencana implementasi model versi 2 (per-tanaman, fitur DL + classifier ML klasik) ada di **bagian 19**. Bagian 11 tetap berisi kontrak output yang mengikat; bagian 19 menjelaskan bagaimana kontrak itu dipenuhi.
+
 ### 11.1 Masukan dan pembatasan per jenis tanaman
 - Format JPEG/PNG; sisi terpanjang <= 1280 px; <= 2 MB (klien mengompres).
 - **Pemeriksaan kualitas di klien** sebelum kirim (peringatan, bukan penghalang): terlalu buram, terlalu gelap, terlalu kecil.
@@ -929,6 +931,7 @@ Kode penyakit **unik global** dengan prefiks jenis; kelas sehat memakai kode ber
 - Target rilis [USULAN]: macro-F1 >= 0,80 di set uji publik **dan** dilaporkan apa adanya di set uji lapangan; ECE <= 0,05. Bila hasil di set uji lapangan jauh lebih buruk, tim memutuskan bersama apakah rilis dengan ambang `confident` yang lebih tinggi.
 - Pengguna dapat menandai `correct`/`incorrect` lewat `PUT /scans/{id}/feedback`. Data ini ditinjau ahli sebelum dipakai melatih ulang (`tqa.md` bagian 8.4).
 - Hanya scan dari pengguna dengan `consent_training_data = true` yang boleh masuk dataset latih. Cek cepat tidak disimpan, jadi tidak pernah masuk dataset.
+- Daftar model aktif/shadow, versi label, dan pemetaan `model_code → disease_code` disimpan di database backend (usulan tabel `ml_models`/`ml_labels`); lihat `docs/data-integration.md`.
 
 ---
 
@@ -1110,6 +1113,198 @@ data/  notebooks/  src/  configs/  reports/   # reports/datasets.md wajib (sumbe
 | 0.2 | 2026-11-08 | Diselaraskan dengan dokumen requirement (R0-R7). | Tim |
 | 0.3 | 2026-11-08 | Ruang kerja tim `tanami-admin` (10.11) dan endpoint staf. | Tim |
 | 2.0 | 2026-11-09 | Fokus mangga/jeruk/stroberi. Tracking berbasis profil tanaman (8.3-8.4) dengan panen bertahap dan perkiraan panen berupa rentang. Episode penyakit dan keterlambatan panen (8.5). Akhiri tracking dengan alasan baru dan status akhir (8.6), selesai otomatis saat masa produktif habis. Scan wajib memilih tanaman; `detection_plants` dihapus; Cek cepat tanpa simpan. Riwayat Tanaman + Riwayat Scan dengan filter. Kontrak ML per jenis tanaman, kelas dan dataset baru, kalibrasi wajib (11). Scan kematangan dan `final_result` dipensiunkan. | Tim |
+| 2.1 | 2026-11-17 | Pasca-rapat: varietas teks bebas sebagai input, umur dari tanggal mulai pembibitan, `placement` per tanaman, arsip dihapus, progress panen + kualitas hasil, irigasi bisa diubah, thumbnail sekali kirim. Desain ML v2 Memet ditambahkan sebagai bagian 19; pemetaan database aplikasi ↔ ML di `docs/data-integration.md`. | Tim |
+
+---
+
+## 19. Deteksi Penyakit — Desain ML v2 (per-tanaman, DL + ML klasik)
+
+Bagian ini adalah desain yang dikirim tim ML (Memet, draft 1, 17 Nov 2026),
+disatukan ke dokumen ini tanpa mengubah kontrak di bagian 11.
+
+**Istilah yang diselaraskan:**
+- "tanaman" di sisi ML = `commodity_code` di backend (lihat 8.2 / `domain.py`).
+- "kategori" di sisi ML = `backend_category` / `disease_code` di backend (lihat `docs/data-integration.md`).
+- "kurang yakin" dan "penolakan foto" adalah **status** di kontrak bagian 11, bukan kelas yang dilatih.
+
+### 19.1 Tujuan
+
+Model menerima **satu foto daun** (satu daun, background polos seperti kertas) dan menjawab kondisinya:
+
+| Kelas | Arti | Padanan di backend |
+|---|---|---|
+| `sehat` | tidak ada penyakit terlihat | `healthy` |
+| `jamur` | penyakit jamur (termasuk oomycete seperti late blight, dicatat di laporan) | `fungus` |
+| `bakteri` | penyakit bakteri | `bacteria` |
+| `virus` | penyakit virus (mosaic, curl, dll) | `virus` |
+| `lainnya` | **keranjang sampah resmi**: semua yang tidak jelas masuk keempat kelas di atas (hama, defisiensi nutrisi, kerusakan fisik, dll). Penyebabnya tidak perlu dikenali. | `pest`, `nutrient`, `other` |
+
+Tambahan di level aplikasi: jawaban **"kurang yakin"** kalau confidence rendah, dan
+**penolakan foto** kalau background tidak bisa dihapus. Keduanya mengikuti ambang
+di 11.2 yang dituning per tanaman.
+
+### 19.2 Keputusan desain (sudah disepakati ML)
+
+1. **Bukan universal.** Satu model per tanaman. User memilih tanaman lewat dropdown.
+2. **DL hanya untuk ekstraksi fitur** (boleh): `rembg` (hapus background) dan EfficientNet-B0 (embedding).
+3. **Training pakai ML klasik**: Random Forest, SVM, gradient boosting (LightGBM/XGBoost), logistic regression sebagai pembanding. Tidak ada fine-tuning jaringan saraf.
+4. **Mulai dari nol**: notebook baru semua, Drive yang sama, folder baru `leaf_project/v2/` supaya hasil lama tidak tertimpa.
+5. **Sebanyak mungkin tanaman** yang punya kategori lengkap. Lihat 19.4 untuk aturan ketat vs longgar.
+6. Semua kode pakai **progress bar** (`tqdm`) untuk loop panjang, download, ekstraksi, dan training.
+
+> Catatan integrasi: poin 1 harus memakai `commodity_code` yang dikirim backend
+> (11.1), bukan dropdown lokal yang berbeda daftarnya. Lihat 19.8.
+
+### 19.3 Alur sistem
+
+```
+foto daun
+  -> rembg (hapus background) -> cek kualitas mask (tolak kalau aneh)
+  -> ekstraksi fitur
+       a) EfficientNet-B0 beku: embedding 1280-d
+       b) handmade: warna, bercak, belang, tekstur
+  -> classifier ML milik tanaman terpilih
+  -> probabilitas per kelas
+  -> kalau max prob < ambang: "kurang yakin"
+  -> output: kelas + confidence
+```
+
+### 19.4 Tanaman dan dataset
+
+**Aturan masuk.** Tanaman dihitung dari matriks *tanaman x kategori* hasil notebook
+audit (`00_audit`). Ambang awal: **>= 150 gambar asli per kelas** (tanpa augmentasi).
+
+- **Mode ketat**: tanaman harus punya kelima kategori.
+- **Mode longgar**: tanaman boleh bolong satu atau dua kategori; model tanaman itu
+  hanya punya kelas yang datanya cukup. App menyimpan daftar kelas per tanaman.
+- Pilihan mode **belum diputuskan** (lihat 19.11). Notebook audit membuat flag
+  `ALLOW_MISSING_CLASSES` supaya bisa diganti tanpa mengubah kode lain.
+
+**Status per tanaman (hasil pengecekan sumber, belum diaudit isi filenya):**
+
+| Tanaman | Sumber | Status | Catatan |
+|---|---|---|---|
+| **Tomat** | PlantVillage (+ PlantDoc, PlantWild untuk test) | Lengkap | bacterial spot (bakteri); early blight, late blight, leaf mold, septoria, target spot (jamur); mosaic virus, yellow leaf curl virus (virus); spider mites (lainnya) |
+| **Pepaya** | BDPapayaLeaf + dataset pepaya Mendeley lain + dataset gabungan bottle gourd/zucchini/papaya | Kemungkinan lengkap (digabung) | anthracnose (jamur), bacterial spot (bakteri), curl dan ring spot (virus), mealybug/whitefly dan insect hole (lainnya). Gabungan beberapa dataset: cek gaya foto dan duplikat. |
+| **Zukini** | dataset gabungan bottle gourd/zucchini/papaya (Mendeley, Daffodil Int'l Univ) | Kemungkinan lengkap | anthracnose, downy mildew (jamur); Xanthomonas leaf spot (bakteri); yellow mosaic virus (virus); insect damage, iron chlorosis, dry leaf (lainnya). Data asli ~2.144 gambar, **jangan pakai versi augmentasi**. |
+| **Jeruk** | dataset 3-fruit crops (Mendeley) | Longgar saja | greening dan canker (bakteri), black spot (jamur), nutrient deficiency dan mold (lainnya). Virus tidak ada, sehat cuma ~87. |
+| Padi, cabai (+ paprika), kedelai, singkong, kapas, mentimun | Kaggle/Mendeley | **Belum diverifikasi** | masuk audit putaran berikutnya |
+
+**Gugur (di sumber publik utama):**
+- Apel, anggur, persik, stroberi, ceri (PlantVillage): hanya jamur + sehat, atau satu penyakit saja.
+- Mangga, pisang, jambu (dataset enam tanaman): satu penyakit per tanaman.
+- Dataset jambu/terong/jintan/jarak (IEEE DataPort): ~768 gambar untuk 40 kelas, terlalu tipis.
+
+**Data test lintas dataset:** PlantDoc (foto lapangan) dan PlantWild (foto internet)
+dipegang sebagai test saja, tidak dipakai training. Foto internet buatan sendiri di
+Drive: `leaf_project/own_photos/<kategori>/`.
+
+### 19.5 Struktur folder Drive
+
+```
+leaf_project/
+  own_photos/<kategori>/
+  v2/
+    raw/<dataset>/...
+    labels/labels_master.csv        # path, tanaman, label_asli, kategori, sumber, grup
+    cutouts/<tanaman>/...           # hasil rembg
+    features/<tanaman>/{hand.npy, emb.npy, meta.csv}
+    models/<tanaman>/model.joblib
+    reports/
+```
+
+`labels_master.csv` menyimpan **nama folder/penyakit asli** (misal `spider_mites`)
+walaupun kelas akhirnya `lainnya`. Tidak dipakai training, tapi berguna untuk
+analisis error. File ini nanti dicatat di `ml_dataset_runs.label_master_uri`
+(`docs/data-integration.md`), bukan disalin ke dalam Postgres.
+
+### 19.6 Notebook
+
+| Notebook | Tugas | Output |
+|---|---|---|
+| `00_audit` | Download dataset, petakan label ke 5 kategori, hitung matriks tanaman x kategori, tandai duplikat dan versi augmentasi | `labels_master.csv`, daftar tanaman final |
+| `01_preprocess` | rembg, simpan cutout dan mask, resize ke 224, buang foto yang maskanya aneh | `cutouts/` + log yang ditolak |
+| `02_features` | Ekstrak fitur embedding dan handmade, simpan sebagai `.npy` | `features/` |
+| `03_train` | Per tanaman: bandingkan RF, SVM-RBF, LightGBM, LogReg; cross-validation per grup | `models/`, tabel hasil |
+| `04_eval` | Test lintas dataset, confusion matrix, permutation importance, ablation, tuning ambang "kurang yakin" | `reports/` |
+| `05_app` | Gradio di Colab: unggah foto, pilih tanaman, hasil | demo |
+
+Semua notebook idempoten: hasil di-cache di Drive, rerun tidak mengulang pekerjaan
+yang sudah selesai.
+
+### 19.7 Fitur
+
+**a) Embedding EfficientNet-B0** (beku, pooled 1280-d). Opsional PCA ke 64-128
+dimensi untuk SVM/RF.
+
+**b) Fitur handmade** (hanya piksel di dalam mask daun):
+
+- **Warna**: mean/std per kanal HSV dan Lab, histogram hue.
+- **Bercak (lesi)**: segmentasi piksel yang menyimpang dari hijau daun; jumlah
+  bercak, rasio luas lesi, ukuran rata-rata dan sebaran, warna rata-rata bercak,
+  kekompakan bentuk.
+- **Belang (mottling)**: varians warna lokal dalam patch kecil, rasio area kuning vs hijau.
+- **Tekstur**: LBP dan GLCM (kontras, homogenitas, energi).
+- **Bentuk daun**: rasio mask, solidity (membantu mendeteksi daun melengkung/keriting
+  dan daun berlubang).
+
+### 19.8 Model dan evaluasi
+
+- Model per tanaman, `class_weight=balanced` bila tersedia.
+- Metrik utama: **macro-F1**, plus confusion matrix (lihat 11.6 untuk target rilis).
+- **Split per grup/sumber**, bukan acak. PlantVillage berisi banyak foto dari daun
+  yang sama, dan beberapa salinan Kaggle sudah berisi hasil augmentasi; split acak
+  membuat akurasi tampak 99% padahal bocor.
+- Evaluasi bertingkat:
+  1. cross-validation per grup di data training,
+  2. **test lintas dataset** (PlantDoc, PlantWild),
+  3. foto internet milik sendiri.
+- **Ablation**: handmade saja vs embedding saja vs gabungan.
+- **Permutation importance** untuk fitur handmade, per tanaman (bahan analisis
+  untuk laporan).
+
+### 19.9 "Kurang yakin" dan penolakan
+
+- Kelas `lainnya` adalah kelas yang dilatih (isinya campuran, jadi paling berantakan
+  di ruang fitur).
+- Ambang "kurang yakin": kalau probabilitas tertinggi < ambang (awal 0,5-0,6), app
+  menjawab "kurang yakin". Ambang **dituning dari validasi**, per tanaman, bukan
+  ditebak. Nilai final mengikuti 11.2 (SUMBER TUNGGAL).
+- Penolakan foto: mask kosong/terlalu kecil, terlalu besar (background tidak
+  terhapus), atau lebih dari satu komponen besar → `status = invalid_image`.
+
+### 19.10 Risiko
+
+| Risiko | Mitigasi |
+|---|---|
+| Aturan dosen soal model pretrained | Rembg dan EfficientNet adalah model pretrained. Konfirmasi ke dosen bahwa pemakaian untuk **ekstraksi** diperbolehkan. Fallback: segmentasi klasik (HSV/Otsu/GrabCut) + fitur handmade saja, ML klasik tetap sama. |
+| Kebocoran data (augmentasi, foto daun yang sama) | Pakai gambar asli saja, split per grup, deduplikasi di audit |
+| Selisih lab vs lapangan | Test lintas dataset; laporkan akurasi lab dan lapangan terpisah |
+| Kelas `lainnya` heterogen | Ambang "kurang yakin", simpan label asli untuk analisis |
+| Virus vs defisiensi sama-sama belang kuning | Diterima; bahas di bagian error analysis |
+| Late blight bukan jamur sejati (oomycete) | Masuk `jamur`, dicatat di laporan |
+| Gabungan beberapa dataset (pepaya) beda gaya foto | Cek visual di audit; hindari model belajar "sumber dataset" alih-alih penyakit |
+| Lisensi data (misal PlantWild non-komersial) | Cukup untuk tugas kuliah; cek lagi bila dipublikasikan |
+
+### 19.11 Keputusan terbuka
+
+1. **Ketat atau longgar** untuk aturan masuk tanaman (19.4).
+2. Konfirmasi dosen soal pemakaian model pretrained untuk ekstraksi (19.10).
+3. Daftar akhir tanaman: ditentukan setelah `00_audit`, termasuk padi, cabai,
+   kedelai, singkong, kapas, mentimun.
+4. **Keselarasan komoditas**: backend v2 hanya `mango`/`citrus`/`strawberry`,
+   sedangkan desain ML v2 memakai tomat/pepaya/zukini/jeruk. Butuh keputusan tim
+   (lihat `docs/data-integration.md` §3.4).
+
+### 19.12 Langkah berikutnya
+
+- [ ] Putuskan ketat vs longgar
+- [ ] `00_audit`: download dataset dan buat matriks tanaman x kategori
+- [ ] Kumpulkan foto internet ke `own_photos/<kategori>/`
+- [ ] `01_preprocess` sampai `03_train` untuk tomat dulu (tanaman paling lengkap), lalu perluas
+- [ ] `04_eval` dan tuning ambang "kurang yakin"
+- [ ] `05_app` demo
+- [ ] Daftarkan model ke `ml_models` sebagai `shadow` sebelum dipakai aplikasi
 
 ---
 
@@ -1123,4 +1318,4 @@ Kode saat ini masih v0.3. Pekerjaan per tim:
 | **Vision/ML** | `POST /predict` menerima `commodity_code`; manifest model per jenis; kelas 11.5; `invalid_reason`. Kumpulkan dan dokumentasikan dataset (`reports/datasets.md`), set uji lapangan, kalibrasi, laporan metrik per jenis. Pensiunkan model cabai dan ripeness. |
 | **Frontend (`tanami-app`)** | Navigasi 5 tab baru (bagian 4); layar S06, S07, S10-S18; Kartu Perkiraan Panen, Timeline Fase, Kartu Konfirmasi Penyakit, Lencana Status Akhir, filter Riwayat Scan; hapus layar Daftar/History Deteksi; antrean offline untuk catatan panen. |
 | **Admin (`tanami-admin`)** | Ringkasan dengan status akhir dan statistik per jenis; Basis penyakit dengan filter jenis dan `harvest_delay_days`; layar Profil tanaman; `allowed_labels` per jenis di Tinjauan deteksi. |
-| **Dokumen** | `tqa.md` dan `architecture.md` sudah selaras dengan v2. Dokumen implementasi (`tanami-backend/README.md`, `tanami-backend/docs/data-model.md`, `contracts/API.md`, `models/README.md`, `tanami-admin/README.md`) diberi catatan status dan isinya diperbarui bersamaan dengan perubahan kodenya. Nomor bagian 1-18 sengaja dipertahankan agar referensi "design 10.6", "design 12.4", dll. di kode tetap menunjuk topik yang sama. |
+| **Dokumen** | `tqa.md` dan `architecture.md` sudah selaras dengan v2. Dokumen implementasi (`tanami-backend/README.md`, `tanami-backend/docs/data-model.md`, `contracts/API.md`, `models/README.md`, `tanami-admin/README.md`) diberi catatan status dan isinya diperbarui bersamaan dengan perubahan kodenya. Nomor bagian 1-18 sengaja dipertahankan agar referensi "design 10.6", "design 12.4", dll. di kode tetap menunjuk topik yang sama. Dokumen pendukung baru: `api-changelog.md`, `class-diagram.md`, `data-integration.md`, `panduan-dokumentasi.md`. Bagian 19 ditambahkan (bukan menggantikan nomor lama). |
