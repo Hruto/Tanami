@@ -17,9 +17,12 @@ async def garden(client: AsyncClient, **farm: Any) -> tuple[dict[str, str], dict
     return headers, await create_farm(client, headers, **farm)
 
 
-async def test_indoor_garden_and_plant_type_dropdown(client: AsyncClient) -> None:
-    headers, farm = await garden(client, placement="indoor")
-    assert farm["placement"] == "indoor" and farm["village"] == "Gambir"
+async def test_indoor_plant_and_plant_type_dropdown(client: AsyncClient) -> None:
+    headers, farm = await garden(client)
+    indoor = await create_plant(
+        client, headers, farm["id"], variety="Mangga Arumanis", placement="indoor"
+    )
+    assert indoor["placement"] == "indoor" and farm["village"] == "Gambir"
     types = (await client.get("/api/v1/plant-types")).json()["data"]
     # design 8.2: only mango, citrus and strawberry are offered in v2.
     assert [row["code"] for row in types] == ["mango", "citrus", "strawberry"]
@@ -35,8 +38,13 @@ async def test_indoor_garden_and_plant_type_dropdown(client: AsyncClient) -> Non
     }
     assert defaults == {"mango": ["grafted"], "citrus": ["grafted"], "strawberry": ["runner"]}
     bad = await client.post(
-        "/api/v1/farms",
-        json={"name": "X", "adm4_code": "31.71.03.1001", "placement": "roof"},
+        f"/api/v1/farms/{farm['id']}/plants",
+        json={
+            "label": "X",
+            "variety": "Mangga Arumanis",
+            "nursery_started_at": "2026-08-01",
+            "placement": "roof",
+        },
         headers=headers,
     )
     assert bad.status_code == 400
@@ -49,8 +57,8 @@ async def test_tracking_photos_care_logs_and_age(client: AsyncClient) -> None:
         client,
         headers,
         farm["id"],
-        commodity_code="mango",
-        planted_at=planted,
+        variety="Mangga Arumanis",
+        nursery_started_at=planted,
         irrigation_schedule="daily",
     )
     assert plant["age_days"] in (29, 30, 31)

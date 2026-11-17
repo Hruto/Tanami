@@ -7,14 +7,14 @@ from datetime import UTC, date, datetime, timedelta
 from decimal import Decimal
 from typing import Annotated, Literal
 
-from pydantic import Field, field_validator, model_validator
+from pydantic import Field, computed_field, field_validator, model_validator
 
 from app.core.errors import ValidationError
 from app.domain import (
-    COMMODITIES_V2,
     MATERIALS_BY_COMMODITY,
     TRACKING_END_REASONS_V2,
     CareAction,
+    HarvestQuality,
     HealthStatus,
     IrrigationSchedule,
     LifecyclePhase,
@@ -22,6 +22,7 @@ from app.domain import (
     PlantingMaterial,
     TrackingEndReason,
     TrackingOutcome,
+    commodity_from_variety,
 )
 from app.schemas.base import ApiModel
 
@@ -51,7 +52,6 @@ class FarmCreate(ApiModel):
     lat: Decimal | None = Field(default=None, ge=-90, le=90)
     lon: Decimal | None = Field(default=None, ge=-180, le=180)
     area_m2: Decimal | None = Field(default=None, gt=0, le=10_000_000)
-    placement: Placement = Placement.OUTDOOR
 
     @field_validator("adm4_code")
     @classmethod
@@ -83,7 +83,6 @@ class FarmUpdate(ApiModel):
     lat: Decimal | None = Field(default=None, ge=-90, le=90)
     lon: Decimal | None = Field(default=None, ge=-180, le=180)
     area_m2: Decimal | None = Field(default=None, gt=0, le=10_000_000)
-    placement: Placement | None = None
 
     @field_validator("name")
     @classmethod
@@ -112,7 +111,6 @@ class FarmOut(ApiModel):
     lat: float | None
     lon: float | None
     area_m2: float | None
-    placement: Placement
     village: str | None = None
     plant_count: int = 0
     archived_at: datetime | None
@@ -130,53 +128,62 @@ class RegionOut(ApiModel):
 
 class PlantCreate(ApiModel):
     label: str = Field(min_length=1, max_length=120)
-    commodity_code: str
+    # Pasca-rapat: "Jenis Tanaman" adalah varietas bebas (mis. "Mangga Arumanis").
+    # Tidak ada lagi field commodity_code yang dikirim klien.
+    variety: str = Field(min_length=1, max_length=80)
+    # Estimasi tanggal mulai pembibitan (dari biji/seedling) — jadi dasar umur.
+    nursery_started_at: date
+    # Tanggal pindah ke lahan; bila kosong, disamakan dengan nursery_started_at.
+    planted_at: date | None = None
+    placement: Placement = Placement.OUTDOOR
     # Omitted: the default material of the commodity (grafted, or runner for strawberry).
     planting_material: PlantingMaterial | None = None
-    variety: str | None = Field(default=None, max_length=80)
-    planted_at: date
     quantity: int = Field(default=1, ge=1, le=100_000)
     irrigation_schedule: IrrigationSchedule = IrrigationSchedule.EVERY_3_5_DAYS
 
-    @field_validator("commodity_code")
-    @classmethod
-    def _commodity(cls, value: str) -> str:
-        if value not in COMMODITIES_V2:
-            raise ValidationError(
-                "Jenis tanaman tidak ada di daftar.",
-                details={"field": "commodity_code", "supported": list(COMMODITIES_V2)},
-            )
-        return value
+    @computed_field  # type: ignore[prop-decorator]
+    @property
+    def derived_commodity(self) -> str:
+        """Komoditas hasil turunan, dipakai mesin; bukan input dari form."""
+        return commodity_from_variety(self.variety)
 
-    @field_validator("label")
+    @field_validator("label", "variety")
     @classmethod
-    def _label(cls, value: str) -> str:
+    def _clean_text(cls, value: str) -> str:
         cleaned = " ".join(value.split())
         if not cleaned:
-            raise ValidationError("Label tanaman tidak boleh kosong.", details={"field": "label"})
+            raise ValidationError("Kolom ini tidak boleh kosong.")
         return cleaned
 
-    @field_validator("planted_at")
+    @field_validator("nursery_started_at", "planted_at")
     @classmethod
-    def _not_future(cls, value: date) -> date:
-        if value > date.today():
+    def _not_future(cls, value: date | None) -> date | None:
+        if value is not None and value > date.today():
             raise ValidationError(
-                "Tanggal tanam tidak boleh di masa depan.",
-                details={"field": "planted_at"},
+                "Tanggal tidak boleh di masa depan.",
+                details={"field": "nursery_started_at"},
             )
         return value
 
     @model_validator(mode="after")
-    def _material_fits_commodity(self) -> PlantCreate:
+    def _plant_defaults(self) -> PlantCreate:
+        if self.planted_at is None:
+            self.planted_at = self.nursery_started_at
+        if self.planted_at < self.nursery_started_at:
+            raise ValidationError(
+                "Tanggal tanam tidak boleh sebelum tanggal mulai pembibitan.",
+                details={"field": "planted_at"},
+            )
+        material = self.planting_material
         if (
-            self.planting_material is not None
-            and self.planting_material.value not in MATERIALS_BY_COMMODITY[self.commodity_code]
+            material is not None
+            and material.value not in MATERIALS_BY_COMMODITY[self.derived_commodity]
         ):
             raise ValidationError(
                 "Jenis bibit ini tidak dipakai untuk tanaman tersebut.",
                 details={
                     "field": "planting_material",
-                    "allowed": list(MATERIALS_BY_COMMODITY[self.commodity_code]),
+                    "allowed": list(MATERIALS_BY_COMMODITY[self.derived_commodity]),
                 },
             )
         return self
@@ -185,7 +192,9 @@ class PlantCreate(ApiModel):
 class PlantUpdate(ApiModel):
     label: Annotated[str | None, Field(min_length=1, max_length=120)] = None
     variety: str | None = Field(default=None, max_length=80)
+    nursery_started_at: date | None = None
     planted_at: date | None = None
+    placement: Placement | None = None
     planting_material: PlantingMaterial | None = None
     quantity: int | None = Field(default=None, ge=1, le=100_000)
     irrigation_schedule: IrrigationSchedule | None = None
@@ -197,7 +206,14 @@ class PlantUpdate(ApiModel):
 
     @model_validator(mode="after")
     def _no_null_required(self) -> PlantUpdate:
-        for name in ("planted_at", "planting_material", "quantity", "irrigation_schedule"):
+        for name in (
+            "nursery_started_at",
+            "planted_at",
+            "placement",
+            "planting_material",
+            "quantity",
+            "irrigation_schedule",
+        ):
             if name in self.model_fields_set and getattr(self, name) is None:
                 raise ValidationError("Kolom ini tidak boleh dikosongkan.", details={"field": name})
         if self.planted_at is not None and self.planted_at > date.today():
@@ -245,6 +261,7 @@ class PlantOut(ApiModel):
     planting_material: PlantingMaterial
     quantity: int
     planted_at: date
+    nursery_started_at: date
     # Computed, never entered; counted to the end date once tracking has ended.
     age_days: int
     lifecycle_phase: LifecyclePhase
@@ -372,14 +389,17 @@ class HarvestCreate(ApiModel):
     """A harvest. ``harvested_at`` is a day (``2026-11-08``); omitted means today."""
 
     harvested_at: date | datetime | None = None
-    quality_note: str | None = Field(default=None, max_length=1000)
+    # Pasca-rapat: pilihan kategori, bukan catatan bebas.
+    quality: HarvestQuality | None = None
     quantity_kg: Decimal | None = Field(default=None, ge=0, le=1_000_000)
+    note: str | None = Field(default=None, max_length=1000)
 
 
 class HarvestUpdate(ApiModel):
     harvested_at: date | datetime | None = None
-    quality_note: str | None = Field(default=None, max_length=1000)
+    quality: HarvestQuality | None = None
     quantity_kg: Decimal | None = Field(default=None, ge=0, le=1_000_000)
+    note: str | None = Field(default=None, max_length=1000)
 
 
 class HarvestOut(ApiModel):
@@ -387,7 +407,10 @@ class HarvestOut(ApiModel):
     plant_id: str
     sequence: int
     harvested_at: date
-    quality_note: str | None
+    quality: HarvestQuality | None
+    quality_label: str | None = None
+    success_pct: float | None = None
+    note: str | None = None
     quantity_kg: float | None
     created_at: datetime
     # The estimate after this change, so the screen can update without a second call.
@@ -445,3 +468,43 @@ class PlantStats(ApiModel):
     health_series: list[HealthPoint]
     harvest_series: list[HarvestPoint]
     estimate_vs_actual: list[EstimateVsActual]
+
+
+# --------------------------------------------------------------------------- #
+# Pasca-rapat: irigasi yang bisa diubah, progres menuju panen, saran irigasi
+# --------------------------------------------------------------------------- #
+class IrrigationChangeCreate(ApiModel):
+    schedule: IrrigationSchedule
+    reason: str | None = Field(default=None, max_length=280)
+
+
+class IrrigationChangeOut(ApiModel):
+    id: str
+    plant_id: str
+    from_schedule: IrrigationSchedule
+    to_schedule: IrrigationSchedule
+    changed_at: datetime
+    reason: str | None = None
+
+
+class IrrigationAdviceOut(ApiModel):
+    """Saran sistem; untuk indoor cuaca sengaja tidak dipakai."""
+
+    recommended: IrrigationSchedule
+    weather_used: bool
+    note: str | None = None
+
+
+class PlantProgressOut(ApiModel):
+    """Ringkasan perjalanan tanaman dari pembibitan sampai tidak produktif."""
+
+    plant_id: str
+    age_days: int
+    phase: LifecyclePhase
+    nursery_started_at: date
+    productive_until: date
+    percent_to_first_harvest: float
+    estimated_first_harvest: date | None = None
+    delay_days: int = 0
+    harvest_count: int = 0
+    weather_used: bool = True

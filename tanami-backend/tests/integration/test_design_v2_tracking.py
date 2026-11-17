@@ -84,8 +84,8 @@ async def new_plant(
 ) -> dict[str, Any]:
     payload: dict[str, Any] = {
         "label": "Mangga Depan Rumah",
-        "commodity_code": "mango",
-        "planted_at": (TODAY - timedelta(days=2000)).isoformat(),
+        "variety": "Mangga Arumanis",
+        "nursery_started_at": (TODAY - timedelta(days=2000)).isoformat(),
     }
     payload.update(overrides)
     response = await client.post(f"/api/v1/farms/{farm_id}/plants", json=payload, headers=headers)
@@ -136,7 +136,7 @@ async def test_plant_codes_count_per_commodity_and_are_never_reused(client: Asyn
     headers, farm = await start(client)
     first = await new_plant(client, headers, farm["id"])
     second = await new_plant(client, headers, farm["id"], label="Mangga 2")
-    citrus = await new_plant(client, headers, farm["id"], label="Jeruk", commodity_code="citrus")
+    citrus = await new_plant(client, headers, farm["id"], label="Jeruk", variety="Jeruk Siam")
     assert [first["code"], second["code"], citrus["code"]] == ["MGA-001", "MGA-002", "JRK-001"]
 
     await client.delete(f"/api/v1/plants/{second['id']}", headers=headers)
@@ -150,7 +150,7 @@ async def test_plant_codes_count_per_commodity_and_are_never_reused(client: Asyn
 async def test_new_plant_defaults_and_estimate(client: AsyncClient) -> None:
     headers, farm = await start(client)
     planted = TODAY - timedelta(days=100)
-    plant = await new_plant(client, headers, farm["id"], planted_at=planted.isoformat())
+    plant = await new_plant(client, headers, farm["id"], nursery_started_at=planted.isoformat())
     assert plant["planting_material"] == "grafted"
     assert plant["quantity"] == 1
     assert plant["lifecycle_phase"] == "juvenile"
@@ -168,8 +168,8 @@ async def test_strawberry_defaults_to_runner_and_can_be_a_group(client: AsyncCli
         client,
         headers,
         farm["id"],
-        commodity_code="strawberry",
-        planted_at=(TODAY - timedelta(days=30)).isoformat(),
+        variety="Stroberi Frigo",
+        nursery_started_at=(TODAY - timedelta(days=30)).isoformat(),
         quantity=200,
         label="Bedengan A",
     )
@@ -181,10 +181,12 @@ async def test_strawberry_defaults_to_runner_and_can_be_a_group(client: AsyncCli
 @pytest.mark.parametrize(
     "overrides",
     [
-        {"commodity_code": "chili"},  # no longer supported
+        {"variety": "Durian Montong"},  # di luar cakupan
         {"planting_material": "runner"},  # runner is strawberry-only
-        {"planted_at": (TODAY + timedelta(days=1)).isoformat()},
-        {"planted_at": (TODAY - timedelta(days=365 * 41)).isoformat()},  # past the productive end
+        {"nursery_started_at": (TODAY + timedelta(days=1)).isoformat()},
+        {
+            "nursery_started_at": (TODAY - timedelta(days=365 * 41)).isoformat()
+        },  # past the productive end
         {"quantity": 0},
     ],
 )
@@ -194,8 +196,8 @@ async def test_invalid_plants_are_rejected(client: AsyncClient, overrides: dict[
         f"/api/v1/farms/{farm['id']}/plants",
         json={
             "label": "X",
-            "commodity_code": "mango",
-            "planted_at": (TODAY - timedelta(days=2000)).isoformat(),
+            "variety": "Mangga Arumanis",
+            "nursery_started_at": (TODAY - timedelta(days=2000)).isoformat(),
             **overrides,
         },
         headers=headers,
@@ -231,7 +233,7 @@ async def test_harvests_are_numbered_and_move_the_estimate(client: AsyncClient) 
 async def test_harvest_date_rules(client: AsyncClient) -> None:
     headers, farm = await start(client)
     planted = TODAY - timedelta(days=2000)
-    plant = await new_plant(client, headers, farm["id"], planted_at=planted.isoformat())
+    plant = await new_plant(client, headers, farm["id"], nursery_started_at=planted.isoformat())
     future = await harvest(client, headers, plant["id"], TODAY + timedelta(days=1))
     assert future.status_code == 400
     before = await harvest(client, headers, plant["id"], planted - timedelta(days=1))
@@ -421,7 +423,7 @@ async def test_scans_send_the_plants_commodity_to_vision(
     client: AsyncClient, vision: FakeVision, diseases: None
 ) -> None:
     headers, farm = await start(client)
-    plant = await new_plant(client, headers, farm["id"], commodity_code="citrus")
+    plant = await new_plant(client, headers, farm["id"], variety="Jeruk Siam")
     vision.enqueue_result(result_for("citrus_greening", cause="bacteria"))
     response = await upload_scan(client, headers, plant_id=plant["id"])
     assert response.status_code == 201, response.text
@@ -433,7 +435,7 @@ async def test_scan_history_filters(
 ) -> None:
     headers, farm = await start(client)
     mango = await new_plant(client, headers, farm["id"])
-    citrus = await new_plant(client, headers, farm["id"], commodity_code="citrus", label="Jeruk")
+    citrus = await new_plant(client, headers, farm["id"], variety="Jeruk Siam", label="Jeruk")
 
     vision.enqueue_result(result_for("mango_anthracnose"))
     await upload_scan(client, headers, plant_id=mango["id"])
@@ -475,7 +477,11 @@ async def test_scans_need_an_active_plant_that_is_yours(
     stranger = await upload_scan(client, stranger_headers, plant_id=plant["id"])
     assert stranger.status_code == 404
 
-    await client.delete(f"/api/v1/plants/{plant['id']}", headers=headers)
+    await client.post(
+        f"/api/v1/plants/{plant['id']}/end",
+        json={"reason": "other", "note": "Dihentikan"},
+        headers=headers,
+    )
     assert (await upload_scan(client, headers, plant_id=plant["id"])).status_code == 400
 
 
@@ -488,7 +494,7 @@ async def test_ending_for_disease_needs_a_disease_or_a_note(
     client: AsyncClient, diseases: None
 ) -> None:
     headers, farm = await start(client)
-    plant = await new_plant(client, headers, farm["id"], commodity_code="citrus", label="Jeruk")
+    plant = await new_plant(client, headers, farm["id"], variety="Jeruk Siam", label="Jeruk")
     url = f"/api/v1/plants/{plant['id']}/end"
 
     assert (await client.post(url, json={"reason": "disease"}, headers=headers)).status_code == 400
@@ -590,8 +596,8 @@ async def test_productive_period_ends_tracking_by_itself(
         client,
         headers,
         farm["id"],
-        commodity_code="strawberry",
-        planted_at=(TODAY - timedelta(days=400)).isoformat(),
+        variety="Stroberi Frigo",
+        nursery_started_at=(TODAY - timedelta(days=400)).isoformat(),
         label="Bedengan A",
     )
     await harvest(client, headers, plant["id"], TODAY - timedelta(days=5))

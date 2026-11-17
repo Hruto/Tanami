@@ -10,7 +10,7 @@ from sqlalchemy.dialects.postgresql import UUID as PgUUID
 from sqlalchemy.orm import Mapped, mapped_column
 
 from app.db.base import Base, created_at_column, updated_at_column
-from app.domain import CareAction
+from app.domain import CareAction, IrrigationSchedule
 from app.models.columns import enum_check, uuid_pk
 
 
@@ -61,4 +61,30 @@ class CareLog(Base):
         CheckConstraint("note IS NULL OR char_length(note) <= 1000", name="note_length"),
         Index("ix_care_logs_plant_performed", "plant_id", text("performed_at DESC")),
         Index("ix_care_logs_plant_action", "plant_id", "action", text("performed_at DESC")),
+    )
+
+
+class IrrigationChange(Base):
+    """Riwayat perubahan jadwal siraman: saran sistem boleh ditimpa user."""
+
+    __tablename__ = "irrigation_changes"
+
+    id: Mapped[UUID] = uuid_pk()
+    plant_id: Mapped[UUID] = mapped_column(
+        PgUUID(as_uuid=True), ForeignKey("plants.id", ondelete="CASCADE"), nullable=False
+    )
+    changed_by: Mapped[UUID | None] = mapped_column(
+        PgUUID(as_uuid=True), ForeignKey("users.id", ondelete="SET NULL"), nullable=True
+    )
+    changed_at: Mapped[datetime] = mapped_column(nullable=False)
+    from_schedule: Mapped[str] = mapped_column(String(16), nullable=False)
+    to_schedule: Mapped[str] = mapped_column(String(16), nullable=False)
+    reason: Mapped[str | None] = mapped_column(Text, nullable=True)
+
+    created_at: Mapped[datetime] = created_at_column()
+
+    __table_args__ = (
+        enum_check("from_schedule", IrrigationSchedule, name="ck_irrigation_from_schedule"),
+        enum_check("to_schedule", IrrigationSchedule, name="ck_irrigation_to_schedule"),
+        Index("ix_irrigation_changes_plant_time", "plant_id", text("changed_at DESC")),
     )

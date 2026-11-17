@@ -31,23 +31,23 @@ async def test_farm_crud_and_ownership(client: AsyncClient) -> None:
     assert bad.status_code == 400 and bad.json()["error"]["details"]["field"] == "adm4_code"
 
 
-async def test_archiving_a_farm_archives_its_plants(client: AsyncClient) -> None:
+async def test_archive_endpoints_are_gone_and_end_tracking_still_works(
+    client: AsyncClient,
+) -> None:
     headers = auth_headers(await register(client))
     farm = await create_farm(client, headers)
     plant = await create_plant(client, headers, farm["id"])
-    assert (await client.delete(f"/api/v1/farms/{farm['id']}", headers=headers)).status_code == 204
-    assert (await client.get("/api/v1/farms", headers=headers)).json()["data"] == []
-    archived = await client.get("/api/v1/farms?include_archived=true", headers=headers)
-    assert len(archived.json()["data"]) == 1
-    plant_now = (await client.get(f"/api/v1/plants/{plant['id']}", headers=headers)).json()
-    assert plant_now["data"]["status"] == "ended"
-    assert plant_now["data"]["end_reason"] == "other"
-    blocked = await client.post(
-        f"/api/v1/farms/{farm['id']}/plants",
-        json={"label": "Baru", "planted_at": "2026-10-01"},
+    assert (await client.delete(f"/api/v1/farms/{farm['id']}", headers=headers)).status_code == 405
+    assert (
+        await client.delete(f"/api/v1/plants/{plant['id']}", headers=headers)
+    ).status_code == 405
+    ended = await client.post(
+        f"/api/v1/plants/{plant['id']}/end",
+        json={"reason": "cut_down", "note": "Ditebang"},
         headers=headers,
     )
-    assert blocked.status_code == 400
+    assert ended.status_code == 200, ended.text
+    assert ended.json()["data"]["status"] == "ended"
 
 
 async def test_plant_validation_and_patch(client: AsyncClient) -> None:
@@ -58,11 +58,11 @@ async def test_plant_validation_and_patch(client: AsyncClient) -> None:
     assert (
         await client.post(
             plants_url,
-            json={"label": "A", "commodity_code": "mango", "planted_at": future},
+            json={"label": "A", "variety": "Mangga Arumanis", "nursery_started_at": future},
             headers=headers,
         )
     ).status_code == 400
-    durian = {"label": "A", "planted_at": "2026-10-01", "commodity_code": "durian"}
+    durian = {"label": "A", "nursery_started_at": "2026-10-01", "variety": "Durian Montong"}
     assert (await client.post(plants_url, json=durian, headers=headers)).status_code == 400
 
     plant = await create_plant(client, headers, farm["id"])
@@ -109,7 +109,7 @@ async def test_harvests_are_repeatable_until_tracking_ends(client: AsyncClient) 
     headers = auth_headers(await register(client))
     farm = await create_farm(client, headers)
     planted = (datetime.now(UTC) - timedelta(days=2000)).date()
-    plant = await create_plant(client, headers, farm["id"], planted_at=planted.isoformat())
+    plant = await create_plant(client, headers, farm["id"], nursery_started_at=planted.isoformat())
     url = f"/api/v1/plants/{plant['id']}/harvests"
     detail_url = f"/api/v1/plants/{plant['id']}"
     picked = datetime.now(UTC) - timedelta(days=1)

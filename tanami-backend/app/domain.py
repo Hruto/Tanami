@@ -9,6 +9,8 @@ from __future__ import annotations
 
 from enum import StrEnum
 
+from app.core.errors import ValidationError
+
 
 class ScanType(StrEnum):
     DISEASE = "disease"
@@ -360,3 +362,63 @@ CAUSE_LABELS: dict[CauseCategory, str] = {
     CauseCategory.NUTRIENT_DEFICIENCY: "Kekurangan hara",
     CauseCategory.UNKNOWN: "Belum diketahui",
 }
+
+# Pasca-rapat: "Jenis Tanaman" di form adalah varietas berupa teks bebas
+# (mis. "Mangga Arumanis"), bukan sebuah pilihan kode. Mesin tetap perlu tahu
+# komoditasnya untuk penyakit, cuaca, forum dan dataset pertumbuhan, jadi
+# komoditas diturunkan dari kata kunci di nama varietas.
+VARIETY_COMMODITY_KEYWORDS: tuple[tuple[str, str], ...] = (
+    ("mangga", "mango"),
+    ("jeruk", "citrus"),
+    ("stroberi", "strawberry"),
+    ("strawberry", "strawberry"),
+)
+
+
+def commodity_from_variety(variety: str) -> str:
+    """Turunkan komoditas dari nama varietas bebas; tolak yang di luar cakupan."""
+    lowered = " ".join(variety.split()).lower()
+    for keyword, commodity in VARIETY_COMMODITY_KEYWORDS:
+        if keyword in lowered:
+            return commodity
+    raise ValidationError(
+        "Jenis tanaman harus menyebut mangga, jeruk, atau stroberi.",
+        details={"field": "variety", "supported": list(COMMODITIES_V2)},
+    )
+
+
+class HarvestQuality(StrEnum):
+    """Hasil akhir panen — dropdown di form, bukan teks bebas (pasca-rapat)."""
+
+    GAGAL = "gagal"
+    KURANG_OPTIMAL = "kurang_optimal"
+    NORMAL = "normal"
+    PANEN_RAYA = "panen_raya"
+
+
+HARVEST_QUALITY_LABELS: dict[HarvestQuality, str] = {
+    HarvestQuality.GAGAL: "Gagal Panen (hasil di bawah 20%)",
+    HarvestQuality.KURANG_OPTIMAL: "Kurang Optimal (20% - 70%)",
+    HarvestQuality.NORMAL: "Panen Normal / Sesuai Target (70% - 100%)",
+    HarvestQuality.PANEN_RAYA: "Panen Raya (melampaui target, >100%)",
+}
+
+# Target hasil panen per pohon, dipakai sebagai penyebut persentase keberhasilan.
+# Angka awal ini berasal dari profil tanaman; saat dataset tersedia, tabel
+# crop_profiles yang menjadi sumbernya.
+EXPECTED_YIELD_KG: dict[str, float] = {
+    "mango": 40.0,
+    "citrus": 25.0,
+    "strawberry": 3.0,
+}
+
+
+def harvest_quality_from_pct(success_pct: float) -> HarvestQuality:
+    """Petakan persentase keberhasilan ke 4 kategori hasil akhir."""
+    if success_pct < 20:
+        return HarvestQuality.GAGAL
+    if success_pct < 70:
+        return HarvestQuality.KURANG_OPTIMAL
+    if success_pct <= 100:
+        return HarvestQuality.NORMAL
+    return HarvestQuality.PANEN_RAYA

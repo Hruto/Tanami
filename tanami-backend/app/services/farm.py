@@ -4,6 +4,7 @@ from __future__ import annotations
 
 from collections.abc import Sequence
 from datetime import UTC, date, datetime, timedelta
+from decimal import Decimal
 from uuid import NAMESPACE_URL, UUID, uuid4, uuid5
 from zoneinfo import ZoneInfo
 
@@ -16,22 +17,28 @@ from app.domain import (
     COMMODITY_LABELS_V2,
     DEFAULT_MATERIAL,
     DISEASE_LABELS,
+    EXPECTED_YIELD_KG,
+    HARVEST_QUALITY_LABELS,
     IRRIGATION_INTERVAL_DAYS,
     MATERIALS_BY_COMMODITY,
     PLANT_CODE_PREFIX,
     CareAction,
     EpisodeCloseReason,
+    HarvestQuality,
     HealthStatus,
+    IrrigationSchedule,
+    Placement,
     PushState,
     ReminderStatus,
     TrackingEndReason,
+    harvest_quality_from_pct,
 )
 from app.models.content import Disease, Region
 from app.models.episode import DiseaseEpisode
 from app.models.farm import Farm, HarvestRecord, Plant
 from app.models.reminder import Reminder
 from app.models.scan import Scan
-from app.models.tracking import CareLog, PlantPhoto
+from app.models.tracking import CareLog, IrrigationChange, PlantPhoto
 from app.models.user import User
 from app.providers.storage import StorageProvider
 from app.schemas.farm import (
@@ -45,9 +52,13 @@ from app.schemas.farm import (
     HarvestPoint,
     HarvestUpdate,
     HealthPoint,
+    IrrigationAdviceOut,
+    IrrigationChangeCreate,
+    IrrigationChangeOut,
     NextHarvestOut,
     PlantCreate,
     PlantOut,
+    PlantProgressOut,
     PlantStats,
     PlantUpdate,
     RegionOut,
@@ -65,6 +76,7 @@ from app.services.estimate import (
     noon_utc,
 )
 from app.services.scan import next_health_status
+from app.services.weather import WeatherService
 
 CARE_LABELS: dict[str, str] = {
     CareAction.WATERING.value: "Penyiraman",
@@ -282,7 +294,6 @@ class FarmService:
             lat=float(farm.lat) if farm.lat is not None else None,
             lon=float(farm.lon) if farm.lon is not None else None,
             area_m2=float(farm.area_m2) if farm.area_m2 is not None else None,
-            placement=farm.placement,
             village=village,
             plant_count=plant_count,
             archived_at=farm.archived_at,
@@ -369,22 +380,25 @@ class PlantService:
         if farm.archived_at is not None:
             raise ValidationError("Lahan ini sudah diarsipkan.", details={"field": "farm_id"})
 
+        commodity = payload.derived_commodity
         material = (
             payload.planting_material.value
             if payload.planting_material
-            else DEFAULT_MATERIAL[payload.commodity_code]
+            else DEFAULT_MATERIAL[commodity]
         )
-        until = await self._productive_until(payload.commodity_code, material, payload.planted_at)
+        until = await self._productive_until(commodity, material, payload.nursery_started_at)
 
         plant = Plant(
             id=uuid4(),
             farm_id=farm_id,
             user_id=user_id,
-            code=await self._next_code(user_id, payload.commodity_code),
-            commodity_code=payload.commodity_code,
+            code=await self._next_code(user_id, commodity),
+            commodity_code=commodity,
             planting_material=material,
             variety=payload.variety,
             label=payload.label,
+            nursery_started_at=payload.nursery_started_at,
+            placement=payload.placement.value,
             planted_at=payload.planted_at,
             quantity=payload.quantity,
             productive_until=until,
@@ -408,6 +422,8 @@ class PlantService:
             data["planting_material"] = material
         if "irrigation_schedule" in data:
             data["irrigation_schedule"] = data["irrigation_schedule"].value
+        if "placement" in data:
+            data["placement"] = data["placement"].value
 
         if "planted_at" in data or "planting_material" in data:
             planted_at = data.get("planted_at", plant.planted_at)
@@ -493,8 +509,13 @@ class PlantService:
             recorded_by=user_id,
             harvested_at=noon_utc(day, self.tz),
             sequence=len(rows) + 1,
-            quality_note=payload.quality_note,
+            quality=None,
+            success_pct=None,
+            quality_note=payload.note,
             quantity_kg=payload.quantity_kg,
+        )
+        self._apply_harvest_result(
+            record, plant.commodity_code, payload.quality, payload.quantity_kg
         )
         self.session.add(record)
         await self.session.commit()
@@ -518,10 +539,16 @@ class PlantService:
             )
             self._check_harvest_day(day, plant, previous=previous, following=following)
             record.harvested_at = noon_utc(day, self.tz)
-        if "quality_note" in data:
-            record.quality_note = data["quality_note"]
+        if "note" in data:
+            record.quality_note = data["note"]
         if "quantity_kg" in data:
             record.quantity_kg = data["quantity_kg"]
+        self._apply_harvest_result(
+            record,
+            plant.commodity_code,
+            HarvestQuality(data["quality"]) if data.get("quality") else None,
+            data.get("quantity_kg", record.quantity_kg),
+        )
         await self.session.flush()
         await self._renumber(plant.id)
         await self.session.commit()
@@ -862,7 +889,12 @@ class PlantService:
             plant_id=str(row.plant_id),
             sequence=row.sequence,
             harvested_at=local_date(row.harvested_at, self.tz),
-            quality_note=row.quality_note,
+            quality=row.quality,
+            quality_label=HARVEST_QUALITY_LABELS.get(HarvestQuality(row.quality))
+            if row.quality
+            else None,
+            success_pct=float(row.success_pct) if row.success_pct is not None else None,
+            note=row.quality_note,
             quantity_kg=float(row.quantity_kg) if row.quantity_kg is not None else None,
             created_at=row.created_at,
             next_harvest=estimate,
@@ -959,7 +991,8 @@ class PlantService:
             planting_material=plant.planting_material,
             quantity=plant.quantity,
             planted_at=plant.planted_at,
-            age_days=rules.age_days(plant.planted_at, end_day),
+            nursery_started_at=plant.nursery_started_at,
+            age_days=rules.age_days(plant.nursery_started_at, end_day),
             lifecycle_phase=facts.phase,
             productive_until=plant.productive_until,
             health_status=plant.health_status,
@@ -974,7 +1007,7 @@ class PlantService:
             cover_photo_url=self.storage.public_url(cover) if cover and self.storage else None,
             last_scan_at=last_scan,
             farm_name=farm.name,
-            placement=farm.placement,
+            placement=plant.placement,
             adm4_code=farm.adm4_code,
             village=village,
             status="ended" if plant.ended_at else "active",
@@ -999,6 +1032,140 @@ class PlantService:
         if age > timedelta(days=self.settings.plant_status_stale_days):
             return f"Tidak ada scan dalam {self.settings.plant_status_stale_days} hari terakhir."
         return None
+
+    def _apply_harvest_result(
+        self,
+        record: HarvestRecord,
+        commodity: str,
+        quality: HarvestQuality | None,
+        quantity_kg: Decimal | None,
+    ) -> None:
+        """Hitung persen keberhasilan dan turunkan kategori dari persen itu."""
+        expected = EXPECTED_YIELD_KG.get(commodity)
+        if quantity_kg is None or not expected:
+            record.success_pct = None
+            record.quality = quality.value if quality else None
+            return
+        pct = float(quantity_kg) / expected * 100
+        derived = harvest_quality_from_pct(pct)
+        if quality is not None and quality != derived:
+            raise ValidationError(
+                "Kategori hasil panen tidak sesuai dengan jumlah kg yang diisi.",
+                details={"field": "quality", "expected": derived.value},
+            )
+        record.success_pct = Decimal(str(round(pct, 2)))
+        record.quality = derived.value
+
+    async def update_irrigation(
+        self, user_id: UUID, plant_id: UUID, payload: IrrigationChangeCreate
+    ) -> PlantOut:
+        """Saran sistem boleh diubah user; setiap perubahan dicatat."""
+        plant = await self.get_active_plant(user_id, plant_id)
+        previous = IrrigationSchedule(plant.irrigation_schedule)
+        if previous == payload.schedule:
+            raise ValidationError("Jadwal penyiraman tidak berubah.", details={"field": "schedule"})
+        change = IrrigationChange(
+            id=uuid4(),
+            plant_id=plant.id,
+            changed_by=user_id,
+            changed_at=datetime.now(UTC),
+            from_schedule=previous.value,
+            to_schedule=payload.schedule.value,
+            reason=payload.reason,
+        )
+        plant.irrigation_schedule = payload.schedule.value
+        self.session.add(change)
+        await self.session.commit()
+        return await self._plant_out(plant)
+
+    async def irrigation_history(self, user_id: UUID, plant_id: UUID) -> list[IrrigationChangeOut]:
+        plant = await self.get_plant(user_id, plant_id)
+        rows = (
+            (
+                await self.session.execute(
+                    select(IrrigationChange)
+                    .where(IrrigationChange.plant_id == plant.id)
+                    .order_by(IrrigationChange.changed_at.desc())
+                )
+            )
+            .scalars()
+            .all()
+        )
+        return [
+            IrrigationChangeOut(
+                id=str(row.id),
+                plant_id=str(row.plant_id),
+                from_schedule=row.from_schedule,
+                to_schedule=row.to_schedule,
+                changed_at=row.changed_at,
+                reason=row.reason,
+            )
+            for row in rows
+        ]
+
+    async def irrigation_advice(
+        self, user_id: UUID, plant_id: UUID, weather: WeatherService | None = None
+    ) -> IrrigationAdviceOut:
+        """Indoor tidak memakai cuaca; outdoor memakai prakiraan BMKG bila ada."""
+        plant = await self.get_active_plant(user_id, plant_id)
+        if plant.placement == Placement.INDOOR.value:
+            return IrrigationAdviceOut(
+                recommended=IrrigationSchedule.EVERY_3_5_DAYS,
+                weather_used=False,
+                note="Tanaman indoor: cuaca tidak dipertimbangkan.",
+            )
+        if weather is not None:
+            forecast = await weather.for_farm(user_id, plant.farm_id)
+            slots = [slot for day in forecast.days for slot in day.slots]
+            rain = sum(slot.precipitation_mm or 0 for slot in slots)
+            temps = [slot.temperature_c for slot in slots if slot.temperature_c is not None]
+            if rain > 5:
+                recommended, note = (
+                    IrrigationSchedule.WEEKLY,
+                    "Curah hujan tinggi: kurangi siraman.",
+                )
+            elif temps and max(temps) >= 32:
+                recommended, note = IrrigationSchedule.DAILY, "Suhu tinggi: siram setiap hari."
+            else:
+                recommended, note = IrrigationSchedule.EVERY_3_5_DAYS, "Cuaca normal."
+            return IrrigationAdviceOut(recommended=recommended, weather_used=True, note=note)
+        return IrrigationAdviceOut(
+            recommended=IrrigationSchedule(plant.irrigation_schedule),
+            weather_used=False,
+            note="Prakiraan cuaca belum tersedia; pakai jadwal berjalan.",
+        )
+
+    async def progress(self, user_id: UUID, plant_id: UUID) -> PlantProgressOut:
+        """Ringkasan perjalanan tanaman dari pembibitan sampai tidak produktif."""
+        plant = await self.get_plant(user_id, plant_id)
+        facts = await self.estimator.facts_for(plant)
+        today = self.estimator.today()
+        age = rules.age_days(
+            plant.nursery_started_at,
+            today,
+            ended_on=plant.ended_at and local_date(plant.ended_at, self.tz),
+        )
+        estimate = facts.next_harvest
+        first = estimate.base_start if estimate and facts.harvest_count == 0 else None
+        if first is None and facts.harvest_dates:
+            first = min(facts.harvest_dates)
+        if first is not None:
+            total = max((first - plant.nursery_started_at).days, 1)
+            percent = min(round(age / total * 100, 2), 100.0)
+        else:
+            percent = 100.0 if facts.harvest_count else 0.0
+        return PlantProgressOut(
+            plant_id=str(plant.id),
+            age_days=age,
+            phase=facts.phase,
+            nursery_started_at=plant.nursery_started_at,
+            productive_until=plant.productive_until,
+            percent_to_first_harvest=percent,
+            estimated_first_harvest=first,
+            delay_days=estimate.delay_days if estimate else 0,
+            harvest_count=facts.harvest_count,
+            weather_used=plant.placement == Placement.OUTDOOR.value,
+        )
 
 
 class RegionService:

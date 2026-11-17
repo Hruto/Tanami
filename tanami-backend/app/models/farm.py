@@ -115,7 +115,13 @@ class Plant(Base):
     planting_material: Mapped[str] = mapped_column(String(16), nullable=False)
     variety: Mapped[str | None] = mapped_column(String(80), nullable=True)
     label: Mapped[str] = mapped_column(String(120), nullable=False)
+    # Pasca-rapat: umur dihitung dari estimasi awal pembibitan, bukan tanam ke lahan.
+    nursery_started_at: Mapped[date] = mapped_column(Date, nullable=False)
     planted_at: Mapped[date] = mapped_column(Date, nullable=False)
+    # Pasca-rapat: indoor/outdoor melekat pada tanaman, bukan kebun.
+    placement: Mapped[str] = mapped_column(
+        String(16), nullable=False, server_default=Placement.OUTDOOR.value, index=True
+    )
     quantity: Mapped[int] = mapped_column(Integer, nullable=False, server_default=text("1"))
     # planted_at + the profile's productive years; tracking ends by itself then.
     productive_until: Mapped[date] = mapped_column(Date, nullable=False)
@@ -160,6 +166,7 @@ class Plant(Base):
         enum_check("planting_material", PlantingMaterial, name="planting_material"),
         enum_check("health_status", HealthStatus, name="health_status"),
         enum_check("irrigation_schedule", IrrigationSchedule, name="irrigation_schedule"),
+        enum_check("placement", Placement, name="placement"),
         values_check("end_reason", TRACKING_END_REASONS_V2, name="end_reason"),
         enum_check("outcome", TrackingOutcome, name="outcome"),
         CheckConstraint("(ended_at IS NULL) = (end_reason IS NULL)", name="ended_with_reason"),
@@ -204,6 +211,8 @@ class HarvestRecord(Base):
     # deleted, so the unique constraint is checked at commit, not per row.
     sequence: Mapped[int] = mapped_column(Integer, nullable=False)
     quality_note: Mapped[str | None] = mapped_column(Text, nullable=True)
+    quality: Mapped[str | None] = mapped_column(String(24), nullable=True)
+    success_pct: Mapped[Decimal | None] = mapped_column(Numeric(6, 2), nullable=True)
     quantity_kg: Mapped[Decimal | None] = mapped_column(Numeric(10, 2), nullable=True)
 
     created_at: Mapped[datetime] = created_at_column()

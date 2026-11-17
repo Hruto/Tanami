@@ -1339,6 +1339,19 @@
         "title": "Envelope[HomeOut]",
         "type": "object"
       },
+      "Envelope_IrrigationAdviceOut_": {
+        "additionalProperties": false,
+        "properties": {
+          "data": {
+            "$ref": "#/components/schemas/IrrigationAdviceOut"
+          }
+        },
+        "required": [
+          "data"
+        ],
+        "title": "Envelope[IrrigationAdviceOut]",
+        "type": "object"
+      },
       "Envelope_NotificationSettingsOut_": {
         "additionalProperties": false,
         "properties": {
@@ -1376,6 +1389,19 @@
           "data"
         ],
         "title": "Envelope[PlantOut]",
+        "type": "object"
+      },
+      "Envelope_PlantProgressOut_": {
+        "additionalProperties": false,
+        "properties": {
+          "data": {
+            "$ref": "#/components/schemas/PlantProgressOut"
+          }
+        },
+        "required": [
+          "data"
+        ],
+        "title": "Envelope[PlantProgressOut]",
         "type": "object"
       },
       "Envelope_PlantStats_": {
@@ -1765,10 +1791,6 @@
             "minLength": 1,
             "title": "Name",
             "type": "string"
-          },
-          "placement": {
-            "$ref": "#/components/schemas/Placement",
-            "default": "outdoor"
           }
         },
         "required": [
@@ -1843,9 +1865,6 @@
             "title": "Name",
             "type": "string"
           },
-          "placement": {
-            "$ref": "#/components/schemas/Placement"
-          },
           "plant_count": {
             "default": 0,
             "title": "Plant Count",
@@ -1875,7 +1894,6 @@
           "lat",
           "lon",
           "area_m2",
-          "placement",
           "archived_at",
           "created_at",
           "updated_at"
@@ -1947,16 +1965,6 @@
               }
             ],
             "title": "Name"
-          },
-          "placement": {
-            "anyOf": [
-              {
-                "$ref": "#/components/schemas/Placement"
-              },
-              {
-                "type": "null"
-              }
-            ]
           }
         },
         "title": "FarmUpdate",
@@ -2630,7 +2638,7 @@
             ],
             "title": "Harvested At"
           },
-          "quality_note": {
+          "note": {
             "anyOf": [
               {
                 "maxLength": 1000,
@@ -2640,7 +2648,17 @@
                 "type": "null"
               }
             ],
-            "title": "Quality Note"
+            "title": "Note"
+          },
+          "quality": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/HarvestQuality"
+              },
+              {
+                "type": "null"
+              }
+            ]
           },
           "quantity_kg": {
             "anyOf": [
@@ -2689,11 +2707,7 @@
               }
             ]
           },
-          "plant_id": {
-            "title": "Plant Id",
-            "type": "string"
-          },
-          "quality_note": {
+          "note": {
             "anyOf": [
               {
                 "type": "string"
@@ -2702,7 +2716,32 @@
                 "type": "null"
               }
             ],
-            "title": "Quality Note"
+            "title": "Note"
+          },
+          "plant_id": {
+            "title": "Plant Id",
+            "type": "string"
+          },
+          "quality": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/HarvestQuality"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "quality_label": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Quality Label"
           },
           "quantity_kg": {
             "anyOf": [
@@ -2718,6 +2757,17 @@
           "sequence": {
             "title": "Sequence",
             "type": "integer"
+          },
+          "success_pct": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Success Pct"
           }
         },
         "required": [
@@ -2725,7 +2775,7 @@
           "plant_id",
           "sequence",
           "harvested_at",
-          "quality_note",
+          "quality",
           "quantity_kg",
           "created_at"
         ],
@@ -2764,6 +2814,17 @@
         "title": "HarvestPoint",
         "type": "object"
       },
+      "HarvestQuality": {
+        "description": "Hasil akhir panen — dropdown di form, bukan teks bebas (pasca-rapat).",
+        "enum": [
+          "gagal",
+          "kurang_optimal",
+          "normal",
+          "panen_raya"
+        ],
+        "title": "HarvestQuality",
+        "type": "string"
+      },
       "HarvestUpdate": {
         "additionalProperties": false,
         "properties": {
@@ -2783,7 +2844,7 @@
             ],
             "title": "Harvested At"
           },
-          "quality_note": {
+          "note": {
             "anyOf": [
               {
                 "maxLength": 1000,
@@ -2793,7 +2854,17 @@
                 "type": "null"
               }
             ],
-            "title": "Quality Note"
+            "title": "Note"
+          },
+          "quality": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/HarvestQuality"
+              },
+              {
+                "type": "null"
+              }
+            ]
           },
           "quantity_kg": {
             "anyOf": [
@@ -2884,6 +2955,105 @@
           "unread_reminder_count"
         ],
         "title": "HomeOut",
+        "type": "object"
+      },
+      "IrrigationAdviceOut": {
+        "additionalProperties": false,
+        "description": "Saran sistem; untuk indoor cuaca sengaja tidak dipakai.",
+        "properties": {
+          "note": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Note"
+          },
+          "recommended": {
+            "$ref": "#/components/schemas/IrrigationSchedule"
+          },
+          "weather_used": {
+            "title": "Weather Used",
+            "type": "boolean"
+          }
+        },
+        "required": [
+          "recommended",
+          "weather_used"
+        ],
+        "title": "IrrigationAdviceOut",
+        "type": "object"
+      },
+      "IrrigationChangeCreate": {
+        "additionalProperties": false,
+        "properties": {
+          "reason": {
+            "anyOf": [
+              {
+                "maxLength": 280,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Reason"
+          },
+          "schedule": {
+            "$ref": "#/components/schemas/IrrigationSchedule"
+          }
+        },
+        "required": [
+          "schedule"
+        ],
+        "title": "IrrigationChangeCreate",
+        "type": "object"
+      },
+      "IrrigationChangeOut": {
+        "additionalProperties": false,
+        "properties": {
+          "changed_at": {
+            "format": "date-time",
+            "title": "Changed At",
+            "type": "string"
+          },
+          "from_schedule": {
+            "$ref": "#/components/schemas/IrrigationSchedule"
+          },
+          "id": {
+            "title": "Id",
+            "type": "string"
+          },
+          "plant_id": {
+            "title": "Plant Id",
+            "type": "string"
+          },
+          "reason": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Reason"
+          },
+          "to_schedule": {
+            "$ref": "#/components/schemas/IrrigationSchedule"
+          }
+        },
+        "required": [
+          "id",
+          "plant_id",
+          "from_schedule",
+          "to_schedule",
+          "changed_at"
+        ],
+        "title": "IrrigationChangeOut",
         "type": "object"
       },
       "IrrigationSchedule": {
@@ -3176,6 +3346,27 @@
           "meta"
         ],
         "title": "ListEnvelope[HarvestOut]",
+        "type": "object"
+      },
+      "ListEnvelope_IrrigationChangeOut_": {
+        "additionalProperties": false,
+        "properties": {
+          "data": {
+            "items": {
+              "$ref": "#/components/schemas/IrrigationChangeOut"
+            },
+            "title": "Data",
+            "type": "array"
+          },
+          "meta": {
+            "$ref": "#/components/schemas/PaginationMeta"
+          }
+        },
+        "required": [
+          "data",
+          "meta"
+        ],
+        "title": "ListEnvelope[IrrigationChangeOut]",
         "type": "object"
       },
       "ListEnvelope_PhotoOut_": {
@@ -3750,10 +3941,6 @@
       "PlantCreate": {
         "additionalProperties": false,
         "properties": {
-          "commodity_code": {
-            "title": "Commodity Code",
-            "type": "string"
-          },
           "irrigation_schedule": {
             "$ref": "#/components/schemas/IrrigationSchedule",
             "default": "every_3_5_days"
@@ -3764,10 +3951,26 @@
             "title": "Label",
             "type": "string"
           },
-          "planted_at": {
+          "nursery_started_at": {
             "format": "date",
-            "title": "Planted At",
+            "title": "Nursery Started At",
             "type": "string"
+          },
+          "placement": {
+            "$ref": "#/components/schemas/Placement",
+            "default": "outdoor"
+          },
+          "planted_at": {
+            "anyOf": [
+              {
+                "format": "date",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Planted At"
           },
           "planting_material": {
             "anyOf": [
@@ -3787,22 +3990,16 @@
             "type": "integer"
           },
           "variety": {
-            "anyOf": [
-              {
-                "maxLength": 80,
-                "type": "string"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "title": "Variety"
+            "maxLength": 80,
+            "minLength": 1,
+            "title": "Variety",
+            "type": "string"
           }
         },
         "required": [
           "label",
-          "commodity_code",
-          "planted_at"
+          "variety",
+          "nursery_started_at"
         ],
         "title": "PlantCreate",
         "type": "object"
@@ -4020,6 +4217,11 @@
             ],
             "title": "Next Watering On"
           },
+          "nursery_started_at": {
+            "format": "date",
+            "title": "Nursery Started At",
+            "type": "string"
+          },
           "open_episode_count": {
             "default": 0,
             "title": "Open Episode Count",
@@ -4102,6 +4304,7 @@
           "planting_material",
           "quantity",
           "planted_at",
+          "nursery_started_at",
           "age_days",
           "lifecycle_phase",
           "productive_until",
@@ -4116,6 +4319,74 @@
           "updated_at"
         ],
         "title": "PlantOut",
+        "type": "object"
+      },
+      "PlantProgressOut": {
+        "additionalProperties": false,
+        "description": "Ringkasan perjalanan tanaman dari pembibitan sampai tidak produktif.",
+        "properties": {
+          "age_days": {
+            "title": "Age Days",
+            "type": "integer"
+          },
+          "delay_days": {
+            "default": 0,
+            "title": "Delay Days",
+            "type": "integer"
+          },
+          "estimated_first_harvest": {
+            "anyOf": [
+              {
+                "format": "date",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Estimated First Harvest"
+          },
+          "harvest_count": {
+            "default": 0,
+            "title": "Harvest Count",
+            "type": "integer"
+          },
+          "nursery_started_at": {
+            "format": "date",
+            "title": "Nursery Started At",
+            "type": "string"
+          },
+          "percent_to_first_harvest": {
+            "title": "Percent To First Harvest",
+            "type": "number"
+          },
+          "phase": {
+            "$ref": "#/components/schemas/LifecyclePhase"
+          },
+          "plant_id": {
+            "title": "Plant Id",
+            "type": "string"
+          },
+          "productive_until": {
+            "format": "date",
+            "title": "Productive Until",
+            "type": "string"
+          },
+          "weather_used": {
+            "default": true,
+            "title": "Weather Used",
+            "type": "boolean"
+          }
+        },
+        "required": [
+          "plant_id",
+          "age_days",
+          "phase",
+          "nursery_started_at",
+          "productive_until",
+          "percent_to_first_harvest"
+        ],
+        "title": "PlantProgressOut",
         "type": "object"
       },
       "PlantStats": {
@@ -4219,6 +4490,28 @@
               }
             ],
             "title": "Label"
+          },
+          "nursery_started_at": {
+            "anyOf": [
+              {
+                "format": "date",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Nursery Started At"
+          },
+          "placement": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/Placement"
+              },
+              {
+                "type": "null"
+              }
+            ]
           },
           "planted_at": {
             "anyOf": [
@@ -6765,56 +7058,6 @@
       }
     },
     "/api/v1/farms/{farm_id}": {
-      "delete": {
-        "operationId": "archive_farm_api_v1_farms__farm_id__delete",
-        "parameters": [
-          {
-            "in": "path",
-            "name": "farm_id",
-            "required": true,
-            "schema": {
-              "format": "uuid",
-              "title": "Farm Id",
-              "type": "string"
-            }
-          },
-          {
-            "in": "header",
-            "name": "authorization",
-            "required": false,
-            "schema": {
-              "anyOf": [
-                {
-                  "type": "string"
-                },
-                {
-                  "type": "null"
-                }
-              ],
-              "title": "Authorization"
-            }
-          }
-        ],
-        "responses": {
-          "204": {
-            "description": "Successful Response"
-          },
-          "422": {
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/HTTPValidationError"
-                }
-              }
-            },
-            "description": "Validation Error"
-          }
-        },
-        "summary": "Archive Farm",
-        "tags": [
-          "farms"
-        ]
-      },
       "get": {
         "operationId": "get_farm_api_v1_farms__farm_id__get",
         "parameters": [
@@ -8246,57 +8489,6 @@
       }
     },
     "/api/v1/plants/{plant_id}": {
-      "delete": {
-        "description": "Shorthand for ending tracking with reason ``other`` (design 10.5).",
-        "operationId": "archive_plant_api_v1_plants__plant_id__delete",
-        "parameters": [
-          {
-            "in": "path",
-            "name": "plant_id",
-            "required": true,
-            "schema": {
-              "format": "uuid",
-              "title": "Plant Id",
-              "type": "string"
-            }
-          },
-          {
-            "in": "header",
-            "name": "authorization",
-            "required": false,
-            "schema": {
-              "anyOf": [
-                {
-                  "type": "string"
-                },
-                {
-                  "type": "null"
-                }
-              ],
-              "title": "Authorization"
-            }
-          }
-        ],
-        "responses": {
-          "204": {
-            "description": "Successful Response"
-          },
-          "422": {
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/HTTPValidationError"
-                }
-              }
-            },
-            "description": "Validation Error"
-          }
-        },
-        "summary": "Archive Plant",
-        "tags": [
-          "farms"
-        ]
-      },
       "get": {
         "operationId": "get_plant_api_v1_plants__plant_id__get",
         "parameters": [
@@ -9044,6 +9236,195 @@
         ]
       }
     },
+    "/api/v1/plants/{plant_id}/irrigation": {
+      "patch": {
+        "description": "User boleh mengubah jadwal siraman; tiap perubahan tercatat.",
+        "operationId": "update_irrigation_api_v1_plants__plant_id__irrigation_patch",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "plant_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Plant Id",
+              "type": "string"
+            }
+          },
+          {
+            "in": "header",
+            "name": "authorization",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Authorization"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/IrrigationChangeCreate"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Envelope_PlantOut_"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Update Irrigation",
+        "tags": [
+          "farms"
+        ]
+      }
+    },
+    "/api/v1/plants/{plant_id}/irrigation-advice": {
+      "get": {
+        "description": "Indoor tidak memanggil BMKG; outdoor memakai prakiraan cuaca.",
+        "operationId": "irrigation_advice_api_v1_plants__plant_id__irrigation_advice_get",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "plant_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Plant Id",
+              "type": "string"
+            }
+          },
+          {
+            "in": "header",
+            "name": "authorization",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Authorization"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Envelope_IrrigationAdviceOut_"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Irrigation Advice",
+        "tags": [
+          "farms"
+        ]
+      }
+    },
+    "/api/v1/plants/{plant_id}/irrigation/history": {
+      "get": {
+        "operationId": "irrigation_history_api_v1_plants__plant_id__irrigation_history_get",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "plant_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Plant Id",
+              "type": "string"
+            }
+          },
+          {
+            "in": "header",
+            "name": "authorization",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Authorization"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ListEnvelope_IrrigationChangeOut_"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Irrigation History",
+        "tags": [
+          "farms"
+        ]
+      }
+    },
     "/api/v1/plants/{plant_id}/photos": {
       "get": {
         "operationId": "list_photos_api_v1_plants__plant_id__photos_get",
@@ -9228,6 +9609,66 @@
           }
         },
         "summary": "Delete Photo",
+        "tags": [
+          "farms"
+        ]
+      }
+    },
+    "/api/v1/plants/{plant_id}/progress": {
+      "get": {
+        "description": "Perjalanan tanaman dari pembibitan sampai akhir masa produktif.",
+        "operationId": "plant_progress_api_v1_plants__plant_id__progress_get",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "plant_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Plant Id",
+              "type": "string"
+            }
+          },
+          {
+            "in": "header",
+            "name": "authorization",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Authorization"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Envelope_PlantProgressOut_"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Plant Progress",
         "tags": [
           "farms"
         ]

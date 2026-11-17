@@ -17,6 +17,7 @@ from app.api.deps import (
     RegionServiceDep,
     SessionDep,
     TrackingServiceDep,
+    WeatherServiceDep,
 )
 from app.domain import (
     COMMODITIES_V2,
@@ -25,7 +26,6 @@ from app.domain import (
     DETECTION_COMMODITIES,
     MATERIALS_BY_COMMODITY,
     CareAction,
-    TrackingEndReason,
 )
 from app.models.content import CropProfile
 from app.schemas.base import Envelope, ListEnvelope, PaginationMeta
@@ -42,10 +42,14 @@ from app.schemas.farm import (
     HarvestCreate,
     HarvestOut,
     HarvestUpdate,
+    IrrigationAdviceOut,
+    IrrigationChangeCreate,
+    IrrigationChangeOut,
     PhotoOut,
     PlantCreate,
     PlantMaterialOut,
     PlantOut,
+    PlantProgressOut,
     PlantStats,
     PlantTypeOut,
     PlantUpdate,
@@ -93,12 +97,6 @@ async def update_farm(
     return Envelope(data=await service.update_farm(user.id, farm_id, payload))
 
 
-@router.delete("/farms/{farm_id}", status_code=status.HTTP_204_NO_CONTENT)
-async def archive_farm(farm_id: UUID, user: CurrentUser, service: FarmServiceDep) -> Response:
-    await service.archive_farm(user.id, farm_id)
-    return Response(status_code=status.HTTP_204_NO_CONTENT)
-
-
 # --------------------------------------------------------------------------- #
 # Plants
 # --------------------------------------------------------------------------- #
@@ -140,17 +138,6 @@ async def update_plant(
     plant_id: UUID, payload: PlantUpdate, user: CurrentUser, service: PlantServiceDep
 ) -> Envelope[PlantOut]:
     return Envelope(data=await service.update_plant(user.id, plant_id, payload))
-
-
-@router.delete("/plants/{plant_id}", status_code=status.HTTP_204_NO_CONTENT)
-async def archive_plant(plant_id: UUID, user: CurrentUser, service: PlantServiceDep) -> Response:
-    """Shorthand for ending tracking with reason ``other`` (design 10.5)."""
-    await service.end_tracking(
-        user.id,
-        plant_id,
-        EndTracking(reason=TrackingEndReason.OTHER, note="Dihentikan oleh pengguna."),
-    )
-    return Response(status_code=status.HTTP_204_NO_CONTENT)
 
 
 _MATERIAL_LABELS = {
@@ -276,6 +263,45 @@ async def delete_photo(
 ) -> Response:
     await service.delete_photo(user.id, plant_id, photo_id)
     return Response(status_code=status.HTTP_204_NO_CONTENT)
+
+
+@router.patch("/plants/{plant_id}/irrigation")
+async def update_irrigation(
+    plant_id: UUID,
+    payload: IrrigationChangeCreate,
+    user: CurrentUser,
+    service: PlantServiceDep,
+) -> Envelope[PlantOut]:
+    """User boleh mengubah jadwal siraman; tiap perubahan tercatat."""
+    return Envelope(data=await service.update_irrigation(user.id, plant_id, payload))
+
+
+@router.get("/plants/{plant_id}/irrigation/history")
+async def irrigation_history(
+    plant_id: UUID, user: CurrentUser, service: PlantServiceDep
+) -> ListEnvelope[IrrigationChangeOut]:
+    return ListEnvelope(
+        data=await service.irrigation_history(user.id, plant_id), meta=PaginationMeta()
+    )
+
+
+@router.get("/plants/{plant_id}/irrigation-advice")
+async def irrigation_advice(
+    plant_id: UUID,
+    user: CurrentUser,
+    service: PlantServiceDep,
+    weather: WeatherServiceDep,
+) -> Envelope[IrrigationAdviceOut]:
+    """Indoor tidak memanggil BMKG; outdoor memakai prakiraan cuaca."""
+    return Envelope(data=await service.irrigation_advice(user.id, plant_id, weather))
+
+
+@router.get("/plants/{plant_id}/progress")
+async def plant_progress(
+    plant_id: UUID, user: CurrentUser, service: PlantServiceDep
+) -> Envelope[PlantProgressOut]:
+    """Perjalanan tanaman dari pembibitan sampai akhir masa produktif."""
+    return Envelope(data=await service.progress(user.id, plant_id))
 
 
 @router.post("/plants/{plant_id}/care-logs", status_code=status.HTTP_201_CREATED)

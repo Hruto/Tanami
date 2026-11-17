@@ -309,8 +309,8 @@ async def create_farm(client: Any, headers: dict[str, str], **overrides: Any) ->
 
 PLANT_PAYLOAD = {
     "label": "Mangga Harum Manis 1",
-    "commodity_code": "mango",
-    "planted_at": "2026-08-01",
+    "variety": "Mangga Harum Manis",
+    "nursery_started_at": "2026-08-01",
 }
 
 

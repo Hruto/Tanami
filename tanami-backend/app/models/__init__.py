@@ -19,7 +19,7 @@ from app.models.farm import Farm, HarvestRecord, Plant
 from app.models.forum import ForumComment, ForumPost, ForumReaction, ForumReport
 from app.models.reminder import Device, Reminder
 from app.models.scan import Scan, ScanFeedback
-from app.models.tracking import CareLog, PlantPhoto
+from app.models.tracking import CareLog, IrrigationChange, PlantPhoto
 from app.models.user import User
 
 __all__ = [
@@ -34,6 +34,7 @@ __all__ = [
     "ForumReaction",
     "ForumReport",
     "HarvestRecord",
+    "IrrigationChange",
     "Plant",
     "PlantPhoto",
     "Region",
