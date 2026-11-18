@@ -1,9 +1,11 @@
 # Arsitektur ML — Jalur 2 (Cek cepat tanpa tanaman dipilih)
 
-Status: draft  
+Status: **trial / usulan sementara — bukan final**  
 Pemilik: Hebert (backend) + tim ML  
 Berdasarkan: diskusi 18 Nov 2026; `design.md` 11.3, 11.5, 19; ringkasan literatur internal Tanami  
 Berlaku untuk: **Jalur 2 — scan tanpa tanaman dipilih**. Jalur 1 (user memilih tanaman di form) tidak diubah.
+
+> ⚠️ Ini **percobaan desain**, bukan keputusan final dan bukan pengganti draft 2 di `design.md` 19. Arsitektur ini bisa diganti dengan model/desain dari tim ML (Memet) setelah keputusan tim. Jangan dipakai sebagai kontrak runtime.
 
 > 🆕 Seluruh komponen bertanda 🆕 di dokumen ini **belum diimplementasikan**.
 > ✅ menandakan fakta runtime yang sudah ada. ⚠️ menandakan konflik/keputusan tim.

@@ -1148,7 +1148,7 @@ dipilih berdasarkan **jumlah penyakit yang tersedia di dataset**.
 > draft 2. Lihat 19.14 dan `docs/data-integration.md` untuk pemetaan yang harus
 > disepakati sebelum diimplementasikan.
 
-> 🆕 Arsitektur implementasi **Jalur 2 (Cek cepat tanpa tanaman dipilih)** — router species → classifier per komoditas → tolak eksplisit, dengan batasan DL hanya untuk ekstraksi fitur — ada di `docs/ml-router-architecture.md`. Dokumen itu belum mengubah kontrak runtime.
+> 🆕 **Percobaan, belum final:** catatan arsitektur Jalur 2 (Cek cepat tanpa tanaman dipilih) — router species → classifier per komoditas → tolak eksplisit, dengan DL hanya untuk ekstraksi fitur — ada di `docs/ml-router-architecture.md`. Ini usulan sementara yang bisa diganti model tim ML, **bukan** pengganti draft 2 di bagian 19 dan **bukan** kontrak runtime.
 
 ### 19.1 Tujuan
 
