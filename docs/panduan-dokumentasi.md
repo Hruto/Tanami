@@ -44,6 +44,7 @@ git diff --stat HEAD~1
 | `docs/api-changelog.md` | Daftar perubahan API, payload, dampak ke klien | Setiap endpoint/field berubah |
 | `docs/class-diagram.md` | Struktur OOP: class, relasi, provider | Ada class/relasi baru |
 | `docs/data-integration.md` | Pemetaan DB aplikasi ↔ artefak & label ML | Ada perubahan skema/model |
+| `docs/ml-router-architecture.md` | Arsitektur Jalur 2: router species → classifier per komoditas → tolak | Ada keputusan arsitektur ML/Cek cepat |
 | `docs/post_meeting_changes.md` | Catatan rapat 17 Nov (lampiran, bukan kontrak) | Jarang; diarsipkan saja |
 | `docs/architecture.md` | Diagram alur & infra | Infra berubah |
 | `contracts/openapi.json` | Kontrak mesin | **Generate**, jangan edit manual |
