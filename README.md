@@ -4,7 +4,7 @@
 
 Tanami membantu petani dan penghobi **mangga, jeruk, dan stroberi** mencatat tanamannya, melihat perkiraan kapan panen berikutnya, mencatat setiap panen, dan memeriksa penyakit daun cukup dari foto.
 
-> **Status: pra-MVP.** Rancangan produk sudah di [`docs/design.md`](docs/design.md) **v2** (fokus 3 tanaman buah). Kode di repo ini **masih mengikuti v0.3** (komoditas cabai, daftar deteksi terpisah). Pekerjaan penyesuaiannya tercatat di lampiran design.md, bagian "Dampak ke Implementasi".
+> **Status: pra-MVP.** Rancangan produk dan kontrak sudah di [`docs/design.md`](docs/design.md) **v2**: tiga komoditas (`mango`, `citrus`, `strawberry`), hanya scan penyakit daun, tanpa ripeness/cabai. `status` ditentukan layanan vision; backend hanya menyimpan. Rincian di lampiran design.md, bagian "Dampak ke Implementasi".
 
 ## Daftar isi
 
@@ -162,11 +162,11 @@ Aturan emas: jika kode berbeda dengan `design.md` pada bagian enum, API, atau ko
 
 | Komponen | Status |
 |---|---|
-| `tanami-backend`: API R0-R7, database dan migrasi, job, tes, CI | ✅ Ada, mengikuti design v0.3 |
-| `tanami-admin`: ruang kerja tim | ✅ Ada, mengikuti design v0.3 |
-| `tanami-vision`: kontrak, stub, jalur ONNX, model bayangan, CI, Docker | ✅ Ada, belum ada model sungguhan |
-| Penyesuaian ke design v2 (tracking 3 tanaman buah, episode penyakit, riwayat baru) | ⏳ Belum |
-| Model ML mangga, jeruk, stroberi + set uji foto lapangan | ⏳ Belum |
+| `tanami-backend`: API R0-R7, database dan migrasi, job, tes, CI | ✅ Ada, selaras design v2 (tiga komoditas) |
+| `tanami-admin`: ruang kerja tim | ✅ Ada, selaras design v2 |
+| `tanami-vision`: kontrak, stub, jalur ONNX, model bayangan, CI, Docker | ✅ Ada, tiga model primer per komoditas |
+| Penyesuaian ke design v2 (tracking 3 tanaman buah, episode penyakit, riwayat baru) | ✅ Selesai |
+| Model runtime mangga, jeruk, stroberi (`disease-<komoditas>-v0.1.0`) | ✅ Ada; set uji foto lapangan ⏳ |
 | Aplikasi mobile `tanami-app` | ⏳ Belum di repo ini |
 | Profil tanaman dan hari keterlambatan per penyakit yang bersumber dan ditinjau ahli | ⏳ Belum |
 

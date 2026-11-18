@@ -1,8 +1,11 @@
 """Domain vocabulary shared by the inference layer and the HTTP layer.
 
-Every value here is copied verbatim from design.md section 8.2 and 11.5. If the
+Every value here is copied verbatim from design.md sections 8.2 and 11.5. If the
 public contract changes, this module changes first and `contracts/API.md` is
 bumped in the same pull request.
+
+v2 supports exactly three fruit commodities and one scan type (``disease``).
+Label sets follow design.md 11.5.
 """
 
 from __future__ import annotations
@@ -13,7 +16,6 @@ from enum import StrEnum
 
 class ScanType(StrEnum):
     DISEASE = "disease"
-    RIPENESS = "ripeness"
 
 
 class ResultStatus(StrEnum):
@@ -31,13 +33,6 @@ class CauseCategory(StrEnum):
     PEST = "pest"
     NUTRIENT_DEFICIENCY = "nutrient_deficiency"
     UNKNOWN = "unknown"
-
-
-class RipenessStage(StrEnum):
-    UNRIPE = "unripe"
-    TURNING = "turning"
-    RIPE = "ripe"
-    OVERRIPE = "overripe"
 
 
 class QualityStatus(StrEnum):
@@ -66,43 +61,75 @@ class DiseaseLabel:
     cause_category: CauseCategory
 
 
+# Sumber: design.md 11.5. Kode penyakit unik global berprefiks komoditas;
+# kelas sehat memakai kode bersama `healthy` pada setiap komoditas.
+DISEASE_LABELS_BY_COMMODITY: dict[str, dict[str, DiseaseLabel]] = {
+    "mango": {
+        "healthy": DiseaseLabel("healthy", "Sehat", CauseCategory.HEALTHY),
+        "mango_anthracnose": DiseaseLabel("mango_anthracnose", "Antraknosa", CauseCategory.FUNGUS),
+        "mango_bacterial_canker": DiseaseLabel(
+            "mango_bacterial_canker", "Kanker bakteri", CauseCategory.BACTERIA
+        ),
+        "mango_die_back": DiseaseLabel("mango_die_back", "Mati pucuk", CauseCategory.FUNGUS),
+        "mango_powdery_mildew": DiseaseLabel(
+            "mango_powdery_mildew", "Embun tepung", CauseCategory.FUNGUS
+        ),
+        "mango_sooty_mould": DiseaseLabel(
+            "mango_sooty_mould", "Embun jelaga", CauseCategory.FUNGUS
+        ),
+        "mango_gall_midge": DiseaseLabel(
+            "mango_gall_midge", "Puru daun (lalat puru)", CauseCategory.PEST
+        ),
+        "mango_cutting_weevil": DiseaseLabel(
+            "mango_cutting_weevil", "Kumbang pemotong pucuk", CauseCategory.PEST
+        ),
+    },
+    "citrus": {
+        "healthy": DiseaseLabel("healthy", "Sehat", CauseCategory.HEALTHY),
+        "citrus_canker": DiseaseLabel("citrus_canker", "Kanker jeruk", CauseCategory.BACTERIA),
+        "citrus_greening": DiseaseLabel(
+            "citrus_greening", "CVPD (Greening/HLB)", CauseCategory.BACTERIA
+        ),
+        "citrus_black_spot": DiseaseLabel(
+            "citrus_black_spot", "Bercak hitam", CauseCategory.FUNGUS
+        ),
+        "citrus_melanose": DiseaseLabel("citrus_melanose", "Melanosa", CauseCategory.FUNGUS),
+    },
+    "strawberry": {
+        "healthy": DiseaseLabel("healthy", "Sehat", CauseCategory.HEALTHY),
+        "strawberry_leaf_scorch": DiseaseLabel(
+            "strawberry_leaf_scorch", "Hangus daun", CauseCategory.FUNGUS
+        ),
+        "strawberry_leaf_spot": DiseaseLabel(
+            "strawberry_leaf_spot", "Bercak daun", CauseCategory.FUNGUS
+        ),
+        "strawberry_angular_leaf_spot": DiseaseLabel(
+            "strawberry_angular_leaf_spot", "Bercak daun bersudut", CauseCategory.BACTERIA
+        ),
+        "strawberry_powdery_mildew": DiseaseLabel(
+            "strawberry_powdery_mildew", "Embun tepung", CauseCategory.FUNGUS
+        ),
+    },
+}
+
+# Union of every commodity's labels, kept for callers that only need to know
+# whether a code is a valid disease label somewhere in the contract.
 DISEASE_LABELS: dict[str, DiseaseLabel] = {
-    "healthy": DiseaseLabel("healthy", "Sehat", CauseCategory.HEALTHY),
-    "anthracnose": DiseaseLabel("anthracnose", "Antraknosa", CauseCategory.FUNGUS),
-    "cercospora_leaf_spot": DiseaseLabel(
-        "cercospora_leaf_spot", "Bercak Daun Cercospora", CauseCategory.FUNGUS
-    ),
-    "bacterial_wilt": DiseaseLabel("bacterial_wilt", "Layu Bakteri", CauseCategory.BACTERIA),
-    "leaf_curl_virus": DiseaseLabel(
-        "leaf_curl_virus", "Keriting Daun (Virus)", CauseCategory.VIRUS
-    ),
-    "pest_damage": DiseaseLabel("pest_damage", "Kerusakan Akibat Hama", CauseCategory.PEST),
-    "nutrient_deficiency": DiseaseLabel(
-        "nutrient_deficiency", "Kekurangan Hara", CauseCategory.NUTRIENT_DEFICIENCY
-    ),
+    code: label for labels in DISEASE_LABELS_BY_COMMODITY.values() for code, label in labels.items()
 }
 
-RIPENESS_LABELS: dict[str, str] = {
-    RipenessStage.UNRIPE.value: "Mentah",
-    RipenessStage.TURNING.value: "Mengkal",
-    RipenessStage.RIPE.value: "Matang",
-    RipenessStage.OVERRIPE.value: "Terlalu Matang",
-}
 
-# Day ranges per ripeness stage. [USULAN] Values must be validated by an
-# agronomist before the beta release (TQA 8.2). The service only returns a
-# range; the backend turns it into absolute dates using the scan timestamp.
-RIPENESS_DAY_POLICY: dict[str, tuple[int, int]] = {
-    RipenessStage.UNRIPE.value: (12, 18),
-    RipenessStage.TURNING.value: (4, 7),
-    RipenessStage.RIPE.value: (0, 2),
-    RipenessStage.OVERRIPE.value: (0, 0),
-}
+def known_labels(scan_type: ScanType, commodity_code: str) -> tuple[str, ...]:
+    """Return the exact, ordered label codes for one commodity.
 
-RIPENESS_NOTE = "Perkiraan kasar; dipengaruhi cuaca dan varietas."
-
-
-def known_labels(scan_type: ScanType) -> tuple[str, ...]:
-    if scan_type is ScanType.DISEASE:
-        return tuple(DISEASE_LABELS)
-    return tuple(RIPENESS_LABELS)
+    Only ``ScanType.DISEASE`` exists in v2; the argument is kept so callers can
+    be explicit about the scan they are validating.
+    """
+    if scan_type.value != ScanType.DISEASE.value:
+        msg = f"jenis scan '{scan_type.value}' tidak didukung; hanya disease yang tersedia"
+        raise ValueError(msg)
+    labels = DISEASE_LABELS_BY_COMMODITY.get(commodity_code)
+    if labels is None:
+        msg = f"komoditas '{commodity_code}' tidak memiliki label penyakit yang dikenal"
+        raise ValueError(msg)
+    return tuple(labels)

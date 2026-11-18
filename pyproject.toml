@@ -5,7 +5,7 @@ build-backend = "hatchling.build"
 [project]
 name = "tanami-vision"
 version = "0.1.0"
-description = "Tanami vision inference service - stateless ML scoring for leaf disease and fruit ripeness"
+description = "Tanami vision inference service - stateless leaf-disease scoring for mango, citrus and strawberry"
 readme = "README.md"
 requires-python = ">=3.12,<3.13"
 license = { text = "Proprietary" }

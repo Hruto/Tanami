@@ -4,8 +4,8 @@ import { ApiError } from "../api/client";
 import { useAuth } from "../auth/AuthContext";
 import { LeafMark } from "../components/Icons";
 
-// A chili plant drawn as a single herbarium sketch for the sign-in panel.
-function ChiliSketch() {
+// A mango plant drawn as a single herbarium sketch for the sign-in panel.
+function MangoSketch() {
   return (
     <svg className="sketch" viewBox="0 0 320 420" fill="none" aria-hidden="true">
       <g stroke="#a7bd8a" strokeWidth="1.4" strokeLinecap="round" strokeLinejoin="round">
@@ -61,7 +61,7 @@ export function Login() {
           <LeafMark />
           <span className="wordmark-name">Tanami</span>
         </div>
-        <ChiliSketch />
+        <MangoSketch />
         <p className="login-note">
           Ruang kerja untuk ahli, moderator, dan admin yang menjaga hasil deteksi tetap benar dan forum tetap aman.
         </p>

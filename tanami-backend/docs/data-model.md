@@ -1,6 +1,9 @@
 # Data model reference
 
-> **Status:** this document describes the code as implemented, which still follows `docs/design.md` **v0.3** (chili, separate detection list, ripeness scans). The target is `docs/design.md` **v2** (mango, citrus, strawberry); see its appendix "Dampak ke Implementasi" for the pending changes.
+> **Status:** this document follows `docs/design.md` **v2** — three commodities
+> (`mango`, `citrus`, `strawberry`), `disease` only, no ripeness. Migrations
+> `0001`–`0006` are kept unchanged; `0007` mengubah default `scans.commodity_code` as schema history; legacy columns still used
+> by the model–migration tests are not removed.
 
 Canonical source: `design.md` section 9. This document records what the
 backend actually implements, including every constraint, index, and server
@@ -19,10 +22,9 @@ default, so the schema can be regenerated from it without reading the code.
 | Enum | Values |
 |---|---|
 | `UserRole` | `farmer`, `expert`, `moderator`, `admin` |
-| `ScanType` | `disease`, `ripeness` |
+| `ScanType` | `disease` |
 | `ResultStatus` | `confident`, `uncertain`, `unknown`, `invalid_image` |
 | `CauseCategory` | `healthy`, `fungus`, `bacteria`, `virus`, `pest`, `nutrient_deficiency`, `unknown` |
-| `RipenessStage` | `unripe`, `turning`, `ripe`, `overripe` |
 | `GrowthStage` | `seedling`, `vegetative`, `flowering`, `fruiting`, `harvesting`, `finished` |
 | `HealthStatus` | `healthy`, `at_risk`, `sick`, `recovering`, `unknown` |
 | `ReminderType` | `fungal_risk`, `heavy_rain_harvest`, `harvest_soon`, `heat_stress`, `scan_followup`, `general` |
@@ -151,7 +153,7 @@ Constraints: `quantity_non_negative`. Index `ix_harvest_records_plant_harvested 
 | `disease_code` | VARCHAR(64) | yes | FK `diseases.code` RESTRICT |
 | `quality` | JSONB | no | blur/brightness report |
 | `confidence` | double precision | yes | |
-| `commodity_code` | VARCHAR(32) | no | default `chili` |
+| `commodity_code` | VARCHAR(32) | no | default `mango`; accepted: `mango`/`citrus`/`strawberry` |
 | `inference_ms` | double precision | yes | |
 | `created_at` | timestamptz | no | now() (no `updated_at`) |
 
@@ -307,7 +309,7 @@ Constraints: `uq_forum_reports_reporter_target (reporter_id, target_type, target
 
 ### `detection_plants` (R3, R4)
 
-`id`, `user_id` (FK `users` CASCADE), `name` VARCHAR(120) (not blank), `commodity_code` VARCHAR(32) default `chili`, `plant_id` (FK `plants` SET NULL, optional link to a tracked plant), `ended_at` timestamptz null (history when set), `end_note` TEXT, timestamps. Index `(user_id, ended_at, created_at DESC)`.
+`id`, `user_id` (FK `users` CASCADE), `name` VARCHAR(120) (not blank), `commodity_code` VARCHAR(32) default `mango` (accepted: `mango`/`citrus`/`strawberry`), `plant_id` (FK `plants` SET NULL, optional link to a tracked plant), `ended_at` timestamptz null (history when set), `end_note` TEXT, timestamps. Index `(user_id, ended_at, created_at DESC)`.
 
 ### `forum_reactions` (R5)
 

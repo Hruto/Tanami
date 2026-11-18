@@ -20,8 +20,6 @@ from app.domain import (
     ReminderPriority,
     ReminderStatus,
     ReminderType,
-    RipenessStage,
-    ScanType,
     UserRole,
 )
 from app.models.content import Disease
@@ -266,7 +264,7 @@ class AdminService:
         if scan is None or owner is None:
             raise NotFound("Umpan balik tidak ditemukan.")
 
-        allowed = set(_allowed_labels(scan.scan_type))
+        allowed = set(_allowed_labels())
         if correct_label not in allowed:
             raise ValidationError(
                 "Label tidak dikenal untuk jenis scan ini.",
@@ -280,14 +278,7 @@ class AdminService:
 
     def _item(self, feedback: ScanFeedback, scan: Scan, owner: User) -> FeedbackReviewItem:
         result = scan.result if isinstance(scan.result, dict) else {}
-        predicted = (
-            result.get("top")
-            if scan.scan_type == ScanType.DISEASE.value
-            else {
-                "stage": result.get("stage"),
-                "confidence": result.get("confidence"),
-            }
-        )
+        predicted = result.get("top")
         return FeedbackReviewItem(
             id=str(feedback.id),
             scan_id=str(scan.id),
@@ -299,13 +290,11 @@ class AdminService:
             comment=feedback.comment,
             correct_label=feedback.correct_label,
             consent_training_data=owner.consent_training_data,
-            allowed_labels=_allowed_labels(scan.scan_type),
+            allowed_labels=_allowed_labels(),
             reviewed_at=feedback.reviewed_at,
             created_at=feedback.created_at,
         )
 
 
-def _allowed_labels(scan_type: str) -> list[str]:
-    if scan_type == ScanType.DISEASE.value:
-        return list(DISEASE_LABELS)
-    return [stage.value for stage in RipenessStage]
+def _allowed_labels() -> list[str]:
+    return list(DISEASE_LABELS)

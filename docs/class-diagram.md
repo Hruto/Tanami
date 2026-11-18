@@ -316,31 +316,33 @@ classDiagram
 
 **Detail layanan vision (dari kode, bukan dugaan):**
 
-- `POST /v1/predict` — multipart `type` (`disease`|`ripeness`), `image`,
-  `commodity_code` (default `chili`), `client_uuid`; header `Idempotency-Key`
-  dan `Authorization: Bearer …`. Respons envelope `{ "data": … }` atau
-  `{ "error": … }`.
+- `POST /v1/predict` — multipart `type` (hanya `disease`), `image`,
+  `commodity_code` (`mango`/`citrus`/`strawberry`, default `mango`), `client_uuid`;
+  header `Idempotency-Key` dan `Authorization: Bearer ...`. Respons envelope
+  `{ "data": … }` atau `{ "error": … }`.
 - `GET /healthz`, `/readyz`, `/livez`, `/metrics`, `GET /v1/models`,
   `POST /v1/models/reload` (admin). Listen di port **8001**.
-- `ModelRegistry` memuat model **primary + shadow** (`LoadedModel.is_shadow`);
-  model shadow dijalankan tapi tidak memengaruhi respons.
+- `ModelRegistry` menyimpan model **primary + shadow per komoditas**
+  (`LoadedModel.is_shadow`); model shadow dijalankan tapi tidak memengaruhi
+  respons. `is_ready` bila ketiga komoditas punya primary.
+- `known_labels(scan_type, commodity_code)` mengembalikan label komoditas;
+  `load_manifest(...)` memvalidasi label **dan** `commodity_code` manifest.
 - `decide_status()` di `app/services/decision.py` menentukan
   `confident | uncertain | unknown | invalid_image` dengan ambang
   `confident = 0,75`, `uncertain = 0,50`, dan kualitas gambar menang atas
-  confidence. `build_disease_result()` / `build_ripeness_result()` menyusun
-  `result`. ⚠️ `design.md` 11.2 menyatakan **backend** yang menentukan status;
-  implementasi sekarang menentukannya di **vision service**. Ini harus
-  disepakati sebelum integrasi.
+  confidence. `build_disease_result()` menyusun `result`. Sesuai `design.md`
+  11.2: **layanan vision** yang menentukan status; backend hanya menyimpan
+  nilainya di `scans`, frontend tidak menghitung ulang.
 - `assess_quality()` (varians Laplacian + luminance) dan `decode_and_prepare()`
   membuang EXIF lalu resize ke `input_size` manifest.
 
-Manifest yang **sedang aktif** di repo masih
-`disease-chili-v0.2.0-rc1` / `ripeness-chili-v0.2.0-rc1`, dengan label
-`healthy, anthracnose, cercospora_leaf_spot, bacterial_wilt, leaf_curl_virus,
-pest_damage, nutrient_deficiency` (disease, 7) dan `unripe, turning, ripe,
-overripe` (ripeness, 4), `commodity_code = chili`. `StubPredictor` deterministik
-dan ditolak di production; produksi memakai `OnnxPredictor`. Desain ML v2 Memet
-belum diimplementasikan di sini. Lihat `docs/data-integration.md`.
+Manifest yang **aktif** adalah `disease-mango-v0.1.0`,
+`disease-citrus-v0.1.0`, dan `disease-strawberry-v0.1.0` (shadow opsional
+`-v0.2.0-rc1`), dengan label per komoditas sesuai `design.md` 11.5 (mango 8,
+citrus 5, strawberry 5). `StubPredictor` deterministik dan ditolak di
+production; produksi memakai `OnnxPredictor`. Lima kategori ML v2 adalah
+pengelompokan training, dipetakan via `ml_labels`. Lihat
+`docs/data-integration.md`.
 
 ## 5. Kenapa ini OOP, bukan DFD
 

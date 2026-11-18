@@ -28,7 +28,7 @@ DEFAULT_OUTPUT = ROOT / "contracts" / "openapi.json"
 def build_spec() -> dict[str, object]:
     # A fixed, side-effect-free settings object keeps the output stable no
     # matter which .env file happens to exist on the machine running this.
-    settings = Settings(app_env="local", model_backend="stub", _env_file=None)  # type: ignore[call-arg]
+    settings = Settings(app_env="local", model_backend="stub", _env_file=None)
     app = create_app(settings, load_models=False)
     spec: dict[str, object] = app.openapi()
     return spec

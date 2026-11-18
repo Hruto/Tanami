@@ -34,7 +34,6 @@ from app.domain import (
     PostStatus,
     ReportReason,
     ReportTargetType,
-    ScanType,
     UserRole,
 )
 from app.models.forum import ForumComment, ForumPost, ForumReaction, ForumReport
@@ -244,8 +243,8 @@ class ForumService:
             )
         ).all()
         counts = {code: int(count) for code, count in rows}
-        # design 10.9 v2: one category per supported commodity plus "Umum". The
-        # legacy commodity list (chili, tomato, ...) is no longer a category set.
+        # design 10.9 v2: one category per supported commodity plus "Umum".
+        # Legacy commodity lists are no longer a category set.
         categories: list[dict[str, Any]] = [
             {"commodity_code": code, "label": label, "post_count": counts.get(code, 0)}
             for code, label in COMMODITY_LABELS_V2.items()
@@ -557,16 +556,11 @@ class ForumService:
             "image_url": self.storage.public_url(scan.image_key),
             "model_version": scan.model_version,
         }
-        if scan.scan_type == ScanType.DISEASE.value:
-            raw_top = result.get("top")
-            top = raw_top if isinstance(raw_top, dict) else None
-            summary["label"] = top.get("label") if top else None
-            summary["cause_category"] = top.get("cause_category") if top else None
-            summary["confidence"] = top.get("confidence") if top else None
-        else:
-            summary["label"] = result.get("stage_label")
-            summary["stage"] = result.get("stage")
-            summary["confidence"] = result.get("confidence")
+        raw_top = result.get("top")
+        top = raw_top if isinstance(raw_top, dict) else None
+        summary["label"] = top.get("label") if top else None
+        summary["cause_category"] = top.get("cause_category") if top else None
+        summary["confidence"] = top.get("confidence") if top else None
         return summary
 
     def _post_out(

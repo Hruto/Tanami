@@ -2,6 +2,8 @@
 
 The shapes mirror design.md section 11.3 exactly, wrapped in the success
 envelope from design.md 10.1 so the backend can forward a response untouched.
+
+v2 returns a single ``DiseaseResult`` shape for every commodity.
 """
 
 from __future__ import annotations
@@ -10,15 +12,7 @@ from typing import Literal
 
 from pydantic import BaseModel, ConfigDict, Field
 
-from app.domain import (
-    CauseCategory,
-    EstimateConfidence,
-    QualityStatus,
-    ResultStatus,
-    RipenessStage,
-    ScanType,
-    Severity,
-)
+from app.domain import CauseCategory, QualityStatus, ResultStatus, ScanType, Severity
 
 
 class ApiModel(BaseModel):
@@ -49,16 +43,6 @@ class DiseaseResult(ApiModel):
     severity: Severity | None
 
 
-class RipenessResult(ApiModel):
-    stage: RipenessStage | None
-    stage_label: str | None
-    confidence: float | None = Field(default=None, ge=0, le=1)
-    estimated_days_min: int | None = Field(default=None, ge=0)
-    estimated_days_max: int | None = Field(default=None, ge=0)
-    estimate_confidence: EstimateConfidence | None
-    note: str
-
-
 class QualityInfo(ApiModel):
     blur: QualityStatus
     brightness: QualityStatus
@@ -67,8 +51,8 @@ class QualityInfo(ApiModel):
 class PredictionData(ApiModel):
     """Response body for ``POST /v1/predict``.
 
-    ``result`` is a discriminated union on ``type`` so a client can branch on a
-    single field. Only one of the two members is ever populated.
+    ``result`` is always a ``DiseaseResult``; the commodity-specific label set
+    is chosen by ``commodity_code`` (design.md 11.5).
     """
 
     model_config = ConfigDict(extra="forbid")
@@ -79,7 +63,7 @@ class PredictionData(ApiModel):
     commodity_code: str
     confidence: float | None = Field(default=None, ge=0, le=1)
     quality: QualityInfo
-    result: DiseaseResult | RipenessResult
+    result: DiseaseResult
     shadow_model_version: str | None = None
     shadow_status: ResultStatus | None = None
     inference_ms: float = Field(ge=0)

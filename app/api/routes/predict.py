@@ -38,9 +38,9 @@ _ERRORS: dict[int | str, dict[str, object]] = {
     dependencies=[Depends(require_service_token)],
     summary="Klasifikasi satu gambar",
     description=(
-        "Menerima satu foto daun (type=disease) atau buah (type=ripeness) dan "
-        "mengembalikan `result` sesuai design.md 11.3 beserta `status` dari "
-        "ambang keyakinan design.md 11.2.\n\n"
+        "Menerima satu foto daun buah dengan type=disease untuk komoditas "
+        "mangga, jeruk, atau stroberi, lalu mengembalikan `result` sesuai "
+        "design.md 11.3 beserta `status` dari ambang keyakinan design.md 11.2.\\n\\n"
         "Layanan ini **stateless**: tidak menyimpan gambar, tidak menulis "
         "database, tidak mengirim notifikasi. Penyimpanan dan pemberian "
         "rekomendasi tetap di backend."
@@ -50,10 +50,12 @@ _ERRORS: dict[int | str, dict[str, object]] = {
 async def predict(
     settings: SettingsDep,
     service: PredictServiceDep,
-    type: Annotated[ScanType, Form(description="disease atau ripeness")],
+    type: Annotated[ScanType, Form(description="disease")],
     image: Annotated[UploadFile, File(description="JPEG/PNG, maks 2 MB dari backend")],
     client_uuid: Annotated[str | None, Form(description="UUID dari klien")] = None,
-    commodity_code: Annotated[str | None, Form(description="Default: komoditas aktif")] = None,
+    commodity_code: Annotated[
+        str | None, Form(description="mango, citrus, atau strawberry (default: mango)")
+    ] = None,
     idempotency_key: IdempotencyKey = None,
 ) -> PredictionResponse:
     commodity = (commodity_code or settings.commodity_code).strip()

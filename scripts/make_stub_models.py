@@ -4,6 +4,7 @@ The `stub` backend needs a manifest (labels, input size, version) but no ONNX
 file. Run this once after cloning, or let the Makefile/CI do it.
 
     python scripts/make_stub_models.py --model-dir models
+    python scripts/make_stub_models.py --model-dir models --with-shadow
 """
 
 from __future__ import annotations
@@ -12,28 +13,36 @@ import argparse
 import json
 from pathlib import Path
 
-from app.domain import ScanType, known_labels
+from app.domain import DISEASE_LABELS_BY_COMMODITY, ScanType, known_labels
 
-DEFAULT_VERSIONS = {
-    ScanType.DISEASE: "disease-chili-v0.1.0",
-    ScanType.RIPENESS: "ripeness-chili-v0.1.0",
+# design.md 11.5 / TQA 8.4 naming: disease-<komoditas>-v<semver>.
+DEFAULT_VERSIONS: dict[str, str] = {
+    "mango": "disease-mango-v0.1.0",
+    "citrus": "disease-citrus-v0.1.0",
+    "strawberry": "disease-strawberry-v0.1.0",
 }
 
-SHADOW_VERSIONS = {
-    ScanType.DISEASE: "disease-chili-v0.2.0-rc1",
-    ScanType.RIPENESS: "ripeness-chili-v0.2.0-rc1",
+SHADOW_VERSIONS: dict[str, str] = {
+    commodity: version.replace("v0.1.0", "v0.2.0-rc1")
+    for commodity, version in DEFAULT_VERSIONS.items()
 }
 
+SUPPORTED = tuple(DISEASE_LABELS_BY_COMMODITY)
 
-def write_manifest(model_dir: Path, version: str, scan_type: ScanType) -> Path:
+
+def write_manifest(model_dir: Path, version: str, commodity_code: str) -> Path:
+    if commodity_code not in SUPPORTED:
+        msg = f"komoditas '{commodity_code}' tidak didukung"
+        raise ValueError(msg)
+
     target = model_dir / version
     target.mkdir(parents=True, exist_ok=True)
     manifest = {
         "model_version": version,
-        "scan_type": scan_type.value,
-        "commodity_code": "chili",
+        "scan_type": ScanType.DISEASE.value,
+        "commodity_code": commodity_code,
         "artifact": "model.onnx",
-        "labels": list(known_labels(scan_type)),
+        "labels": list(known_labels(ScanType.DISEASE, commodity_code)),
         "input_size": 224,
         "input_name": "input",
         "output_name": "logits",
@@ -53,18 +62,18 @@ def main() -> int:
     parser.add_argument(
         "--with-shadow",
         action="store_true",
-        help="Also write a shadow version per scan type, for staging experiments.",
+        help="Juga tulis versi shadow per komoditas, untuk eksperimen staging.",
     )
     args = parser.parse_args()
 
     written = [
-        write_manifest(args.model_dir, version, scan_type)
-        for scan_type, version in DEFAULT_VERSIONS.items()
+        write_manifest(args.model_dir, version, commodity)
+        for commodity, version in DEFAULT_VERSIONS.items()
     ]
     if args.with_shadow:
         written.extend(
-            write_manifest(args.model_dir, version, scan_type)
-            for scan_type, version in SHADOW_VERSIONS.items()
+            write_manifest(args.model_dir, version, commodity)
+            for commodity, version in SHADOW_VERSIONS.items()
         )
 
     for path in written:

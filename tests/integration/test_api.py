@@ -5,7 +5,14 @@ from collections.abc import Iterator
 
 import pytest
 from fastapi.testclient import TestClient
-from tests.conftest import blurred_image, dark_image, encode, noise_image
+from tests.conftest import (
+    MODEL_VERSIONS,
+    blurred_image,
+    dark_image,
+    encode,
+    noise_image,
+    write_primary_models,
+)
 
 
 def predict(client: TestClient, **overrides: object):  # type: ignore[no-untyped-def]
@@ -22,7 +29,10 @@ def test_healthz_reports_loaded_models(client: TestClient) -> None:
     assert response.status_code == 200
     body = response.json()["data"]
     assert body["status"] == "ok"
-    assert {model["scan_type"] for model in body["models"]} == {"disease", "ripeness"}
+    models = body["models"]
+    assert {model["scan_type"] for model in models} == {"disease"}
+    assert {model["commodity_code"] for model in models} == set(MODEL_VERSIONS)
+    assert {model["model_version"] for model in models} == set(MODEL_VERSIONS.values())
 
 
 def test_readyz_is_ready(client: TestClient) -> None:
@@ -77,23 +87,22 @@ def test_predict_disease_success(client: TestClient) -> None:
     assert response.status_code == 200
     data = response.json()["data"]
     assert data["type"] == "disease"
+    assert data["commodity_code"] == "mango"
     assert data["status"] in {"confident", "uncertain", "unknown"}
     assert "result" in data
+    assert "top" in data["result"]
+    assert "stage" not in data["result"]
     assert data["quality"] == {"blur": "ok", "brightness": "ok"}
 
 
-def test_predict_ripeness_success(client: TestClient) -> None:
-    response = predict(client, data={"type": "ripeness"})
+@pytest.mark.parametrize("commodity", list(MODEL_VERSIONS))
+def test_predict_accepts_each_commodity(client: TestClient, commodity: str) -> None:
+    response = predict(client, data={"type": "disease", "commodity_code": commodity})
     assert response.status_code == 200
     data = response.json()["data"]
-    assert data["type"] == "ripeness"
-    assert "stage" in data["result"]
-
-
-def test_predict_accepts_commodity_code(client: TestClient) -> None:
-    response = predict(client, data={"type": "disease", "commodity_code": "chili"})
-    assert response.status_code == 200
-    assert response.json()["data"]["commodity_code"] == "chili"
+    assert data["commodity_code"] == commodity
+    assert data["model_version"] == MODEL_VERSIONS[commodity]
+    assert "top" in data["result"]
 
 
 def test_predict_rejects_unknown_commodity(client: TestClient) -> None:
@@ -218,22 +227,17 @@ def test_route_uses_the_shared_predict_service(client: TestClient) -> None:
 def test_inference_timeout_returns_503(settings) -> None:  # type: ignore[no-untyped-def]
     """A slow model must surface as 503, not as a hung request or a 500.
 
-    The model is made to sleep rather than relying on a tiny timeout: with a
-    microsecond budget the work could finish first, so the test would fail or
-    pass depending on machine load.
-
     Uses the ``settings`` fixture so the manifests exist: without them the 503
     would come from the registry and this test would pass for the wrong reason.
     """
     import time
 
-    from app.domain import ScanType
     from app.main import create_app
 
     timed_out = settings.model_copy(update={"inference_timeout_seconds": 0.05})
     app = create_app(timed_out)
     with TestClient(app) as test_client:
-        model = test_client.app.state.tanami.registry.primary(ScanType.DISEASE)  # type: ignore[attr-defined]
+        model = test_client.app.state.tanami.registry.primary("mango")  # type: ignore[attr-defined]
 
         def slow(_image):  # type: ignore[no-untyped-def]
             time.sleep(0.5)
@@ -262,27 +266,10 @@ def test_wrong_method_uses_error_envelope(client: TestClient) -> None:
 def secured_client(tmp_path) -> Iterator[TestClient]:  # type: ignore[no-untyped-def]
     from app.core.config import Settings
     from app.main import create_app
-    from tests.conftest import (
-        DISEASE_LABELS,
-        MODEL_VERSIONS,
-        RIPENESS_LABELS,
-        make_settings,
-        write_manifest,
-    )
+    from tests.conftest import make_settings
 
     base = make_settings(tmp_path)
-    write_manifest(
-        base.model_dir,
-        scan_type="disease",
-        version=MODEL_VERSIONS["disease"],
-        labels=DISEASE_LABELS,
-    )
-    write_manifest(
-        base.model_dir,
-        scan_type="ripeness",
-        version=MODEL_VERSIONS["ripeness"],
-        labels=RIPENESS_LABELS,
-    )
+    write_primary_models(base.model_dir)
     settings = Settings(  # type: ignore[call-arg]
         _env_file=None,
         app_env="local",

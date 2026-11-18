@@ -123,10 +123,12 @@ final res = await req.send();
 
 ## 6. Dampak ke tim ML
 
-Backend mengirim ke model: `commodity_code` (hasil turunan) + Gambar. Model mengembalikan
-`status`/`cause_category` + `confidence`. Desain ML v2 Memet memakai 5 kategori
-(`sehat`, `jamur`, `bakteri`, `virus`, `lainnya`) yang **belum** sama dengan kode penyakit
-backend. Pemetaan dan rencana penyatuan ada di `docs/data-integration.md`.
+Backend mengirim ke model: `commodity_code` (hasil turunan: `mango`/`citrus`/
+`strawberry`) + gambar. Layanan vision menentukan `status` (`decide_status()`);
+backend hanya menyimpannya di `scans`. Desain ML v2 Memet memakai 5 kategori
+(`sehat`, `jamur`, `bakteri`, `virus`, `lainnya`) sebagai **pengelompokan
+training**, bukan label runtime. Runtime memakai kode penyakit `design.md` 11.5;
+pemetaannya ada di tabel `ml_labels` (`docs/data-integration.md` §3.3).
 
 ## 7. Cara memperbarui dokumentasi ini
 
@@ -137,3 +139,24 @@ cd tanami-backend
 ```
 
 Lalu ubah tabel di atas, bukan menyalin manual isi `openapi.json`.
+
+---
+
+## 8. Kontrak layanan vision (`POST /v1/predict`) — perubahan v2
+
+Catatan perubahan kontrak teks (`contracts/API.md`, `models/README.md`) mengikuti
+keputusan tiga komoditas. `contracts/openapi.json` tetap dihasilkan dari kode.
+
+| Area | Sebelum | Sesudah |
+|---|---|---|
+| Komoditas | default `chili`, daftar tidak divalidasi ketat | tepat `mango`, `citrus`, `strawberry`; default `mango`; selain itu 400 |
+| `type` | `disease` \| `ripeness` | hanya `disease`; `ripeness` dihapus total |
+| Model | `disease-chili-v0.1.0`, `ripeness-chili-v0.1.0` | `disease-mango-v0.1.0`, `disease-citrus-v0.1.0`, `disease-strawberry-v0.1.0`; shadow opsional `-v0.2.0-rc1` |
+| Manifest | 7 label cabai + 4 stage ripeness | 8/5/5 label per komoditas (`design.md` 11.5); `commodity_code` manifest wajib sama dengan yang diminta |
+| Contoh payload | `chili`, `anthracnose`, field `stage` | `mango`, `mango_anthracnose`, tanpa `stage`/`estimated_days_*` |
+| `status` | sumber kebenaran didokumentasikan sebagai backend (`design.md` 11.2 lama) | **layanan vision** (`decide_status()`); backend hanya menyimpan di `scans`, frontend tidak menghitung ulang |
+| Kategori ML | 5 kategori disangka label runtime | 5 kategori = pengelompokan training, dipetakan via `ml_labels`; runtime memakai kode penyakit 11.5 |
+
+Dampak klien: kirim `commodity_code` eksplisit, `type=disease`, dan jangan
+menghitung `status` sendiri. Karena enum dan arti `status` berubah, versi kontrak
+naik ke `2.0.0` (lihat `contracts/API.md` bagian 8).

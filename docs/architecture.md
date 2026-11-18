@@ -1,6 +1,6 @@
 # Arsitektur layanan inferensi
 
-> Selaras dengan `design.md` v2: satu layanan memuat model penyakit daun untuk mangga, jeruk, dan stroberi; backend selalu mengirim `commodity_code`. Kode layanan saat ini masih memuat model stub cabai (v0.3).
+> Selaras dengan `design.md` v2: satu layanan memuat tiga model penyakit daun — `disease-mango-v0.1.0`, `disease-citrus-v0.1.0`, dan `disease-strawberry-v0.1.0` (shadow opsional `-v0.2.0-rc1`). Backend selalu mengirim `commodity_code`; layanan vision yang menentukan `status`, backend hanya menyimpan.
 
 ## Keputusan: satu layanan inferensi terpisah dari backend
 
@@ -86,7 +86,7 @@ pertama dilatih. Stub tidak membaca file apa pun dan **ditolak** saat
 
 ## Model bayangan (shadow)
 
-Bila `VISION_SHADOW_*_MODEL_VERSION` diisi, setiap request juga dinilai model
+Bila `VISION_SHADOW_MODEL_VERSIONS` diisi (peta per komoditas), setiap request juga dinilai model
 bayangan. Hasilnya **tidak** memengaruhi respons utama; yang dikembalikan hanya
 `shadow_model_version` dan `shadow_status`. Kegagalan model bayangan ditelan dan
 dicatat sebagai `inference_error{reason="shadow_error"}`.
@@ -102,7 +102,7 @@ Untuk staging itu dapat diterima; untuk produksi, pindahkan ke antrean.
 
 | Kapan | Perubahan |
 |---|---|
-| Model pertama siap | Isi `models/`, set `VISION_MODEL_BACKEND=onnx`, verifikasi `sha256` |
+| Model siap | Isi `models/` dengan tiga folder versi, set `VISION_MODEL_BACKEND=onnx`, verifikasi `sha256` |
 | Trafik naik | Scale horizontal; layanan tidak punya state, cukup tambah replika |
 | Butuh GPU | Tambah provider `CUDAExecutionProvider`; kontrak HTTP tidak berubah |
 | Shadow di produksi | Pindahkan ke job antrean (Redis) dan tulis perbandingan ke DB backend |

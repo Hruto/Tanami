@@ -1,10 +1,12 @@
 # Tanami Backend
 
-FastAPI service behind the Tanami mobile app. It implements the product requirements R0-R7 (gardens, plant tracking and its history, the disease-detection list and its history, forum, profile, reminders) plus fruit-ripeness scans, BMKG weather, moderation and the disease knowledge base. It is the single owner of persistent state; the `tanami-vision` service (repo root) is stateless and only serves inference.
+FastAPI service behind the Tanami mobile app. It implements the product requirements R0-R7 (gardens, plant tracking and its history, leaf scan history, forum, profile, reminders) plus BMKG weather, moderation and the disease knowledge base. It is the single owner of persistent state; the `tanami-vision` service (repo root) is stateless and only serves inference for the three fruits (`mango`, `citrus`, `strawberry`).
 
-Contract: written against `docs/design.md` v0.3 (sections 8, 10, 11, 12) and `docs/tqa.md`.
+Contract: written against `docs/design.md` v2 (sections 8, 10, 11, 12) and `docs/tqa.md`.
 
-> **Status:** this document describes the code as implemented, which still follows `docs/design.md` **v0.3** (chili, separate detection list, ripeness scans). The target is `docs/design.md` **v2** (mango, citrus, strawberry); see its appendix "Dampak ke Implementasi" for the pending changes.
+> **Status:** this document follows `docs/design.md` **v2** — three commodities
+> (`mango`, `citrus`, `strawberry`), `type=disease` only, no ripeness scans. The
+> vision service decides `status`; the backend only stores it (`design.md` 11.2).
 
 The generated OpenAPI lives in `contracts/openapi.json`; the frontend generates its types from it.
 

@@ -2,8 +2,8 @@
 
 Design v2: every stored scan belongs to an active plant from the start (the
 ``PATCH /scans/{id}`` attach route is gone), ``type`` is always ``disease``
-(``ripeness`` was dropped with the ML ripeness model) and a "Cek cepat" without
-``plant_id`` needs ``commodity_code`` and is never stored.
+and a "Cek cepat" without ``plant_id`` needs ``commodity_code`` and is never
+stored.
 """
 
 from __future__ import annotations
@@ -182,10 +182,10 @@ async def test_late_offline_upload_does_not_override_newer_scan(
     assert await health(client, headers, plant["id"]) == "recovering"
 
 
-async def test_ripeness_type_is_ignored(client: AsyncClient) -> None:
-    """Design 10.6 v2: ``type`` is always ``disease``, so a v0.3 client still works."""
+async def test_unknown_scan_type_is_ignored(client: AsyncClient) -> None:
+    """Design 10.6 v2: ``type`` is always ``disease``, so legacy values are ignored."""
     headers, plant = await setup(client)
-    response = await upload_scan(client, headers, scan_type="ripeness", plant_id=plant["id"])
+    response = await upload_scan(client, headers, scan_type="legacy", plant_id=plant["id"])
     assert response.status_code == 201, response.text
     body = response.json()["data"]
     assert body["type"] == "disease"

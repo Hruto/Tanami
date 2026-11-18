@@ -1,11 +1,12 @@
 """Contract tests.
 
-Two independent guarantees:
+Three independent guarantees:
 
 * the committed ``contracts/openapi.json`` still describes the running app,
 * every documented response validates against the committed document, so a
   handler that drifts from its declared schema fails here rather than in the
-  Tanami backend's integration tests.
+  Tanami backend's integration tests,
+* the published enum exposes only the disease scan type.
 """
 
 from __future__ import annotations
@@ -19,7 +20,7 @@ import referencing
 from app.main import create_app
 from fastapi.testclient import TestClient
 from openapi_spec_validator import validate
-from tests.conftest import blurred_image, encode, noise_image
+from tests.conftest import MODEL_VERSIONS, blurred_image, encode, noise_image
 
 pytestmark = pytest.mark.contract
 
@@ -49,6 +50,11 @@ def test_committed_spec_matches_the_application(contract: dict) -> None:
     assert contract == json.loads(json.dumps(build_spec()))
 
 
+def test_contract_describes_only_disease(contract: dict) -> None:
+    assert contract["components"]["schemas"]["ScanType"]["enum"] == ["disease"]
+    assert "DiseaseResult" in contract["components"]["schemas"]
+
+
 def test_success_response_matches_schema(client: TestClient, contract: dict) -> None:
     response = client.post(
         "/v1/predict",
@@ -56,11 +62,21 @@ def test_success_response_matches_schema(client: TestClient, contract: dict) -> 
         data={"type": "disease"},
     )
     assert response.status_code == 200
+    _validate_prediction_response(response.json(), contract)
 
-    schema_ref = contract["paths"]["/v1/predict"]["post"]["responses"]["200"]["content"][
-        "application/json"
-    ]["schema"]
-    _validate_with_refs(response.json(), schema_ref, contract)
+
+@pytest.mark.parametrize("commodity", list(MODEL_VERSIONS))
+def test_each_commodity_response_matches_schema(
+    client: TestClient, contract: dict, commodity: str
+) -> None:
+    response = client.post(
+        "/v1/predict",
+        files={"image": ("photo.jpg", encode(noise_image()), "image/jpeg")},
+        data={"type": "disease", "commodity_code": commodity},
+    )
+    assert response.status_code == 200
+    assert response.json()["data"]["commodity_code"] == commodity
+    _validate_prediction_response(response.json(), contract)
 
 
 def test_error_response_matches_schema(client: TestClient, contract: dict) -> None:
@@ -93,10 +109,7 @@ def test_invalid_image_response_matches_schema(client: TestClient, contract: dic
         data={"type": "disease"},
     )
     assert response.status_code == 200
-    schema_ref = contract["paths"]["/v1/predict"]["post"]["responses"]["200"]["content"][
-        "application/json"
-    ]["schema"]
-    _validate_with_refs(response.json(), schema_ref, contract)
+    _validate_prediction_response(response.json(), contract)
 
 
 def test_every_documented_status_is_reachable(client: TestClient, contract: dict) -> None:
@@ -109,6 +122,13 @@ def test_every_documented_status_is_reachable(client: TestClient, contract: dict
     assert documented == {200, 400, 401, 413, 415, 422, 429, 500, 503}
     # Touch the client so an app that fails to start cannot pass this test.
     assert client.get("/livez").status_code == 200
+
+
+def _validate_prediction_response(payload: object, contract: dict) -> None:
+    schema_ref = contract["paths"]["/v1/predict"]["post"]["responses"]["200"]["content"][
+        "application/json"
+    ]["schema"]
+    _validate_with_refs(payload, schema_ref, contract)
 
 
 def _validate_with_refs(payload: object, schema_ref: dict, contract: dict) -> None:

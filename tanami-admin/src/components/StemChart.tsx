@@ -5,7 +5,6 @@ import { formatNumber } from "../lib/format";
 interface Day {
   day: string;
   disease: number;
-  ripeness: number;
 }
 
 const HEIGHT = 230;
@@ -20,9 +19,8 @@ function parseDay(value: string): Date {
 }
 
 /**
- * Daily scans drawn as plant stems: the stem height is the number of photos
- * analysed that day, the leaf at the tip marks leaf photos and a second,
- * lighter leaf marks fruit photos. Empty days are a seed on the soil line.
+ * Daily scans drawn as plant stems: the stem height is the number of leaf photos
+ * analysed that day, with a leaf at the tip. Empty days are a seed on the soil line.
  */
 function useNarrow(query = "(max-width: 600px)"): boolean {
   const [narrow, setNarrow] = useState(() => window.matchMedia(query).matches);
@@ -43,7 +41,7 @@ export function StemChart({ days: allDays }: { days: Day[] }) {
   // The viewBox roughly matches the rendered width so text stays near 1:1.
   const WIDTH = narrow ? 360 : 1000;
   const STEP = WIDTH / Math.max(1, days.length);
-  const max = Math.max(1, ...days.map((d) => d.disease + d.ripeness));
+  const max = Math.max(1, ...days.map((d) => d.disease));
   const scale = (value: number) => ((BASELINE - TOP) * value) / max;
 
   const focused = active === null ? null : days[active];
@@ -54,9 +52,8 @@ export function StemChart({ days: allDays }: { days: Day[] }) {
         <line x1="0" x2={WIDTH} y1={BASELINE} y2={BASELINE} className="stems-soil" />
         {days.map((day, index) => {
           const x = STEP * index + STEP / 2;
-          const total = day.disease + day.ripeness;
+          const total = day.disease;
           const tip = BASELINE - scale(total);
-          const fork = BASELINE - scale(day.disease);
           const date = parseDay(day.day);
           const isLast = index === days.length - 1;
           const showMonth = index === 0 || date.getUTCDate() === 1;
@@ -77,18 +74,10 @@ export function StemChart({ days: allDays }: { days: Day[] }) {
               ) : (
                 <>
                   <line x1={x} x2={x} y1={BASELINE} y2={tip} className="stem-line" pathLength={1} />
-                  {day.disease > 0 ? (
-                    <path
-                      d={`M ${x} ${fork} c -2 -9 -9 -13 -17 -13 c 1 8 7 13 17 13 Z`}
-                      className="stem-leaf"
-                    />
-                  ) : null}
-                  {day.ripeness > 0 ? (
-                    <path
-                      d={`M ${x} ${tip} c 2 -9 9 -13 17 -13 c -1 8 -7 13 -17 13 Z`}
-                      className="stem-fruit"
-                    />
-                  ) : null}
+                  <path
+                    d={`M ${x} ${tip} c -2 -9 -9 -13 -17 -13 c 1 8 7 13 17 13 Z`}
+                    className="stem-leaf"
+                  />
                   <text x={x} y={tip - 18} className="stem-value num">
                     {formatNumber(total)}
                   </text>
@@ -114,23 +103,20 @@ export function StemChart({ days: allDays }: { days: Day[] }) {
       <figcaption id="stems-caption" className="stems-caption">
         {focused ? (
           <span>
-            {dayFormat.format(parseDay(focused.day))}: {formatNumber(focused.disease)} foto daun,{" "}
-            {formatNumber(focused.ripeness)} foto buah.
+            {dayFormat.format(parseDay(focused.day))}: {formatNumber(focused.disease)} foto daun.
           </span>
         ) : (
           <span>
-            Foto yang dianalisis per hari, {days.length} hari terakhir. Daun hijau tua untuk foto daun, daun hijau
-            muda untuk foto buah.
+            Foto daun yang dianalisis per hari, {days.length} hari terakhir. Daun hijau tua menandai jumlah foto.
           </span>
         )}
       </figcaption>
       <table className="sr-only">
-        <caption>Jumlah foto dianalisis per hari</caption>
+        <caption>Jumlah foto daun dianalisis per hari</caption>
         <thead>
           <tr>
             <th>Tanggal</th>
             <th>Foto daun</th>
-            <th>Foto buah</th>
           </tr>
         </thead>
         <tbody>
@@ -138,7 +124,6 @@ export function StemChart({ days: allDays }: { days: Day[] }) {
             <tr key={day.day}>
               <td>{dayFormat.format(parseDay(day.day))}</td>
               <td>{day.disease}</td>
-              <td>{day.ripeness}</td>
             </tr>
           ))}
         </tbody>

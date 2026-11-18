@@ -114,26 +114,12 @@ class DemoVision:
     async def predict(
         self,
         *,
-        scan_type: str,
+        scan_type: str,  # noqa: ARG002 - protocol signature; legacy values ignored
         image: bytes,  # noqa: ARG002 - protocol signature
         content_type: str,  # noqa: ARG002 - protocol signature
         client_uuid: str,  # noqa: ARG002 - protocol signature
         commodity_code: str,
     ) -> VisionResult:
-        if scan_type == "ripeness":
-            stage = self.rng.choice(["unripe", "turning", "ripe"])
-            low = {"unripe": 10, "turning": 4, "ripe": 0}[stage]
-            result: dict[str, object] = {
-                "stage": stage,
-                "stage_label": None,
-                "confidence": round(self.rng.uniform(0.7, 0.96), 2),
-                "estimated_days_min": low,
-                "estimated_days_max": low + 4,
-                "estimate_confidence": "medium",
-                "note": f"Perkiraan panen {low}-{low + 4} hari lagi.",
-            }
-            return self._wrap("ripeness", "confident", result, 0.88, commodity_code)
-
         code = self.forced.pop(0) if self.forced else self.rng.choice(WEIGHTED_CODES)
         roll = self.rng.random()
         status = "confident" if roll < 0.7 else "uncertain" if roll < 0.92 else "unknown"
@@ -149,7 +135,7 @@ class DemoVision:
                 "cause_category": CAUSES[code],
                 "confidence": confidence,
             }
-        result = {
+        result: dict[str, object] = {
             "top": top,
             "alternatives": [],
             "is_healthy": None if top is None else code == "healthy",
@@ -180,7 +166,7 @@ class DemoVision:
 
 
 def leaf_photo(rng: random.Random, *, sick: bool) -> bytes:
-    """A small drawn chili leaf so the review screen has something to look at."""
+    """A small drawn mango leaf so the review screen has something to look at."""
     image = Image.new("RGB", (480, 360), (226, 221, 200))
     draw = ImageDraw.Draw(image)
     green = (rng.randint(50, 80), rng.randint(110, 140), rng.randint(50, 70))

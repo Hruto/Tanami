@@ -25,10 +25,6 @@ export const LABEL_NAME: Record<string, string> = {
   leaf_curl_virus: "Keriting daun (virus)",
   pest_damage: "Kerusakan akibat hama",
   nutrient_deficiency: "Kekurangan hara",
-  unripe: "Mentah",
-  turning: "Mengkal",
-  ripe: "Matang",
-  overripe: "Terlalu matang",
 };
 
 export function labelName(code: string | null | undefined): string {

@@ -71,25 +71,6 @@ def disease_result(
     }
 
 
-def ripeness_result(
-    *,
-    stage: str = "turning",
-    days_min: int | None = 4,
-    days_max: int | None = 7,
-    confidence: float = 0.9,
-    status: str = ResultStatus.CONFIDENT.value,
-) -> dict[str, Any]:
-    return {
-        "stage": stage,
-        "stage_label": None,
-        "confidence": confidence,
-        "estimated_days_min": days_min,
-        "estimated_days_max": days_max,
-        "estimate_confidence": "high",
-        "note": f"Perkiraan panen {days_min}-{days_max} hari lagi." if days_min else "-",
-    }
-
-
 def vision_payload(
     scan_type: ScanType = ScanType.DISEASE,
     *,
@@ -101,10 +82,7 @@ def vision_payload(
 ) -> VisionResult:
     """Build the exact dataclass ``VisionClient._parse`` would have returned."""
     if result is None:
-        if scan_type is ScanType.DISEASE:
-            result = disease_result(status=status or ResultStatus.CONFIDENT.value)
-        else:
-            result = ripeness_result(status=status or ResultStatus.CONFIDENT.value)
+        result = disease_result(status=status or ResultStatus.CONFIDENT.value)
     return VisionResult(
         scan_type=scan_type.value,
         status=status or ResultStatus.CONFIDENT.value,
@@ -165,7 +143,7 @@ class FakeVision:
             return self._results.popleft()
         if self.default_result is not None:
             return self.default_result
-        return vision_payload(ScanType(scan_type))
+        return vision_payload(ScanType.DISEASE)
 
 
 # --------------------------------------------------------------------------- #

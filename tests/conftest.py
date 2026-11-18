@@ -6,13 +6,32 @@ from pathlib import Path
 
 import pytest
 from app.core.config import Settings
+from app.domain import DISEASE_LABELS_BY_COMMODITY, ScanType, known_labels
 from app.main import create_app
 from app.services.registry import ModelRegistry
 from PIL import Image, ImageFilter
 
-MODEL_VERSIONS = {
-    "disease": "disease-chili-v0.1.0",
-    "ripeness": "ripeness-chili-v0.1.0",
+MODEL_VERSIONS: dict[str, str] = {
+    "mango": "disease-mango-v0.1.0",
+    "citrus": "disease-citrus-v0.1.0",
+    "strawberry": "disease-strawberry-v0.1.0",
+}
+
+SHADOW_VERSIONS: dict[str, str] = {
+    commodity: version.replace("v0.1.0", "v0.2.0-rc1")
+    for commodity, version in MODEL_VERSIONS.items()
+}
+
+
+def labels_for(commodity: str) -> list[str]:
+    return list(known_labels(ScanType.DISEASE, commodity))
+
+
+MANGO_LABELS = labels_for("mango")
+CITRUS_LABELS = labels_for("citrus")
+STRAWBERRY_LABELS = labels_for("strawberry")
+LABELS_BY_COMMODITY = {
+    commodity: labels_for(commodity) for commodity in DISEASE_LABELS_BY_COMMODITY
 }
 
 
@@ -36,9 +55,10 @@ def make_settings(tmp_path: Path, **overrides: object) -> Settings:
 def write_manifest(
     model_dir: Path,
     *,
-    scan_type: str,
+    commodity_code: str,
     version: str,
     labels: list[str],
+    scan_type: str = "disease",
     input_size: int = 224,
 ) -> Path:
     import json
@@ -48,7 +68,7 @@ def write_manifest(
     manifest = {
         "model_version": version,
         "scan_type": scan_type,
-        "commodity_code": "chili",
+        "commodity_code": commodity_code,
         "artifact": "model.onnx",
         "labels": labels,
         "input_size": input_size,
@@ -64,34 +84,22 @@ def write_manifest(
     return path
 
 
-DISEASE_LABELS = [
-    "healthy",
-    "anthracnose",
-    "cercospora_leaf_spot",
-    "bacterial_wilt",
-    "leaf_curl_virus",
-    "pest_damage",
-    "nutrient_deficiency",
-]
-RIPENESS_LABELS = ["unripe", "turning", "ripe", "overripe"]
+def write_primary_models(model_dir: Path) -> None:
+    """Write the three primary manifests used by the shared fixtures."""
+    for commodity, version in MODEL_VERSIONS.items():
+        write_manifest(
+            model_dir,
+            commodity_code=commodity,
+            version=version,
+            labels=LABELS_BY_COMMODITY[commodity],
+        )
 
 
 @pytest.fixture
 def settings(tmp_path: Path) -> Settings:
     resolved = make_settings(tmp_path)
     resolved.model_dir.mkdir(parents=True, exist_ok=True)
-    write_manifest(
-        resolved.model_dir,
-        scan_type="disease",
-        version=MODEL_VERSIONS["disease"],
-        labels=DISEASE_LABELS,
-    )
-    write_manifest(
-        resolved.model_dir,
-        scan_type="ripeness",
-        version=MODEL_VERSIONS["ripeness"],
-        labels=RIPENESS_LABELS,
-    )
+    write_primary_models(resolved.model_dir)
     return resolved
 
 

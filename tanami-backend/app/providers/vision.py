@@ -149,7 +149,7 @@ class VisionClient:
                 scan_type=str(data["type"]),
                 status=str(data["status"]),
                 model_version=str(data["model_version"]),
-                commodity_code=str(data.get("commodity_code", "chili")),
+                commodity_code=str(data.get("commodity_code", "mango")),
                 confidence=(
                     float(data["confidence"]) if data.get("confidence") is not None else None
                 ),

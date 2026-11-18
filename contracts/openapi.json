@@ -24,7 +24,7 @@
                 "type": "null"
               }
             ],
-            "description": "Default: komoditas aktif",
+            "description": "mango, citrus, atau strawberry (default: mango)",
             "title": "Commodity Code"
           },
           "image": {
@@ -35,7 +35,7 @@
           },
           "type": {
             "$ref": "#/components/schemas/ScanType",
-            "description": "disease atau ripeness"
+            "description": "disease"
           }
         },
         "required": [
@@ -218,15 +218,6 @@
         "title": "ErrorResponse",
         "type": "object"
       },
-      "EstimateConfidence": {
-        "enum": [
-          "low",
-          "medium",
-          "high"
-        ],
-        "title": "EstimateConfidence",
-        "type": "string"
-      },
       "HTTPValidationError": {
         "properties": {
           "detail": {
@@ -374,7 +365,7 @@
       },
       "PredictionData": {
         "additionalProperties": false,
-        "description": "Response body for ``POST /v1/predict``.\n\n``result`` is a discriminated union on ``type`` so a client can branch on a\nsingle field. Only one of the two members is ever populated.",
+        "description": "Response body for ``POST /v1/predict``.\n\n``result`` is always a ``DiseaseResult``; the commodity-specific label set\nis chosen by ``commodity_code`` (design.md 11.5).",
         "properties": {
           "commodity_code": {
             "title": "Commodity Code",
@@ -406,15 +397,7 @@
             "$ref": "#/components/schemas/QualityInfo"
           },
           "result": {
-            "anyOf": [
-              {
-                "$ref": "#/components/schemas/DiseaseResult"
-              },
-              {
-                "$ref": "#/components/schemas/RipenessResult"
-              }
-            ],
-            "title": "Result"
+            "$ref": "#/components/schemas/DiseaseResult"
           },
           "shadow_model_version": {
             "anyOf": [
@@ -541,105 +524,9 @@
         "title": "ResultStatus",
         "type": "string"
       },
-      "RipenessResult": {
-        "additionalProperties": false,
-        "properties": {
-          "confidence": {
-            "anyOf": [
-              {
-                "maximum": 1.0,
-                "minimum": 0.0,
-                "type": "number"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "title": "Confidence"
-          },
-          "estimate_confidence": {
-            "anyOf": [
-              {
-                "$ref": "#/components/schemas/EstimateConfidence"
-              },
-              {
-                "type": "null"
-              }
-            ]
-          },
-          "estimated_days_max": {
-            "anyOf": [
-              {
-                "minimum": 0.0,
-                "type": "integer"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "title": "Estimated Days Max"
-          },
-          "estimated_days_min": {
-            "anyOf": [
-              {
-                "minimum": 0.0,
-                "type": "integer"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "title": "Estimated Days Min"
-          },
-          "note": {
-            "title": "Note",
-            "type": "string"
-          },
-          "stage": {
-            "anyOf": [
-              {
-                "$ref": "#/components/schemas/RipenessStage"
-              },
-              {
-                "type": "null"
-              }
-            ]
-          },
-          "stage_label": {
-            "anyOf": [
-              {
-                "type": "string"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "title": "Stage Label"
-          }
-        },
-        "required": [
-          "stage",
-          "stage_label",
-          "estimate_confidence",
-          "note"
-        ],
-        "title": "RipenessResult",
-        "type": "object"
-      },
-      "RipenessStage": {
-        "enum": [
-          "unripe",
-          "turning",
-          "ripe",
-          "overripe"
-        ],
-        "title": "RipenessStage",
-        "type": "string"
-      },
       "ScanType": {
         "enum": [
-          "disease",
-          "ripeness"
+          "disease"
         ],
         "title": "ScanType",
         "type": "string"
@@ -819,7 +706,7 @@
     },
     "/v1/predict": {
       "post": {
-        "description": "Menerima satu foto daun (type=disease) atau buah (type=ripeness) dan mengembalikan `result` sesuai design.md 11.3 beserta `status` dari ambang keyakinan design.md 11.2.\n\nLayanan ini **stateless**: tidak menyimpan gambar, tidak menulis database, tidak mengirim notifikasi. Penyimpanan dan pemberian rekomendasi tetap di backend.",
+        "description": "Menerima satu foto daun buah dengan type=disease untuk komoditas mangga, jeruk, atau stroberi, lalu mengembalikan `result` sesuai design.md 11.3 beserta `status` dari ambang keyakinan design.md 11.2.\\n\\nLayanan ini **stateless**: tidak menyimpan gambar, tidak menulis database, tidak mengirim notifikasi. Penyimpanan dan pemberian rekomendasi tetap di backend.",
         "operationId": "predict_v1_predict_post",
         "parameters": [
           {

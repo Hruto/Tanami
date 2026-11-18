@@ -1,13 +1,12 @@
 from __future__ import annotations
 
 import pytest
-from app.domain import CauseCategory, EstimateConfidence, QualityStatus, ResultStatus, RipenessStage
+from app.domain import CauseCategory, QualityStatus, ResultStatus
 from app.inference.predictor import RawPrediction
 from app.inference.preprocessing import QualityReport
 from app.services.decision import (
     Thresholds,
     build_disease_result,
-    build_ripeness_result,
     decide_status,
 )
 
@@ -50,32 +49,38 @@ def test_thresholds_reject_degenerate_values(value: float) -> None:
 
 def _prediction(**scores: float) -> RawPrediction:
     return RawPrediction(
-        model_version="disease-chili-v0.1.0", probabilities=scores, inference_ms=1.0
+        model_version="disease-mango-v0.1.0", probabilities=scores, inference_ms=1.0
     )
 
 
 def test_confident_disease_result_has_top_and_alternatives() -> None:
-    prediction = _prediction(anthracnose=0.87, healthy=0.08, pest_damage=0.05)
-    result = build_disease_result(prediction, status=ResultStatus.CONFIDENT, top_k=3)
+    prediction = _prediction(mango_anthracnose=0.87, healthy=0.08, mango_gall_midge=0.05)
+    result = build_disease_result(
+        prediction, commodity_code="mango", status=ResultStatus.CONFIDENT, top_k=3
+    )
 
     assert result.top is not None
-    assert result.top.disease_code == "anthracnose"
+    assert result.top.disease_code == "mango_anthracnose"
     assert result.top.label == "Antraknosa"
     assert result.top.cause_category is CauseCategory.FUNGUS
     assert result.top.confidence == 0.87
     assert result.is_healthy is False
-    assert [alt.disease_code for alt in result.alternatives] == ["healthy", "pest_damage"]
+    assert [alt.disease_code for alt in result.alternatives] == ["healthy", "mango_gall_midge"]
 
 
 def test_top_k_limits_alternatives() -> None:
-    prediction = _prediction(a=0.0, healthy=0.2, anthracnose=0.5, pest_damage=0.1)
-    result = build_disease_result(prediction, status=ResultStatus.CONFIDENT, top_k=2)
+    prediction = _prediction(a=0.0, healthy=0.2, mango_anthracnose=0.5, mango_gall_midge=0.1)
+    result = build_disease_result(
+        prediction, commodity_code="mango", status=ResultStatus.CONFIDENT, top_k=2
+    )
     assert len(result.alternatives) == 1
 
 
 def test_healthy_result_sets_healthy_flag() -> None:
-    prediction = _prediction(healthy=0.95, anthracnose=0.05)
-    result = build_disease_result(prediction, status=ResultStatus.CONFIDENT, top_k=3)
+    prediction = _prediction(healthy=0.95, mango_anthracnose=0.05)
+    result = build_disease_result(
+        prediction, commodity_code="mango", status=ResultStatus.CONFIDENT, top_k=3
+    )
     assert result.is_healthy is True
     assert result.top is not None
     assert result.top.cause_category is CauseCategory.HEALTHY
@@ -84,23 +89,27 @@ def test_healthy_result_sets_healthy_flag() -> None:
 
 def test_unknown_keeps_candidates_but_hides_top() -> None:
     """design.md 11.3: unknown may still list candidates, but names no disease."""
-    prediction = _prediction(anthracnose=0.4, healthy=0.35, pest_damage=0.25)
-    result = build_disease_result(prediction, status=ResultStatus.UNKNOWN, top_k=3)
+    prediction = _prediction(mango_anthracnose=0.4, healthy=0.35, mango_gall_midge=0.25)
+    result = build_disease_result(
+        prediction, commodity_code="mango", status=ResultStatus.UNKNOWN, top_k=3
+    )
 
     assert result.top is None
     assert result.is_healthy is None
     assert result.severity is None
     assert [alt.disease_code for alt in result.alternatives] == [
-        "anthracnose",
+        "mango_anthracnose",
         "healthy",
-        "pest_damage",
+        "mango_gall_midge",
     ]
 
 
 def test_invalid_image_returns_no_candidates() -> None:
     """Unusable pixels make every score meaningless, so none are surfaced."""
-    prediction = _prediction(anthracnose=0.4, healthy=0.35, pest_damage=0.25)
-    result = build_disease_result(prediction, status=ResultStatus.INVALID_IMAGE, top_k=3)
+    prediction = _prediction(mango_anthracnose=0.4, healthy=0.35, mango_gall_midge=0.25)
+    result = build_disease_result(
+        prediction, commodity_code="mango", status=ResultStatus.INVALID_IMAGE, top_k=3
+    )
 
     assert result.top is None
     assert result.is_healthy is None
@@ -111,76 +120,48 @@ def test_invalid_image_returns_no_candidates() -> None:
 def test_unknown_label_in_model_output_raises() -> None:
     prediction = _prediction(mystery_disease=0.9)
     with pytest.raises(ValueError, match="tak dikenal"):
-        build_disease_result(prediction, status=ResultStatus.CONFIDENT, top_k=3)
+        build_disease_result(
+            prediction, commodity_code="mango", status=ResultStatus.CONFIDENT, top_k=3
+        )
+
+
+def test_label_from_another_commodity_is_rejected() -> None:
+    prediction = _prediction(mango_anthracnose=0.9, healthy=0.1)
+    with pytest.raises(ValueError, match="tak dikenal"):
+        build_disease_result(
+            prediction, commodity_code="citrus", status=ResultStatus.CONFIDENT, top_k=3
+        )
+
+
+@pytest.mark.parametrize(
+    ("commodity", "code", "label", "category"),
+    [
+        ("citrus", "citrus_canker", "Kanker jeruk", CauseCategory.BACTERIA),
+        ("citrus", "citrus_greening", "CVPD (Greening/HLB)", CauseCategory.BACTERIA),
+        (
+            "strawberry",
+            "strawberry_angular_leaf_spot",
+            "Bercak daun bersudut",
+            CauseCategory.BACTERIA,
+        ),
+        ("strawberry", "strawberry_leaf_scorch", "Hangus daun", CauseCategory.FUNGUS),
+        ("mango", "mango_gall_midge", "Puru daun (lalat puru)", CauseCategory.PEST),
+    ],
+)
+def test_labels_and_categories_follow_design_11_5(
+    commodity: str, code: str, label: str, category: CauseCategory
+) -> None:
+    prediction = RawPrediction(model_version="v", probabilities={code: 0.9}, inference_ms=0.0)
+    result = build_disease_result(
+        prediction, commodity_code=commodity, status=ResultStatus.CONFIDENT, top_k=3
+    )
+    assert result.top is not None
+    assert result.top.disease_code == code
+    assert result.top.label == label
+    assert result.top.cause_category is category
 
 
 def test_empty_prediction_raises() -> None:
     empty = RawPrediction(model_version="v", probabilities={}, inference_ms=0.0)
     with pytest.raises(ValueError, match="tidak mengembalikan"):
-        build_disease_result(empty, status=ResultStatus.CONFIDENT, top_k=3)
-
-
-def test_ripeness_always_returns_a_range() -> None:
-    prediction = RawPrediction(
-        model_version="ripeness-chili-v0.1.0",
-        probabilities={"turning": 0.81, "ripe": 0.19},
-        inference_ms=2.0,
-    )
-    result = build_ripeness_result(prediction, status=ResultStatus.CONFIDENT)
-    assert result.stage is RipenessStage.TURNING
-    assert result.stage_label == "Mengkal"
-    assert result.estimated_days_min == 4
-    assert result.estimated_days_max == 7
-    assert result.estimated_days_min < result.estimated_days_max
-    assert result.estimate_confidence is EstimateConfidence.MEDIUM
-
-
-def test_overripe_is_zero_to_zero() -> None:
-    prediction = RawPrediction(
-        model_version="v", probabilities={"overripe": 0.9, "ripe": 0.1}, inference_ms=0.0
-    )
-    result = build_ripeness_result(prediction, status=ResultStatus.CONFIDENT)
-    assert result.stage is RipenessStage.OVERRIPE
-    assert (result.estimated_days_min, result.estimated_days_max) == (0, 0)
-
-
-@pytest.mark.parametrize(
-    ("confidence", "expected"),
-    [
-        (0.95, EstimateConfidence.HIGH),
-        (0.85, EstimateConfidence.HIGH),
-        (0.84, EstimateConfidence.MEDIUM),
-        (0.60, EstimateConfidence.MEDIUM),
-        (0.59, EstimateConfidence.LOW),
-    ],
-)
-def test_estimate_confidence_bands(confidence: float, expected: EstimateConfidence) -> None:
-    prediction = RawPrediction(
-        model_version="v",
-        probabilities={"turning": confidence, "ripe": 1 - confidence},
-        inference_ms=0.0,
-    )
-    # confidence >= 0.5 keeps the stage populated; use confident status so the
-    # stage is never suppressed by the status gate.
-    result = build_ripeness_result(prediction, status=ResultStatus.CONFIDENT)
-    assert result.estimate_confidence is expected
-
-
-@pytest.mark.parametrize("status", [ResultStatus.UNKNOWN, ResultStatus.INVALID_IMAGE])
-def test_ripeness_unknown_returns_nulls(status: ResultStatus) -> None:
-    prediction = RawPrediction(
-        model_version="v", probabilities={"turning": 0.3, "ripe": 0.7}, inference_ms=0.0
-    )
-    result = build_ripeness_result(prediction, status=status)
-    assert result.stage is None
-    assert result.stage_label is None
-    assert result.confidence is None
-    assert result.estimated_days_min is None
-    assert result.estimated_days_max is None
-    assert result.note
-
-
-def test_ripeness_unknown_stage_raises() -> None:
-    prediction = RawPrediction(model_version="v", probabilities={"rotten": 0.9}, inference_ms=0.0)
-    with pytest.raises(ValueError, match="tak dikenal"):
-        build_ripeness_result(prediction, status=ResultStatus.CONFIDENT)
+        build_disease_result(empty, commodity_code="mango", status=ResultStatus.CONFIDENT, top_k=3)

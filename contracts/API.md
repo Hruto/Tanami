@@ -1,12 +1,17 @@
 # Kontrak API — `tanami-vision`
 
-> **Status:** dokumen ini menjelaskan kode yang berjalan sekarang, yang masih mengikuti `docs/design.md` **v0.3** (cabai, daftar deteksi terpisah, scan kematangan). Targetnya `docs/design.md` **v2** (mangga, jeruk, stroberi); daftar perubahan yang tertunda ada di lampiran "Dampak ke Implementasi".
+> **Status:** dokumen ini mengikuti `docs/design.md` **v2** — tiga komoditas
+> (`mango`, `citrus`, `strawberry`), hanya `type=disease`, tanpa scan kematangan.
+> `commodity_code` wajib dikirim (default `mango`); nilai di luar tiga kode itu
+> ditolak 400.
 
-> Di v2 bidang `commodity_code` menjadi wajib dan bernilai `mango`, `citrus`, atau `strawberry`; `type` hanya `disease`; respons menambah `invalid_reason`.
+> `status` ditentukan oleh layanan ini (`decide_status()`), bukan dihitung ulang
+> oleh backend/frontend; backend hanya menyimpan nilai yang diterima. Lihat
+> `design.md` 11.2.
 
 | | |
 |---|---|
-| Versi kontrak | 0.1.0 |
+| Versi kontrak | 2.0.0 |
 | Tanggal | 26 Oktober 2026 |
 | Pemilik | Backend/ML 2 (lihat `tqa.md` bagian 2) |
 | Pendamping | `design.md` bagian 11 (kontrak output ML) dan bagian 10.1 (format galat) |
@@ -27,7 +32,7 @@ yang menang adalah berkas OpenAPI; perbedaan itu harus diperbaiki lewat PR.
 | Menjalankan model dan memutuskan `status` | **Layanan ini** |
 | Mengisi `advice` dan rekomendasi dari tabel `diseases` | **Backend** |
 | Menghitung tanggal panen absolut dari rentang hari | **Backend** |
-| Menyimpan hasil scan, feedback, notifikasi | **Backend** |
+| Menyimpan hasil scan (termasuk `status` dari vision), feedback, notifikasi | **Backend** (menyimpan, tidak menghitung ulang `status`) |
 
 Layanan ini **tidak** menyimpan apa pun. Satu request masuk, satu hasil keluar,
 tidak ada efek samping selain metrik dan log.
@@ -71,9 +76,9 @@ internal.
 
 | Bidang | Wajib | Tipe | Keterangan |
 |---|---|---|---|
-| `type` | ya | `disease` \| `ripeness` | Jenis scan (design.md 8.2) |
+| `type` | ya | `disease` | Jenis scan; hanya penyakit daun (design.md 8.2) |
 | `image` | ya | file | JPEG/PNG. Batas keras layanan: `VISION_MAX_UPLOAD_BYTES` (default 8 MB) dan sisi ≤ `VISION_MAX_IMAGE_SIDE` |
-| `commodity_code` | tidak | string | Default `VISION_COMMODITY_CODE` (`chili`). Nilai di luar `VISION_SUPPORTED_COMMODITIES` → 400 |
+| `commodity_code` | ya | string | `mango`, `citrus`, atau `strawberry` (default `mango`). Nilai di luar `VISION_SUPPORTED_COMMODITIES` → 400 |
 | `client_uuid` | tidak | UUID | UUID dari aplikasi; dicatat di log untuk korelasi |
 | `Idempotency-Key` (header) | tidak | string | Dipakai sebagai `client_uuid` bila bidang form kosong |
 
@@ -88,21 +93,21 @@ punya database. Nilai ini di sini murni untuk penelusuran log.
   "data": {
     "type": "disease",
     "status": "confident",
-    "model_version": "disease-chili-v0.1.0",
-    "commodity_code": "chili",
+    "model_version": "disease-mango-v0.1.0",
+    "commodity_code": "mango",
     "confidence": 0.87,
     "quality": { "blur": "ok", "brightness": "ok" },
     "result": {
       "top": {
-        "disease_code": "anthracnose",
+        "disease_code": "mango_anthracnose",
         "label": "Antraknosa",
         "cause_category": "fungus",
         "confidence": 0.87
       },
       "alternatives": [
         {
-          "disease_code": "cercospora_leaf_spot",
-          "label": "Bercak Daun Cercospora",
+          "disease_code": "mango_powdery_mildew",
+          "label": "Embun Tepung",
           "cause_category": "fungus",
           "confidence": 0.08
         }
@@ -117,48 +122,23 @@ punya database. Nilai ini di sini murni untuk penelusuran log.
 }
 ```
 
-Scan buah (`type=ripeness`):
-
-```json
-{
-  "data": {
-    "type": "ripeness",
-    "status": "confident",
-    "model_version": "ripeness-chili-v0.1.0",
-    "commodity_code": "chili",
-    "confidence": 0.81,
-    "quality": { "blur": "ok", "brightness": "ok" },
-    "result": {
-      "stage": "turning",
-      "stage_label": "Mengkal",
-      "confidence": 0.81,
-      "estimated_days_min": 4,
-      "estimated_days_max": 7,
-      "estimate_confidence": "medium",
-      "note": "Perkiraan kasar; dipengaruhi cuaca dan varietas."
-    },
-    "shadow_model_version": null,
-    "shadow_status": null,
-    "inference_ms": 96.2
-  }
-}
-```
+Scan kematangan tidak lagi tersedia: `type` hanya menerima `disease`; nilai lain
+ditolak 400 (design.md 8.2/11.1).
 
 Aturan yang mengikat hasil (dari design.md 11.2–11.4):
 
-1. `status` diputuskan **layanan ini**, bukan frontend:
-   `>= 0.75` confident, `0.50–<0.75` uncertain, `< 0.50` unknown.
+1. `status` diputuskan **layanan ini** (`decide_status()`), bukan frontend dan
+   bukan backend: `>= 0.75` confident, `0.50–<0.75` uncertain, `< 0.50` unknown.
+   Backend hanya menyimpan nilai yang diterima ke `scans` (design.md 11.2).
 2. Kualitas gambar menang atas keyakinan: foto buram/gelap/terlalu terang →
    `status = invalid_image` walaupun model 0,99.
 3. `result.top = null` untuk `unknown` dan `invalid_image`. Untuk `unknown`,
    `alternatives` tetap berisi kandidat agar alur "tanya ahli" punya konteks;
    untuk `invalid_image`, `alternatives` kosong karena skornya tidak bermakna.
-4. Scan buah **selalu** mengembalikan rentang hari. Tidak ada field berisi satu
-   angka tunggal. `overripe` → `0..0`.
-5. `advice` **tidak ada** di respons ini. Itu wilayah backend, dari tabel
+4. `advice` **tidak ada** di respons ini. Itu wilayah backend, dari tabel
    `diseases` yang ditinjau ahli (TQA 8.3).
-6. `estimated_harvest_date_*` **tidak ada** di sini. Backend menambahkannya
-   dari `captured_at`/`created_at` + rentang hari.
+5. `estimated_harvest_date_*` **tidak ada** di sini. Backend menambahkannya
+   dari `captured_at`/`created_at` + rentang hari profil tanaman.
 
 ### 4.2 Kode galat
 
@@ -227,11 +207,11 @@ Layanan ini tidak menebak label dari isi artefak. Setiap model wajib punya
 
 ```json
 {
-  "model_version": "disease-chili-v0.1.0",
+  "model_version": "disease-mango-v0.1.0",
   "scan_type": "disease",
-  "commodity_code": "chili",
+  "commodity_code": "mango",
   "artifact": "model.onnx",
-  "labels": ["healthy", "anthracnose", "..."],
+  "labels": ["healthy", "mango_anthracnose", "mango_bacterial_canker", "mango_die_back", "mango_powdery_mildew", "mango_sooty_mould", "mango_gall_midge", "mango_cutting_weevil"],
   "input_size": 224,
   "input_name": "input",
   "output_name": "logits",
@@ -244,8 +224,9 @@ Layanan ini tidak menebak label dari isi artefak. Setiap model wajib punya
 
 Divalidasi saat start (gagal = model tidak dipakai):
 
-- `scan_type` cocok dengan slot;
-- himpunan `labels` **sama persis** dengan kontrak design.md 11.5;
+- `scan_type = disease`;
+- `commodity_code` manifest **sama** dengan komoditas yang diminta;
+- himpunan `labels` **sama persis** dengan kontrak design.md 11.5 untuk komoditas itu;
 - `artifact` relatif dan tidak keluar dari folder versi;
 - `input_size` > 0, `normalization` ∈ {`zero_one`, `imagenet`},
   `output_activation` ∈ {`softmax`, `none`}.
@@ -260,7 +241,8 @@ kontrak (TQA bagian 6):
 
 | Variabel | Default | Efek |
 |---|---|---|
-| `VISION_CONFIDENT_THRESHOLD` | 0.75 | Batas `confident` |
+| `VISION_SUPPORTED_COMMODITIES` | `mango,citrus,strawberry` | Komoditas yang diterima; di luar itu 400 |
+| `VISION_CONFIDENT_THRESHOLD` | 0.75 | Batas `confident` (sumber kebenaran: layanan vision) |
 | `VISION_UNCERTAIN_THRESHOLD` | 0.50 | Batas `uncertain`; wajib < confident |
 | `VISION_BLUR_MIN_VARIANCE` | 45.0 | Ambang blur (varians Laplacian pada maks 512 px) |
 | `VISION_BRIGHTNESS_MIN/MAX` | 0.15 / 0.92 | Ambang pencahayaan (rata-rata luminance 0–1) |

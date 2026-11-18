@@ -73,7 +73,7 @@ async def create_scan(
     limiter: RateLimiterDep,
     response: Response,
     image: Annotated[UploadFile, File()],
-    scan_type: Annotated[ScanType, Form(alias="type")] = ScanType.DISEASE,
+    scan_type: Annotated[str, Form(alias="type")] = "disease",  # noqa: ARG001 - legacy values ignored
     client_uuid: Annotated[UUID | None, Form()] = None,
     plant_id: Annotated[UUID | None, Form()] = None,
     commodity_code: Annotated[str | None, Form()] = None,
@@ -101,9 +101,9 @@ async def create_scan(
     created = await service.create(
         ScanCommand(
             user_id=user.id,
-            # design 10.6 v2: every scan is a disease scan. A v0.3 client that
-            # still sends "ripeness" must not break, so the value is ignored.
-            scan_type=ScanType.DISEASE if scan_type is ScanType.RIPENESS else scan_type,
+            # design 10.6 v2: every scan is a disease scan; a legacy value in
+            # the ``type`` form field is deliberately ignored.
+            scan_type=ScanType.DISEASE,
             image=raw,
             client_uuid=resolved_uuid,
             captured_at=captured_at,

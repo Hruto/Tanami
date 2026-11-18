@@ -15,8 +15,10 @@ Dokumentasi Tanami boleh membuat **keputusan**, tapi tidak boleh mengarang
 5. Ingatan — **tidak boleh** jadi sumber satu-satunya
 
 Contoh kebiasaan buruk yang harus dihindari: menulis "endpoint archive ada"
-padahal sudah dihapus di commit `2a53bea`; atau menulis "model memakai 5 kelas"
-padahal manifest yang aktif masih 7 label chili.
+padahal sudah dihapus di commit `2a53bea`; atau mengira lima kategori ML v2
+adalah label runtime. Runtime memakai 8/5/5 kode penyakit per komoditas
+(`design.md` 11.5); kategori itu hanya pengelompokan training yang dipetakan
+lewat `ml_labels` (`docs/data-integration.md`).
 
 Perintah yang biasa dipakai:
 
@@ -117,6 +119,7 @@ Jangan menghapus desain software lama; tambahkan sebagai bagian baru:
 
 - [ ] Angka di dokumen sesuai hasil perintah terakhir (path/test/commit)
 - [ ] Tidak ada nama endpoint/field yang sudah dihapus
+- [ ] Tidak ada referensi cabai/ripeness di dokumentasi aktif (kecuali catatan sejarah/migrasi)
 - [ ] Kontrak `openapi.json` diregenerasi kalau API berubah
 - [ ] `pytest`, `ruff`, `mypy` hijau kalau kode ikut berubah
 - [ ] File yang diubah disebut di pesan commit

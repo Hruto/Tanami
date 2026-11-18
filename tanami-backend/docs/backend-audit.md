@@ -33,7 +33,7 @@ Struktur backend sudah rapi dan mengikuti design (route tipis, logika di `servic
 | 12.1 BMKG | Job terjadwal membaca cache (tidak mengambil data baru); tanpa jeda (bisa melewati 60 req/menit); gagal menulis arsip menggagalkan seluruh respons cuaca. | `WeatherService.refresh` paksa ambil BMKG; jeda `TANAMI_BMKG_MIN_INTERVAL_SECONDS`; arsip gagal hanya dicatat di log. |
 | 13 forum | `scan_summary` selalu `null`; posting tersembunyi tetap bisa dibuka publik; komentar tersembunyi tidak mengurangi `comment_count`. | Ringkasan scan (foto + hasil singkat, tanpa data tanaman); visibilitas `hidden` hanya penulis & moderator; penghitung konsisten. |
 | TQA 9 hapus akun | Komentar kode menjanjikan "sweep job" yang tidak ada. | Job `purge_accounts` menghapus foto dan baris setelah 30 hari. |
-| Panen cabai | Panen pertama menandai tanaman `finished`. | `harvesting`; hanya `is_final: true` yang menandai `finished`. |
+| Panen pertama | Panen pertama menandai tanaman `finished`. | `harvesting`; hanya `is_final: true` yang menandai `finished`. |
 
 ## 4. Keamanan dan ketahanan (sudah diperbaiki)
 

@@ -1,25 +1,34 @@
 from __future__ import annotations
 
 import pytest
-from app.core.config import Settings
+from app.core.config import DEFAULT_DISEASE_MODEL_VERSIONS, Settings
 
 
 def test_defaults_match_contract_defaults() -> None:
     settings = Settings(_env_file=None)  # type: ignore[call-arg]
-    assert settings.supported_commodities == ("chili",)
+    assert settings.supported_commodities == ("mango", "citrus", "strawberry")
+    assert settings.commodity_code == "mango"
     assert settings.confident_threshold == 0.75
     assert settings.uncertain_threshold == 0.50
-    assert settings.disease_model_version == "disease-chili-v0.1.0"
-    assert settings.ripeness_model_version == "ripeness-chili-v0.1.0"
+    assert settings.disease_model_versions == DEFAULT_DISEASE_MODEL_VERSIONS
+    assert settings.disease_model_versions == {
+        "mango": "disease-mango-v0.1.0",
+        "citrus": "disease-citrus-v0.1.0",
+        "strawberry": "disease-strawberry-v0.1.0",
+    }
+    assert settings.shadow_model_versions == {}
+    assert settings.model_version_for("mango") == "disease-mango-v0.1.0"
+    assert settings.shadow_version_for("citrus") is None
 
 
 def test_env_prefix_is_applied(monkeypatch: pytest.MonkeyPatch) -> None:
-    monkeypatch.setenv("VISION_COMMODITY_CODE", "chili")
+    monkeypatch.setenv("VISION_COMMODITY_CODE", "citrus")
     monkeypatch.setenv("VISION_TOP_K", "5")
-    monkeypatch.setenv("VISION_SUPPORTED_COMMODITIES", '["chili","tomato"]')
+    monkeypatch.setenv("VISION_SUPPORTED_COMMODITIES", '["mango","citrus"]')
     settings = Settings(_env_file=None)  # type: ignore[call-arg]
     assert settings.top_k == 5
-    assert settings.supported_commodities == ("chili", "tomato")
+    assert settings.commodity_code == "citrus"
+    assert settings.supported_commodities == ("mango", "citrus")
 
 
 def test_thresholds_must_be_ordered() -> None:
@@ -49,9 +58,37 @@ def test_brightness_bounds_must_be_ordered() -> None:
         )
 
 
+def test_unknown_commodity_is_rejected() -> None:
+    with pytest.raises(ValueError, match="komoditas tidak dikenal"):
+        Settings(  # type: ignore[call-arg]
+            _env_file=None,
+            supported_commodities=("mango", "citrus", "strawberry", "tomato"),
+        )
+
+
 def test_commodity_must_be_supported() -> None:
     with pytest.raises(ValueError, match="tidak ada di supported_commodities"):
-        Settings(_env_file=None, commodity_code="tomato")  # type: ignore[call-arg]
+        Settings(  # type: ignore[call-arg]
+            _env_file=None,
+            supported_commodities=("mango", "citrus"),
+            commodity_code="strawberry",
+        )
+
+
+def test_every_supported_commodity_needs_a_model_version() -> None:
+    with pytest.raises(ValueError, match="disease_model_versions"):
+        Settings(  # type: ignore[call-arg]
+            _env_file=None,
+            disease_model_versions={"mango": "disease-mango-v0.1.0"},
+        )
+
+
+def test_shadow_version_must_use_a_supported_commodity() -> None:
+    with pytest.raises(ValueError, match="shadow_model_versions"):
+        Settings(  # type: ignore[call-arg]
+            _env_file=None,
+            shadow_model_versions={"tomato": "disease-tomato-v0.2.0-rc1"},
+        )
 
 
 def test_stub_backend_refused_in_production() -> None:

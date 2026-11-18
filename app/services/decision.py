@@ -5,7 +5,7 @@ place so there is exactly one implementation of each:
 
 * status thresholds (design.md 11.2),
 * ``top`` is null for ``unknown`` / ``invalid_image`` (design.md 11.3),
-* ripeness always returns a *range*, never a single number (design.md 11.3),
+* labels and cause categories come from the per-commodity table in design.md 11.5,
 * no treatment advice is produced here (tqa.md 8.3) - the backend fills it
   from the reviewed ``diseases`` table.
 """
@@ -16,23 +16,14 @@ from dataclasses import dataclass
 
 from app.core.config import Settings
 from app.domain import (
-    DISEASE_LABELS,
-    RIPENESS_DAY_POLICY,
-    RIPENESS_LABELS,
-    RIPENESS_NOTE,
+    DISEASE_LABELS_BY_COMMODITY,
     CauseCategory,
-    EstimateConfidence,
+    DiseaseLabel,
     ResultStatus,
-    RipenessStage,
 )
 from app.inference.predictor import RawPrediction
 from app.inference.preprocessing import QualityReport
-from app.schemas.prediction import (
-    DiseaseAlternative,
-    DiseaseResult,
-    DiseaseTop,
-    RipenessResult,
-)
+from app.schemas.prediction import DiseaseAlternative, DiseaseResult, DiseaseTop
 
 
 @dataclass(frozen=True, slots=True)
@@ -66,47 +57,51 @@ def decide_status(
     return ResultStatus.UNKNOWN
 
 
-def estimate_confidence(confidence: float) -> EstimateConfidence:
-    if confidence >= 0.85:
-        return EstimateConfidence.HIGH
-    if confidence >= 0.60:
-        return EstimateConfidence.MEDIUM
-    return EstimateConfidence.LOW
-
-
 def ranked(probabilities: dict[str, float]) -> list[tuple[str, float]]:
     return sorted(probabilities.items(), key=lambda item: item[1], reverse=True)
 
 
-def _alternatives(ordered: list[tuple[str, float]]) -> list[DiseaseAlternative]:
-    return [
-        DiseaseAlternative(
-            disease_code=code,
-            label=DISEASE_LABELS[code].label_id if code in DISEASE_LABELS else code,
-            cause_category=(
-                DISEASE_LABELS[code].cause_category
-                if code in DISEASE_LABELS
-                else CauseCategory.UNKNOWN
-            ),
-            confidence=round(score, 4),
+def _labels_for(commodity_code: str) -> dict[str, DiseaseLabel]:
+    labels = DISEASE_LABELS_BY_COMMODITY.get(commodity_code)
+    if labels is None:
+        msg = f"komoditas '{commodity_code}' tidak memiliki label penyakit yang dikenal"
+        raise ValueError(msg)
+    return labels
+
+
+def _alternatives(
+    ordered: list[tuple[str, float]], labels: dict[str, DiseaseLabel]
+) -> list[DiseaseAlternative]:
+    result: list[DiseaseAlternative] = []
+    for code, score in ordered:
+        label = labels.get(code)
+        result.append(
+            DiseaseAlternative(
+                disease_code=code,
+                label=label.label_id if label is not None else code,
+                cause_category=label.cause_category if label is not None else CauseCategory.UNKNOWN,
+                confidence=round(score, 4),
+            )
         )
-        for code, score in ordered
-    ]
+    return result
 
 
 def build_disease_result(
     prediction: RawPrediction,
     *,
+    commodity_code: str,
     status: ResultStatus,
     top_k: int,
 ) -> DiseaseResult:
+    """Build the always-disease result using ``commodity_code``'s label table."""
+    labels = _labels_for(commodity_code)
     ordered = ranked(prediction.probabilities)
     if not ordered:
         msg = f"model {prediction.model_version} tidak mengembalikan skor apa pun"
         raise ValueError(msg)
 
     top_code, top_confidence = ordered[0]
-    top_label = DISEASE_LABELS.get(top_code)
+    top_label = labels.get(top_code)
     if top_label is None:
         msg = f"model {prediction.model_version} mengembalikan label tak dikenal: {top_code}"
         raise ValueError(msg)
@@ -123,7 +118,7 @@ def build_disease_result(
         # class therefore stays in `alternatives` instead of being dropped.
         return DiseaseResult(
             top=None,
-            alternatives=_alternatives(ordered[:top_k]),
+            alternatives=_alternatives(ordered[:top_k], labels),
             is_healthy=None,
             severity=None,
         )
@@ -135,49 +130,9 @@ def build_disease_result(
             cause_category=top_label.cause_category,
             confidence=round(top_confidence, 4),
         ),
-        alternatives=_alternatives(ordered[1:top_k]),
+        alternatives=_alternatives(ordered[1:top_k], labels),
         is_healthy=top_label.cause_category is CauseCategory.HEALTHY,
         # Severity is optional in the MVP and the first model does not predict
         # it; the backend may override this from the reviewed knowledge base.
         severity=None,
-    )
-
-
-def build_ripeness_result(
-    prediction: RawPrediction,
-    *,
-    status: ResultStatus,
-) -> RipenessResult:
-    ordered = ranked(prediction.probabilities)
-    if not ordered:
-        msg = f"model {prediction.model_version} tidak mengembalikan skor apa pun"
-        raise ValueError(msg)
-
-    if status in {ResultStatus.UNKNOWN, ResultStatus.INVALID_IMAGE}:
-        return RipenessResult(
-            stage=None,
-            stage_label=None,
-            confidence=None,
-            estimated_days_min=None,
-            estimated_days_max=None,
-            estimate_confidence=None,
-            note=RIPENESS_NOTE,
-        )
-
-    stage_value, confidence = ordered[0]
-    try:
-        stage = RipenessStage(stage_value)
-    except ValueError as exc:
-        msg = f"model {prediction.model_version} mengembalikan tahap tak dikenal: {stage_value}"
-        raise ValueError(msg) from exc
-
-    days_min, days_max = RIPENESS_DAY_POLICY[stage.value]
-    return RipenessResult(
-        stage=stage,
-        stage_label=RIPENESS_LABELS[stage.value],
-        confidence=round(confidence, 4),
-        estimated_days_min=days_min,
-        estimated_days_max=days_max,
-        estimate_confidence=estimate_confidence(confidence),
-        note=RIPENESS_NOTE,
     )

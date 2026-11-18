@@ -1,16 +1,17 @@
 {
-  "model_version": "disease-chili-v0.2.0-rc1",
+  "model_version": "disease-mango-v0.1.0",
   "scan_type": "disease",
-  "commodity_code": "chili",
+  "commodity_code": "mango",
   "artifact": "model.onnx",
   "labels": [
     "healthy",
-    "anthracnose",
-    "cercospora_leaf_spot",
-    "bacterial_wilt",
-    "leaf_curl_virus",
-    "pest_damage",
-    "nutrient_deficiency"
+    "mango_anthracnose",
+    "mango_bacterial_canker",
+    "mango_die_back",
+    "mango_powdery_mildew",
+    "mango_sooty_mould",
+    "mango_gall_midge",
+    "mango_cutting_weevil"
   ],
   "input_size": 224,
   "input_name": "input",

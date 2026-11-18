@@ -9,7 +9,7 @@ Dokumen ini adalah **kontrak bersama** antara frontend, backend, dan ML. Tujuann
 | Dasar | Dokumen *Requirements Aplikasi Deteksi dan Tracking Tanaman* (requirement 0-7) + keputusan tim 9 November 2026 (fokus 3 tanaman buah) |
 | Dokumen pendamping | `tqa.md` (standar kualitas) |
 | Status nilai | Nilai bertanda **[USULAN]** adalah titik awal dan dapat diubah lewat PR yang disetujui pemilik area (lihat `tqa.md` bagian 2 dan 16). Nilai bertanda **[PERLU SUMBER]** wajib diberi rujukan (jurnal, Balitjestro, Kementan) sebelum rilis. |
-| Status implementasi | Kode backend, `tanami-admin`, dan layanan vision **masih mengikuti v0.3**. Daftar pekerjaan penyesuaian ada di lampiran "Dampak ke Implementasi". |
+| Status implementasi | Kontrak dan dokumentasi sudah selaras dengan **v2**: tiga komoditas, hanya `disease`, model runtime `disease-<komoditas>-v0.1.0`. `status` ditentukan layanan vision; backend hanya menyimpan (11.2). Rincian di lampiran "Dampak ke Implementasi". |
 
 **Cara memakai dokumen ini**
 - Bagian 8 (istilah, enum, aturan bisnis), 10 (API), dan 11 (kontrak ML) adalah **sumber kebenaran**. Jika kode berbeda dengan dokumen ini, salah satunya harus diperbaiki lewat PR, bukan dibiarkan.
@@ -349,7 +349,7 @@ Daftar posting -> detail -> komentar / suka / laporkan. Buat posting: judul, isi
 | `disease_episode_status` | `open` (sedang sakit), `resolved` (sembuh/ditutup) |
 | `episode_close_reason` | `user_marked_healed`, `healthy_scan`, `tracking_ended` |
 | `care_action` (R2) | `watering`, `fertilizing`, `pest_control`, `pruning`, `weeding`, `other` |
-| `scan_type` | `disease` (nilai `ripeness` dipensiunkan di v2) |
+| `scan_type` | `disease` |
 | `result_status` | `confident`, `uncertain`, `unknown`, `invalid_image` |
 | `invalid_reason` | `not_leaf`, `blurry`, `too_dark`, `wrong_commodity` (lihat 11.1) |
 | `cause_category` | `healthy`, `fungus`, `bacteria`, `virus`, `pest`, `nutrient_deficiency`, `unknown` |
@@ -821,7 +821,13 @@ Bagian ini mengikat ML, backend, dan frontend. Mengubahnya memerlukan persetujua
 | < 0,50 | `unknown` |
 | (gagal pemeriksaan gambar) | `invalid_image` |
 
-Backend menentukan `status`. Frontend **tidak** menghitung ulang dari angka keyakinan. Ambang disimpan di konfigurasi backend agar bisa disetel, dan **boleh berbeda per jenis tanaman** setelah kalibrasi (11.6).
+**Layanan vision** yang menentukan `status` (`decide_status()` di
+`app/services/decision.py`): confidence >= 0,75 -> `confident`, >= 0,50 ->
+`uncertain`, lebih rendah -> `unknown`; quality gate menang atas confidence
+(sehingga `invalid_image`). Backend **hanya menyimpan** status yang diterima dari
+vision ke tabel `scans`, tidak menghitung ulang. Frontend juga **tidak** menghitung
+ulang dari angka keyakinan. Ambang disimpan di konfigurasi layanan vision agar bisa
+disetel, dan **boleh berbeda per jenis tanaman** setelah kalibrasi (11.6).
 
 Karena hanya `confident` yang bisa memundurkan panen, **kalibrasi keyakinan adalah syarat rilis**, bukan pelengkap.
 
@@ -1136,6 +1142,14 @@ dataset), 16 (struktur proyek), dan 17 (keputusan terbuka).
 - "kategori" di sisi ML = `backend_category` / `disease_code` di backend (lihat `docs/data-integration.md`).
 - "kurang yakin" dan "penolakan foto" adalah **status** di kontrak bagian 11, bukan kelas yang dilatih.
 
+> **Status implementasi (v2):** runtime sekarang memakai **3 model penyakit daun**,
+> satu per komoditas — `disease-mango-v0.1.0`, `disease-citrus-v0.1.0`, dan
+> `disease-strawberry-v0.1.0` (shadow opsional `-v0.2.0-rc1`). Lima kategori ML di
+> 19.1 (`sehat`, `jamur`, `bakteri`, `virus`, `lainnya`) adalah **pengelompokan
+> internal training**, bukan label runtime. Runtime memakai kode penyakit
+> berprefiks komoditas di 11.5; pemetaannya ada di tabel usulan `ml_labels`
+> (`docs/data-integration.md`). Jangan mencampurkan keduanya.
+
 ### 19.1 Tujuan
 
 Model menerima **satu foto daun** (satu daun, background polos seperti kertas) dan menjawab kondisinya:
@@ -1197,7 +1211,7 @@ audit (`00_audit`). Ambang awal: **>= 150 gambar asli per kelas** (tanpa augment
 | **Pepaya** | BDPapayaLeaf + dataset pepaya Mendeley lain + dataset gabungan bottle gourd/zucchini/papaya | Kemungkinan lengkap (digabung) | anthracnose (jamur), bacterial spot (bakteri), curl dan ring spot (virus), mealybug/whitefly dan insect hole (lainnya). Gabungan beberapa dataset: cek gaya foto dan duplikat. |
 | **Zukini** | dataset gabungan bottle gourd/zucchini/papaya (Mendeley, Daffodil Int'l Univ) | Kemungkinan lengkap | anthracnose, downy mildew (jamur); Xanthomonas leaf spot (bakteri); yellow mosaic virus (virus); insect damage, iron chlorosis, dry leaf (lainnya). Data asli ~2.144 gambar, **jangan pakai versi augmentasi**. |
 | **Jeruk** | dataset 3-fruit crops (Mendeley) | Longgar saja | greening dan canker (bakteri), black spot (jamur), nutrient deficiency dan mold (lainnya). Virus tidak ada, sehat cuma ~87. |
-| Padi, cabai (+ paprika), kedelai, singkong, kapas, mentimun | Kaggle/Mendeley | **Belum diverifikasi** | masuk audit putaran berikutnya |
+| Padi, kedelai, singkong, kapas, mentimun | Kaggle/Mendeley | **Belum diverifikasi** | masuk audit putaran berikutnya |
 
 **Gugur (di sumber publik utama):**
 - Apel, anggur, persik, stroberi, ceri (PlantVillage): hanya jamur + sehat, atau satu penyakit saja.
@@ -1299,11 +1313,14 @@ dimensi untuk SVM/RF.
 
 1. **Ketat atau longgar** untuk aturan masuk tanaman (19.4).
 2. Konfirmasi dosen soal pemakaian model pretrained untuk ekstraksi (19.10).
-3. Daftar akhir tanaman: ditentukan setelah `00_audit`, termasuk padi, cabai,
-   kedelai, singkong, kapas, mentimun.
-4. **Keselarasan komoditas**: backend v2 hanya `mango`/`citrus`/`strawberry`,
-   sedangkan desain ML v2 memakai tomat/pepaya/zukini/jeruk. Butuh keputusan tim
-   (lihat `docs/data-integration.md` §3.4).
+3. Daftar akhir tanaman untuk **training**: ditentukan setelah `00_audit`,
+   termasuk padi, kedelai, singkong, kapas, mentimun. Komoditas runtime tetap tiga
+   (11.5).
+4. **Keselarasan komoditas — SELESAI**: komoditas runtime adalah tiga
+   (`mango`/`citrus`/`strawberry`, 11.5). Tomat/pepaya/zukini/jeruk di 19.4 adalah
+   kandidat **dataset training**, dipetakan ke `backend_category`/
+   `backend_disease_code` via `ml_labels` (`docs/data-integration.md` §3.3/§3.4);
+   tidak menambah komoditas runtime.
 
 ### 19.12 Langkah berikutnya
 
@@ -1319,12 +1336,13 @@ dimensi untuk SVM/RF.
 
 ## Lampiran: Dampak ke Implementasi
 
-Kode saat ini masih v0.3. Pekerjaan per tim:
+Kode sudah selaras dengan design v2 (tiga komoditas). Rincian pekerjaan per tim:
 
 | Tim | Pekerjaan |
 |---|---|
 | **Backend** | Migrasi `0005`: tabel `crop_profiles` dan `disease_episodes`; ubah `plants` (kolom baru/dihapus 9.2), `harvest_records.sequence`, `scans.plant_id` NOT NULL + `disease_episode_id`, `diseases.harvest_delay_days`; hapus `detection_plants` (scan lama tanpa tanaman: dibuatkan tanaman dari detection plant yang tertaut, sisanya dihapus atau diarsipkan; data uji boleh dibuang). Layanan `harvest_estimate` dan `disease_episode` dengan tes unit untuk semua aturan 8.4-8.6. Endpoint 10.5/10.6/10.8/10.10 baru; hapus `/detection-plants*`. Pengingat baru 12.1 dan job `complete_productive_period`. Seed `crop_profiles` dan basis penyakit 11.5. Perbarui `contracts/openapi.json` dan tes kontrak. |
-| **Vision/ML** | `POST /v1/predict` menerima `commodity_code` (default lama `chili`); manifest model per jenis; kelas 11.5; `invalid_reason`. Service berjalan di port 8001, stateless tanpa database; model aktif + shadow dimuat lewat `ModelRegistry`, reload via `POST /v1/models/reload`. Kumpulkan dan dokumentasikan dataset (`reports/datasets.md`), set uji lapangan, kalibrasi, laporan metrik per jenis. Pensiunkan model cabai dan ripeness. |
+| **Vision/ML** | `POST /v1/predict` menerima `commodity_code` (default `mango`); manifest model per jenis; kelas 11.5; `invalid_reason`. Service berjalan di port 8001, stateless tanpa database; model aktif + shadow dimuat lewat `ModelRegistry`, reload via `POST /v1/models/reload`. Kumpulkan dan dokumentasikan dataset (`reports/datasets.md`), set uji lapangan, kalibrasi, laporan metrik per jenis. Pensiunkan model cabai dan ripeness: **SELESAI**. |
 | **Frontend (`tanami-app`)** | Navigasi 5 tab baru (bagian 4); layar S06, S07, S10-S18; Kartu Perkiraan Panen, Timeline Fase, Kartu Konfirmasi Penyakit, Lencana Status Akhir, filter Riwayat Scan; hapus layar Daftar/History Deteksi; antrean offline untuk catatan panen. |
 | **Admin (`tanami-admin`)** | Ringkasan dengan status akhir dan statistik per jenis; Basis penyakit dengan filter jenis dan `harvest_delay_days`; layar Profil tanaman; `allowed_labels` per jenis di Tinjauan deteksi. |
-| **Dokumen** | `tqa.md` dan `architecture.md` sudah selaras dengan v2. Dokumen implementasi (`tanami-backend/README.md`, `tanami-backend/docs/data-model.md`, `contracts/API.md`, `models/README.md`, `tanami-admin/README.md`) diberi catatan status dan isinya diperbarui bersamaan dengan perubahan kodenya. Nomor bagian 1-18 sengaja dipertahankan agar referensi "design 10.6", "design 12.4", dll. di kode tetap menunjuk topik yang sama. Dokumen pendukung baru: `api-changelog.md`, `class-diagram.md`, `data-integration.md`, `panduan-dokumentasi.md`. Bagian 19 ditambahkan (bukan menggantikan nomor lama). |
+| **Dokumen** | `tqa.md` dan `architecture.md` sudah selaras dengan v2. Dokumen implementasi (`tanami-backend/README.md`, `tanami-backend/docs/data-model.md`, `contracts/API.md`, `models/README.md`) sudah diselaraskan dengan design v2
+(tiga komoditas; tanpa catatan "masih v0.3"). Nomor bagian 1-18 sengaja dipertahankan agar referensi "design 10.6", "design 12.4", dll. di kode tetap menunjuk topik yang sama. Dokumen pendukung baru: `api-changelog.md`, `class-diagram.md`, `data-integration.md`, `panduan-dokumentasi.md`. Bagian 19 ditambahkan (bukan menggantikan nomor lama). |

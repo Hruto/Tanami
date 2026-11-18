@@ -100,7 +100,6 @@ class QueueCounts(ApiModel):
 class DailyScans(ApiModel):
     day: date
     disease: int
-    ripeness: int
 
 
 class DiseaseCount(ApiModel):

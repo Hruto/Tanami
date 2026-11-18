@@ -13,7 +13,7 @@ import argparse
 import json
 from pathlib import Path
 
-from app.domain import ScanType, known_labels
+from app.domain import DISEASE_LABELS_BY_COMMODITY, ScanType, known_labels
 
 
 def build_fixture_onnx(output: Path, *, labels: list[str], input_size: int) -> None:
@@ -58,20 +58,24 @@ def build_fixture_onnx(output: Path, *, labels: list[str], input_size: int) -> N
 
 def main() -> int:
     parser = argparse.ArgumentParser(description=__doc__)
-    parser.add_argument("--scan-type", choices=["disease", "ripeness"], default="disease")
+    parser.add_argument(
+        "--commodity-code",
+        choices=sorted(DISEASE_LABELS_BY_COMMODITY),
+        default="mango",
+    )
     parser.add_argument("--version", required=True)
     parser.add_argument("--model-dir", type=Path, default=Path("models"))
     args = parser.parse_args()
 
-    scan_type = ScanType(args.scan_type)
+    labels = list(known_labels(ScanType.DISEASE, args.commodity_code))
     target = args.model_dir / args.version
-    build_fixture_onnx(target / "model.onnx", labels=list(known_labels(scan_type)), input_size=224)
+    build_fixture_onnx(target / "model.onnx", labels=labels, input_size=224)
     manifest = {
         "model_version": args.version,
-        "scan_type": scan_type.value,
-        "commodity_code": "chili",
+        "scan_type": ScanType.DISEASE.value,
+        "commodity_code": args.commodity_code,
         "artifact": "model.onnx",
-        "labels": list(known_labels(scan_type)),
+        "labels": labels,
         "input_size": 224,
         "input_name": "input",
         "output_name": "output",

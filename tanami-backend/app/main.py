@@ -52,7 +52,7 @@ from app.providers.weather import build_weather_provider
 logger = get_logger("app")
 
 DESCRIPTION = """
-API Tanami: autentikasi, lahan dan tanaman, scan penyakit dan kematangan,
+API Tanami: autentikasi, lahan dan tanaman, scan penyakit,
 riwayat, cuaca BMKG, reminder, forum, moderasi, dan basis pengetahuan penyakit.
 
 Semua respons memakai amplop `{"data": ...}`. Galat memakai

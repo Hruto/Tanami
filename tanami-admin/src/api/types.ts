@@ -35,7 +35,7 @@ export interface Overview {
   };
   detection: { active_detection_plants: number; scans_total: number; scans_7d: number };
   queues: { open_reports: number; feedback_pending: number };
-  scans_daily: { day: string; disease: number; ripeness: number }[];
+  scans_daily: { day: string; disease: number }[];
   scan_status_30d: Record<string, number>;
   top_diseases_30d: { code: string; name: string; count: number }[];
 }
@@ -59,7 +59,7 @@ export interface ReportedTarget {
 export interface FeedbackItem {
   id: string;
   scan_id: string;
-  scan_type: "disease" | "ripeness";
+  scan_type: "disease";
   image_url: string;
   model_version: string;
   predicted: Record<string, unknown> | null;

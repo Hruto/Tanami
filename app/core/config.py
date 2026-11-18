@@ -6,8 +6,17 @@ from typing import Literal
 from pydantic import Field, field_validator, model_validator
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
+from app.domain import DISEASE_LABELS_BY_COMMODITY
+
 Environment = Literal["local", "staging", "production"]
 ModelBackend = Literal["stub", "onnx"]
+
+# design.md 11.5 / TQA 8.4 naming: disease-<komoditas>-v<semver>.
+DEFAULT_DISEASE_MODEL_VERSIONS: dict[str, str] = {
+    "mango": "disease-mango-v0.1.0",
+    "citrus": "disease-citrus-v0.1.0",
+    "strawberry": "disease-strawberry-v0.1.0",
+}
 
 
 class Settings(BaseSettings):
@@ -26,13 +35,15 @@ class Settings(BaseSettings):
 
     model_backend: ModelBackend = "stub"
     model_dir: Path = Path("models")
-    commodity_code: str = "chili"
-    supported_commodities: tuple[str, ...] = ("chili",)
+    commodity_code: str = "mango"
+    supported_commodities: tuple[str, ...] = tuple(DISEASE_LABELS_BY_COMMODITY)
 
-    disease_model_version: str = "disease-chili-v0.1.0"
-    ripeness_model_version: str = "ripeness-chili-v0.1.0"
-    shadow_disease_model_version: str = ""
-    shadow_ripeness_model_version: str = ""
+    # One primary model per commodity. Shadow models are optional and keyed by
+    # the same commodity codes; an empty dict disables shadow scoring entirely.
+    disease_model_versions: dict[str, str] = Field(
+        default_factory=lambda: dict(DEFAULT_DISEASE_MODEL_VERSIONS)
+    )
+    shadow_model_versions: dict[str, str] = Field(default_factory=dict)
 
     max_upload_bytes: int = Field(default=8 * 1024 * 1024, gt=0)
     max_image_pixels: int = Field(default=40_000_000, gt=0)
@@ -71,6 +82,16 @@ class Settings(BaseSettings):
         if not value:
             msg = "supported_commodities tidak boleh kosong."
             raise ValueError(msg)
+        unknown = [code for code in value if code not in DISEASE_LABELS_BY_COMMODITY]
+        if unknown:
+            msg = (
+                f"komoditas tidak dikenal {unknown}; "
+                f"yang didukung: {list(DISEASE_LABELS_BY_COMMODITY)}."
+            )
+            raise ValueError(msg)
+        if len(set(value)) != len(value):
+            msg = "supported_commodities tidak boleh mengandung duplikat."
+            raise ValueError(msg)
         return value
 
     @model_validator(mode="after")
@@ -90,6 +111,18 @@ class Settings(BaseSettings):
                 f"{list(self.supported_commodities)}."
             )
             raise ValueError(msg)
+        missing = [
+            code for code in self.supported_commodities if not self.disease_model_versions.get(code)
+        ]
+        if missing:
+            msg = f"disease_model_versions belum memiliki versi untuk {missing}."
+            raise ValueError(msg)
+        unknown_shadow = [
+            code for code in self.shadow_model_versions if code not in self.supported_commodities
+        ]
+        if unknown_shadow:
+            msg = f"shadow_model_versions memuat komoditas yang tidak didukung: {unknown_shadow}."
+            raise ValueError(msg)
         if self.is_production and self.model_backend == "stub":
             msg = (
                 "VISION_MODEL_BACKEND=stub tidak diizinkan di production: "
@@ -103,6 +136,14 @@ class Settings(BaseSettings):
             msg = "VISION_SERVICE_TOKEN wajib diisi di production."
             raise ValueError(msg)
         return self
+
+    def model_version_for(self, commodity_code: str) -> str:
+        """Primary model version for ``commodity_code`` (validated at startup)."""
+        return self.disease_model_versions[commodity_code]
+
+    def shadow_version_for(self, commodity_code: str) -> str | None:
+        """Optional shadow version, or ``None`` when shadow scoring is disabled."""
+        return self.shadow_model_versions.get(commodity_code) or None
 
     @property
     def is_production(self) -> bool:

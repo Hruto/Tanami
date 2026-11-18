@@ -79,7 +79,7 @@ class Scan(Base):
 
     # Copied from the vision response for reporting and drift analysis.
     confidence: Mapped[float | None] = mapped_column(nullable=True)
-    commodity_code: Mapped[str] = mapped_column(String(32), nullable=False, server_default="chili")
+    commodity_code: Mapped[str] = mapped_column(String(32), nullable=False, server_default="mango")
     inference_ms: Mapped[float | None] = mapped_column(nullable=True)
 
     created_at: Mapped[datetime] = created_at_column()
@@ -107,7 +107,7 @@ class Scan(Base):
             "confidence IS NULL OR (confidence >= 0 AND confidence <= 1)",
             name="confidence_range",
         ),
-        # History per plant: "the last ripeness scan for this plant".
+        # History per plant: the newest scan for this plant.
         Index("ix_scans_plant_captured", "plant_id", text("captured_at DESC")),
         # Global history and keyset pagination per user.
         Index("ix_scans_user_created", "user_id", text("created_at DESC")),

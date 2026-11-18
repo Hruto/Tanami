@@ -40,7 +40,7 @@ async def test_wrong_method_and_bad_uuid(client: AsyncClient) -> None:
 
 async def test_disease_knowledge_base(client: AsyncClient) -> None:
     headers = auth_headers(await register(client))
-    listing = (await client.get("/api/v1/diseases?commodity_code=chili", headers=headers)).json()
+    listing = (await client.get("/api/v1/diseases?commodity_code=mango", headers=headers)).json()
     codes = {row["code"] for row in listing["data"]}
     assert {"healthy", "anthracnose", "bacterial_wilt"} <= codes
     detail = (await client.get("/api/v1/diseases/anthracnose", headers=headers)).json()["data"]

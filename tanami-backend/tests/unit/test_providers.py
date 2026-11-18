@@ -77,8 +77,8 @@ def vision_ok() -> dict[str, Any]:
         "data": {
             "type": "disease",
             "status": "confident",
-            "model_version": "disease-chili-v0.1.0",
-            "commodity_code": "chili",
+            "model_version": "disease-mango-v0.1.0",
+            "commodity_code": "mango",
             "confidence": 0.9,
             "quality": {"blur": "ok", "brightness": "ok"},
             "result": {"top": None, "alternatives": [], "is_healthy": None, "severity": None},
@@ -93,7 +93,7 @@ async def predict(client: VisionClient) -> Any:
         image=b"x",
         content_type="image/jpeg",
         client_uuid="u",
-        commodity_code="chili",
+        commodity_code="mango",
     )
 
 
@@ -105,7 +105,7 @@ async def test_vision_retries_503_then_succeeds() -> None:
         return httpx.Response(status, json=vision_ok() if status == 200 else {})
 
     client = VisionClient(settings(), transport=httpx.MockTransport(handler))
-    assert (await predict(client)).model_version == "disease-chili-v0.1.0"
+    assert (await predict(client)).model_version == "disease-mango-v0.1.0"
 
 
 async def test_vision_4xx_is_not_retried() -> None:

@@ -14,11 +14,9 @@ from pydantic import Field
 
 from app.domain import (
     CauseCategory,
-    EstimateConfidence,
     FeedbackValue,
     QualityStatus,
     ResultStatus,
-    RipenessStage,
     ScanType,
     Severity,
 )
@@ -63,18 +61,6 @@ class DiseaseResultOut(ApiModel):
     severity: Severity | None
     advice: AdviceOut | None = None
     quality: dict[str, QualityStatus] | None = None
-
-
-class RipenessResultOut(ApiModel):
-    stage: RipenessStage | None
-    stage_label: str | None
-    confidence: float | None
-    estimated_days_min: int | None
-    estimated_days_max: int | None
-    estimate_confidence: EstimateConfidence | None
-    estimated_harvest_date_min: date | None = None
-    estimated_harvest_date_max: date | None = None
-    note: str
 
 
 class ScanOut(ApiModel):

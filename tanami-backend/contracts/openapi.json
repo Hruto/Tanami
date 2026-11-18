@@ -259,8 +259,9 @@
             "title": "Plant Id"
           },
           "type": {
-            "$ref": "#/components/schemas/ScanType",
-            "default": "disease"
+            "default": "disease",
+            "title": "Type",
+            "type": "string"
           }
         },
         "required": [
@@ -619,16 +620,11 @@
           "disease": {
             "title": "Disease",
             "type": "integer"
-          },
-          "ripeness": {
-            "title": "Ripeness",
-            "type": "integer"
           }
         },
         "required": [
           "day",
-          "disease",
-          "ripeness"
+          "disease"
         ],
         "title": "DailyScans",
         "type": "object"
@@ -5397,8 +5393,7 @@
       },
       "ScanType": {
         "enum": [
-          "disease",
-          "ripeness"
+          "disease"
         ],
         "title": "ScanType",
         "type": "string"
@@ -5990,7 +5985,7 @@
     }
   },
   "info": {
-    "description": "API Tanami: autentikasi, lahan dan tanaman, scan penyakit dan kematangan,\nriwayat, cuaca BMKG, reminder, forum, moderasi, dan basis pengetahuan penyakit.\n\nSemua respons memakai amplop `{\"data\": ...}`. Galat memakai\n`{\"error\": {\"code\", \"message\", \"details\", \"request_id\"}}` dengan `message`\nberbahasa Indonesia yang layak ditampilkan ke pengguna.",
+    "description": "API Tanami: autentikasi, lahan dan tanaman, scan penyakit,\nriwayat, cuaca BMKG, reminder, forum, moderasi, dan basis pengetahuan penyakit.\n\nSemua respons memakai amplop `{\"data\": ...}`. Galat memakai\n`{\"error\": {\"code\", \"message\", \"details\", \"request_id\"}}` dengan `message`\nberbahasa Indonesia yang layak ditampilkan ke pengguna.",
     "title": "Tanami API",
     "version": "0.1.0"
   },

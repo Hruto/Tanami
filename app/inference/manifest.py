@@ -4,6 +4,8 @@ A manifest is written next to the exported artifact by the training pipeline
 (`tanami-ml`). The service refuses to load a model whose manifest disagrees
 with the contract, because a silent label-order mismatch produces confident
 but wrong diagnoses (TQA 8.4).
+
+In v2 every manifest belongs to exactly one commodity and to ``disease`` only.
 """
 
 from __future__ import annotations
@@ -14,7 +16,7 @@ from pathlib import Path
 from typing import Any
 
 from app.core.errors import ModelLoadError
-from app.domain import ScanType, known_labels
+from app.domain import DISEASE_LABELS_BY_COMMODITY, ScanType, known_labels
 
 
 @dataclass(frozen=True, slots=True)
@@ -40,7 +42,13 @@ def _require(data: dict[str, Any], key: str) -> Any:
     return data[key]
 
 
-def load_manifest(model_dir: Path, model_version: str, scan_type: ScanType) -> ModelManifest:
+def load_manifest(model_dir: Path, model_version: str, commodity_code: str) -> ModelManifest:
+    """Load ``model_version`` and assert it matches ``commodity_code``.
+
+    Both the manifest's own ``commodity_code`` and its label set must agree with
+    the requested commodity; otherwise an apple model could silently answer a
+    citrus request with confident but wrong labels.
+    """
     manifest_path = model_dir / model_version / "manifest.json"
     if not manifest_path.is_file():
         msg = f"manifest model tidak ditemukan: {manifest_path}"
@@ -52,21 +60,25 @@ def load_manifest(model_dir: Path, model_version: str, scan_type: ScanType) -> M
         msg = f"manifest model tidak dapat dibaca: {manifest_path}"
         raise ModelLoadError(msg) from exc
 
-    try:
-        manifest_scan_type = ScanType(str(_require(raw, "scan_type")))
-    except ValueError as exc:
-        msg = f"scan_type pada manifest {model_version} tidak dikenal"
-        raise ModelLoadError(msg) from exc
+    if commodity_code not in DISEASE_LABELS_BY_COMMODITY:
+        msg = f"komoditas '{commodity_code}' tidak didukung"
+        raise ModelLoadError(msg)
 
-    if manifest_scan_type is not scan_type:
+    raw_scan_type = str(_require(raw, "scan_type"))
+    if raw_scan_type != ScanType.DISEASE.value:
+        msg = f"scan_type pada manifest {model_version} tidak dikenal: {raw_scan_type}"
+        raise ModelLoadError(msg)
+
+    manifest_commodity = str(_require(raw, "commodity_code"))
+    if manifest_commodity != commodity_code:
         msg = (
-            f"manifest {model_version} bertipe {manifest_scan_type.value}, "
-            f"tetapi diminta sebagai {scan_type.value}"
+            f"manifest {model_version} untuk komoditas '{manifest_commodity}', "
+            f"tetapi diminta sebagai '{commodity_code}'"
         )
         raise ModelLoadError(msg)
 
     labels = tuple(str(item) for item in _require(raw, "labels"))
-    expected = known_labels(scan_type)
+    expected = known_labels(ScanType.DISEASE, commodity_code)
     if sorted(labels) != sorted(expected):
         msg = f"label pada manifest {model_version} tidak sesuai kontrak: {list(labels)}"
         raise ModelLoadError(msg)
@@ -96,8 +108,8 @@ def load_manifest(model_dir: Path, model_version: str, scan_type: ScanType) -> M
 
     return ModelManifest(
         model_version=str(_require(raw, "model_version")),
-        scan_type=manifest_scan_type,
-        commodity_code=str(_require(raw, "commodity_code")),
+        scan_type=ScanType.DISEASE,
+        commodity_code=manifest_commodity,
         artifact=artifact,
         labels=labels,
         input_size=input_size,

@@ -139,7 +139,6 @@ class OverviewService:
             DailyScans(
                 day=day,
                 disease=counts.get((day, ScanType.DISEASE.value), 0),
-                ripeness=counts.get((day, ScanType.RIPENESS.value), 0),
             )
             for day in (first + timedelta(days=offset) for offset in range(CHART_DAYS))
         ]

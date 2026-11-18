@@ -1,56 +1,62 @@
 # Model directory
 
-> **Status:** this document describes the code as implemented, which still follows `docs/design.md` **v0.3** (chili, separate detection list, ripeness scans). The target is `docs/design.md` **v2** (mango, citrus, strawberry); see its appendix "Dampak ke Implementasi" for the pending changes.
+> **Status:** dokumen ini mengikuti `docs/design.md` **v2** — tepat tiga komoditas
+> (`mango`, `citrus`, `strawberry`), hanya `type=disease`.
 
-> In v2 the folders become e.g. `disease-mango-v1.0.0/`, `disease-citrus-v1.0.0/`, `disease-strawberry-v1.0.0/`, and ripeness models are retired.
+> Folder aktif: `disease-mango-v0.1.0/`, `disease-citrus-v0.1.0/`, dan
+> `disease-strawberry-v0.1.0/`. Shadow opsional memakai versi `-v0.2.0-rc1`
+> per komoditas.
 
-Each version lives in its own folder and is discovered only through its
-`manifest.json`:
+Tiap versi hidup di folder sendiri dan ditemukan hanya lewat `manifest.json`:
 
 ```
 models/
-  disease-chili-v0.1.0/
+  disease-mango-v0.1.0/
     manifest.json
     model.onnx
-  ripeness-chili-v0.1.0/
+  disease-citrus-v0.1.0/
+    manifest.json
+    model.onnx
+  disease-strawberry-v0.1.0/
     manifest.json
     model.onnx
 ```
 
-`manifest.json` is written by the `tanami-ml` export step and is the only
-description of a model the service trusts:
+`manifest.json` ditulis oleh langkah ekspor `tanami-ml` dan merupakan satu-satunya
+deskripsi model yang dipercaya layanan:
 
 | field               | type     | notes                                                        |
 | ------------------- | -------- | ------------------------------------------------------------ |
-| `model_version`     | str      | must equal the folder name (TQA 8.4 naming: `<jenis>-<komoditas>-v<semver>`) |
-| `scan_type`         | str      | `disease` or `ripeness`                                      |
-| `commodity_code`    | str      | `chili` for the MVP                                          |
-| `artifact`          | str      | relative filename of the `.onnx` file                        |
-| `labels`            | string[] | output order; must match the contract label set exactly      |
-| `input_size`        | int      | square side length the model expects                         |
-| `input_name`        | str      | ONNX input tensor name                                       |
-| `output_name`       | str      | ONNX output tensor name (one score vector)                   |
-| `normalization`     | str      | `zero_one` (default) or `imagenet`                           |
-| `output_activation` | str      | `softmax` (default) or `none`                                |
-| `sha256`            | str      | artifact checksum, recorded for the audit trail              |
-| `metrics`           | object   | whatever the evaluation wrote; surfaced by `/healthz`        |
+| `model_version`     | str      | harus sama dengan nama folder (TQA 8.4: `<jenis>-<komoditas>-v<semver>`) |
+| `scan_type`         | str      | hanya `disease`                                              |
+| `commodity_code`    | str      | `mango` / `citrus` / `strawberry`; wajib sama dengan yang diminta |
+| `artifact`          | str      | nama berkas `.onnx` relatif terhadap folder versi             |
+| `labels`            | string[] | urutan output; harus sama persis dengan 11.5 untuk komoditas itu |
+| `input_size`        | int      | sisi kotak yang diharapkan model                             |
+| `input_name`        | str      | nama tensor input ONNX                                       |
+| `output_name`       | str      | nama tensor output ONNX (satu vektor skor)                   |
+| `normalization`     | str      | `zero_one` (default) atau `imagenet`                          |
+| `output_activation` | str      | `softmax` (default) atau `none`                              |
+| `sha256`            | str      | checksum artefak untuk jejak audit                           |
+| `metrics`           | object   | hasil evaluasi; ditampilkan `/healthz`                        |
 
-Example (a trained model):
+Contoh (model mango, 8 label sesuai `design.md` 11.5):
 
 ```json
 {
-  "model_version": "disease-chili-v0.1.0",
+  "model_version": "disease-mango-v0.1.0",
   "scan_type": "disease",
-  "commodity_code": "chili",
+  "commodity_code": "mango",
   "artifact": "model.onnx",
   "labels": [
     "healthy",
-    "anthracnose",
-    "cercospora_leaf_spot",
-    "bacterial_wilt",
-    "leaf_curl_virus",
-    "pest_damage",
-    "nutrient_deficiency"
+    "mango_anthracnose",
+    "mango_bacterial_canker",
+    "mango_die_back",
+    "mango_powdery_mildew",
+    "mango_sooty_mould",
+    "mango_gall_midge",
+    "mango_cutting_weevil"
   ],
   "input_size": 224,
   "input_name": "input",
@@ -58,10 +64,15 @@ Example (a trained model):
   "normalization": "zero_one",
   "output_activation": "softmax",
   "sha256": "<sha256 of model.onnx>",
-  "metrics": { "macro_f1": 0.83, "eval_set": "field-2026-10" }
+  "metrics": { "macro_f1": 0.83, "eval_set": "field-2026-11" }
 }
 ```
 
-The `stub` backend reads the same manifests, so the whole pipeline can be
-exercised before the first model exists (see `scripts/make_stub_models.py`).
-Stub mode is refused when `VISION_APP_ENV=production`.
+Lima kategori ML v2 (`sehat`, `jamur`, `bakteri`, `virus`, `lainnya`) adalah
+pengelompokan **training**, bukan label runtime; pemetaannya ada di `ml_labels`
+(`docs/data-integration.md`). Label runtime memakai kode penyakit berprefiks
+komoditas di `design.md` 11.5.
+
+Backend `stub` membaca manifest yang sama, sehingga seluruh alur bisa dijalankan
+sebelum model sungguhan tersedia (`scripts/make_stub_models.py`). Mode stub
+ditolak saat `VISION_APP_ENV=production`.

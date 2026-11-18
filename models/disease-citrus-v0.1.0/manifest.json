@@ -1,16 +1,14 @@
 {
-  "model_version": "disease-chili-v0.1.0",
+  "model_version": "disease-citrus-v0.1.0",
   "scan_type": "disease",
-  "commodity_code": "chili",
+  "commodity_code": "citrus",
   "artifact": "model.onnx",
   "labels": [
     "healthy",
-    "anthracnose",
-    "cercospora_leaf_spot",
-    "bacterial_wilt",
-    "leaf_curl_virus",
-    "pest_damage",
-    "nutrient_deficiency"
+    "citrus_canker",
+    "citrus_greening",
+    "citrus_black_spot",
+    "citrus_melanose"
   ],
   "input_size": 224,
   "input_name": "input",

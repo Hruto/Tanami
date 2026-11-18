@@ -1,13 +1,14 @@
 {
-  "model_version": "ripeness-chili-v0.1.0",
-  "scan_type": "ripeness",
-  "commodity_code": "chili",
+  "model_version": "disease-strawberry-v0.1.0",
+  "scan_type": "disease",
+  "commodity_code": "strawberry",
   "artifact": "model.onnx",
   "labels": [
-    "unripe",
-    "turning",
-    "ripe",
-    "overripe"
+    "healthy",
+    "strawberry_leaf_scorch",
+    "strawberry_leaf_spot",
+    "strawberry_angular_leaf_spot",
+    "strawberry_powdery_mildew"
   ],
   "input_size": 224,
   "input_name": "input",

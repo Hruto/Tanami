@@ -1,6 +1,6 @@
 """Reviewed disease knowledge base (``design.md`` 9.3, 11.5).
 
-One row per class in the model's label set, for chili. The advice text is what
+One row per class in the model's label set. The advice text is what
 the app shows next to a scan result; the model never writes it (TQA 8.3).
 
 Two editorial rules are enforced by the schema and repeated here so nobody adds
@@ -17,7 +17,7 @@ from dataclasses import dataclass, field
 from datetime import date
 from typing import Any
 
-COMMODITY = "chili"
+COMMODITY = "mango"
 
 # The review that signed off on this text. Bump both when the content changes.
 REVIEWED_BY = "Tim Agronomi Tanami"

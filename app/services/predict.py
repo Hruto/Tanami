@@ -3,6 +3,8 @@
 This module owns the whole lifecycle of one inference request: lookup, decode,
 blocking inference on a worker thread, thresholding, and metrics. Routes stay
 thin so the logic is testable without HTTP.
+
+v2 always produces a ``DiseaseResult``; the model is selected by commodity.
 """
 
 from __future__ import annotations
@@ -20,18 +22,8 @@ from app.core.metrics import INFERENCE_ERRORS, PREDICTION_LATENCY, PREDICTIONS_T
 from app.domain import ResultStatus, ScanType
 from app.inference.predictor import RawPrediction
 from app.inference.preprocessing import PreparedImage, decode_and_prepare
-from app.schemas.prediction import (
-    DiseaseResult,
-    PredictionData,
-    QualityInfo,
-    RipenessResult,
-)
-from app.services.decision import (
-    Thresholds,
-    build_disease_result,
-    build_ripeness_result,
-    decide_status,
-)
+from app.schemas.prediction import DiseaseResult, PredictionData, QualityInfo
+from app.services.decision import Thresholds, build_disease_result, decide_status
 from app.services.registry import LoadedModel, ModelRegistry
 
 logger = get_logger(__name__)
@@ -39,11 +31,11 @@ logger = get_logger(__name__)
 
 @dataclass(frozen=True, slots=True)
 class PredictCommand:
-    scan_type: ScanType
     image_bytes: bytes
     content_type: str | None
     commodity_code: str
     client_uuid: str | None = None
+    scan_type: ScanType = ScanType.DISEASE
 
 
 class PredictService:
@@ -69,7 +61,7 @@ class PredictService:
 
     async def predict(self, command: PredictCommand) -> PredictionData:
         started = time.perf_counter()
-        model = self._registry.primary(command.scan_type)
+        model = self._registry.primary(command.commodity_code)
 
         try:
             with anyio.fail_after(self._settings.inference_timeout_seconds):
@@ -90,7 +82,7 @@ class PredictService:
             INFERENCE_ERRORS.labels(reason="model_error").inc()
             logger.error(
                 "inference_failed",
-                scan_type=command.scan_type.value,
+                commodity_code=command.commodity_code,
                 model_version=model.version,
                 error=str(exc),
             )
@@ -100,7 +92,12 @@ class PredictService:
         top_confidence = ordered[0][1] if ordered else 0.0
         status = decide_status(top_confidence, prepared.quality, self._thresholds)
 
-        result = self._build_result(command.scan_type, prediction, status)
+        result: DiseaseResult = build_disease_result(
+            prediction,
+            commodity_code=command.commodity_code,
+            status=status,
+            top_k=self._settings.top_k,
+        )
 
         shadow_version, shadow_status = self._run_shadow(command, prepared)
 
@@ -124,16 +121,6 @@ class PredictService:
             inference_ms=prediction.inference_ms,
         )
 
-    def _build_result(
-        self,
-        scan_type: ScanType,
-        prediction: RawPrediction,
-        status: ResultStatus,
-    ) -> DiseaseResult | RipenessResult:
-        if scan_type is ScanType.DISEASE:
-            return build_disease_result(prediction, status=status, top_k=self._settings.top_k)
-        return build_ripeness_result(prediction, status=status)
-
     def _run_shadow(
         self, command: PredictCommand, prepared: PreparedImage
     ) -> tuple[str | None, ResultStatus | None]:
@@ -142,7 +129,7 @@ class PredictService:
         Recording both statuses is what makes the staging comparison in
         TQA 8.4 possible. Failures are logged and swallowed.
         """
-        shadow = self._registry.shadow(command.scan_type)
+        shadow = self._registry.shadow(command.commodity_code)
         if shadow is None:
             return None, None
 
@@ -153,7 +140,7 @@ class PredictService:
         except Exception as exc:  # a shadow failure must never break the request
             logger.warning(
                 "shadow_inference_failed",
-                scan_type=command.scan_type.value,
+                commodity_code=command.commodity_code,
                 model_version=shadow.version,
                 error=str(exc),
             )

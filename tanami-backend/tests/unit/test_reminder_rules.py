@@ -60,7 +60,7 @@ def plant(**overrides: object) -> PlantContext:
         "plant_id": uuid4(),
         "user_id": uuid4(),
         "farm_id": uuid4(),
-        "label": "Cabai Blok A",
+        "label": "Mangga Blok A",
         "health_status": "healthy",
         "expected_harvest_min": None,
         "last_scan_at": NOW,
@@ -172,7 +172,7 @@ def test_harvest_today_text() -> None:
         now=NOW,
         today=TODAY,
     )
-    assert [item.body for item in out] == ["Cabai Blok A diperkirakan sudah siap panen hari ini."]
+    assert [item.body for item in out] == ["Mangga Blok A diperkirakan sudah siap panen hari ini."]
 
 
 def test_quiet_forecast_creates_nothing() -> None:

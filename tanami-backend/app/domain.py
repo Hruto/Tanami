@@ -14,7 +14,6 @@ from app.core.errors import ValidationError
 
 class ScanType(StrEnum):
     DISEASE = "disease"
-    RIPENESS = "ripeness"
 
 
 class ResultStatus(StrEnum):
@@ -32,13 +31,6 @@ class CauseCategory(StrEnum):
     PEST = "pest"
     NUTRIENT_DEFICIENCY = "nutrient_deficiency"
     UNKNOWN = "unknown"
-
-
-class RipenessStage(StrEnum):
-    UNRIPE = "unripe"
-    TURNING = "turning"
-    RIPE = "ripe"
-    OVERRIPE = "overripe"
 
 
 class GrowthStage(StrEnum):
@@ -265,26 +257,6 @@ class PushState(StrEnum):
     EXPIRED = "expired"
 
 
-# Plant types for the tracking dropdown (requirement 1). Tracking works for any
-# of them; disease detection only for the commodities a model exists for.
-PLANT_TYPES: dict[str, str] = {
-    "chili": "Cabai",
-    "tomato": "Tomat",
-    "eggplant": "Terong",
-    "shallot": "Bawang Merah",
-    "cucumber": "Mentimun",
-    "long_bean": "Kacang Panjang",
-    "spinach": "Bayam",
-    "water_spinach": "Kangkung",
-    "mustard_greens": "Sawi",
-    "lettuce": "Selada",
-    "corn": "Jagung",
-    "rice": "Padi",
-    "strawberry": "Stroberi",
-    "other": "Lainnya",
-}
-COMMODITY_LABELS: dict[str, str] = PLANT_TYPES
-SUPPORTED_COMMODITIES: tuple[str, ...] = tuple(PLANT_TYPES)
 # Commodities the vision service has a model for (design 11.5).
 DETECTION_COMMODITIES: tuple[str, ...] = ("mango", "citrus", "strawberry")
 # design 13: one forum category per commodity plus "Umum".
@@ -344,13 +316,6 @@ DISEASE_LABELS: dict[str, str] = {
     "leaf_curl_virus": "Keriting Daun (Virus)",
     "pest_damage": "Kerusakan Akibat Hama",
     "nutrient_deficiency": "Kekurangan Hara",
-}
-
-RIPENESS_LABELS: dict[str, str] = {
-    RipenessStage.UNRIPE.value: "Mentah",
-    RipenessStage.TURNING.value: "Mengkal",
-    RipenessStage.RIPE.value: "Matang",
-    RipenessStage.OVERRIPE.value: "Terlalu Matang",
 }
 
 CAUSE_LABELS: dict[CauseCategory, str] = {
