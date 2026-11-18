@@ -4,7 +4,8 @@ Dokumen ini menjawab: **"database software dan database ML itu disatukan gimana?
 Status: **proposal desain** — tabel `ml_*` di bawah belum ada di migrasi saat ini.
 Bagian yang sudah ada di kode diberi tanda ✅; yang baru diberi tanda 🆕.
 Terkait `design.md` 8.3 (profil tanaman), 8.5 (delay), 11.1/11.2 (kontrak &
-status), 11.5 (kelas & dataset), 16 (struktur proyek), dan 17 (keputusan terbuka).
+status), 11.5 (kelas & dataset), 16 (struktur proyek), 17 (keputusan terbuka),
+dan **19 (draft 2 ML — rencana, belum runtime)**.
 
 ## 1. Fakta kondisi saat ini
 
@@ -14,7 +15,7 @@ status), 11.5 (kelas & dataset), 16 (struktur proyek), dan 17 (keputusan terbuka
 | Vision service ✅ | root `app/` (FastAPI) | **tidak ada** | Baca manifest dari folder `models/`, prediksi via ONNX/stub, tidak menyimpan hasil ke DB. |
 | Manifest model ✅ | `models/*/manifest.json` | file | `disease-mango-v0.1.0`, `disease-citrus-v0.1.0`, `disease-strawberry-v0.1.0`; `commodity_code` = `mango`/`citrus`/`strawberry`, 8/5/5 label (`design.md` 11.5). |
 | Backend ↔ vision ✅ | `tanami-backend/app/providers/vision.py` | HTTP + `Bearer` token | `POST /v1/predict` dengan `image`, `type`, `commodity_code`, `client_uuid`, header `Idempotency-Key`; `GET /readyz`; timeout 6s, retry 2× untuk 502/503/504; port 8001. |
-| Desain ML v2 ✅ | `design.md` bagian 19 | sudah didokumentasikan | Model per komoditas, 5 kategori training, fitur EfficientNet + handmade, ML klasik, artefak di Drive. |
+| Desain ML draft 2 ⚠️ | `design.md` bagian 19 | didokumentasikan, **belum diimplementasikan** | Output nama penyakit + status `sehat/sakit/tak_terdeteksi/foto_ditolak`, model per tanaman, tiga lapis tolak, `taxonomy.yaml`, artefak `.joblib` di Drive. Komoditas risetnya berbeda dari runtime (lihat 19.14). |
 
 Masalah yang sudah selesai dan yang masih tertunda:
 
@@ -24,8 +25,9 @@ Masalah yang sudah selesai dan yang masih tertunda:
    menyimpan (lihat §3.3 dan `design.md` 11.2).
 3. ⏳ `diseases.harvest_delay_days` masih `0` dan `crop_profiles.source` kosong;
    angka "delay penyakit" dan "target hasil" belum punya asal yang bisa diaudit.
-4. ⏳ Pemetaan resmi `model_label → disease_code` masih perlu diisi di `ml_labels`.
-   Lima kategori ML v2 adalah pengelompokan training, bukan label runtime.
+4. ⏳ Draft 2 ML memakai kontrak output yang **berbeda** dengan runtime. Perlu
+   keputusan: terjemahkan di backend atau ubah kontrak 11.3 (lihat §3.5).
+5. ⏳ Pemetaan resmi `model_label → disease_code` masih perlu diisi di `ml_labels`.
 
 ## 2. Prinsip penyatuan
 
@@ -63,7 +65,7 @@ Aturan:
 | `disease_episodes` | `plant_id`, `disease_code`, `started_at`, `ended_at` | Catatan penyakit yang mempengaruhi delay panen. |
 | `scans` | `plant_id`, `status`, `model_version`, `result`, `raw`, `client_uuid` | Tempat hasil prediksi disimpan. `raw` menyimpan response mentah vision; `client_uuid` dipakai sebagai idempotensi. |
 
-### 3.2 🆕 Tabel baru (usulan migrasi `0007_ml_integration.py`)
+### 3.2 🆕 Tabel baru (usulan migrasi `0008_ml_integration.py`)
 
 ```text
 ml_models
@@ -86,9 +88,9 @@ ml_labels
 ─────────
 id                   uuid PK
 model_version        text   -- FK logis ke ml_models.version
-model_code           text   -- "jamur" | "mango_anthracnose" | "healthy"
+model_code           text   -- "late_blight" | "mango_anthracnose" | "healthy" (nama penyakit kanonis)
 backend_disease_code text   -- "mango_anthracnose" | "citrus_canker" | "strawberry_leaf_scorch" | ... (nullable untuk sehat)
-backend_category     text   -- "sehat" | "jamur" | "bakteri" | "virus" | "lainnya" (pengelompokan training)
+backend_status       text   -- "sehat" | "sakit" | "tak_terdeteksi" | "foto_ditolak" (draft 2)
 display_label        text
 is_trainable         bool   -- true kecuali "kurang yakin"/"ditolak"
 urutan               int
@@ -120,33 +122,30 @@ created_at           timestamptz
 tanpa mengganti jawaban yang dipakai aplikasi (backend sudah punya field
 `shadow_model_version`/`shadow_status` di `VisionResult`).
 
-### 3.3 Pemetaan label ML v2 → kode backend
+### 3.3 Pemetaan nama penyakit draft 2 → kode backend
 
-Lima kategori di bawah adalah **pengelompokan internal training**. Label runtime
-adalah kode penyakit berprefiks komoditas di `design.md` 11.5; keduanya
-dihubungkan oleh `ml_labels`, bukan disamakan.
+Draft 2 **membuang** lima kategori `sehat/jamur/bakteri/virus/lainnya`. Outputnya
+adalah **nama penyakit kanonis** dari `taxonomy.yaml` per tanaman. Pemetaan ke
+kode runtime `design.md` 11.5 dilakukan lewat `ml_labels`, bukan disamakan.
 
-| Kategori ML v2 | `model_code` contoh | `backend_disease_code` | Catatan |
+| Draft 2 | `model_code` contoh | `backend_disease_code` | Catatan |
 |---|---|---|---|
-| `sehat` | `sehat` | `healthy` | Tidak membuka episode penyakit |
-| `jamur` | `jamur` | `mango_anthracnose`, `mango_powdery_mildew`, `citrus_black_spot`, `strawberry_leaf_scorch` | late blight masuk sini (oomycete) |
-| `bakteri` | `bakteri` | `mango_bacterial_canker`, `citrus_canker`, `citrus_greening`, `strawberry_angular_leaf_spot` | sesuai 11.5 |
-| `virus` | `virus` | (belum ada kode runtime) | perlu kode baru di `diseases` kalau dipakai |
-| `lainnya` | `lainnya` | `mango_gall_midge`, `mango_cutting_weevil` | keranjang sampah training; di runtime masuk `pest` |
+| `sehat` | `healthy` | `healthy` | Tidak membuka episode penyakit |
+| `sakit` + penyakit | `late_blight`, `anthracnose`, dll. | `mango_anthracnose`, `citrus_black_spot`, `strawberry_leaf_scorch`, dll. | Nama kanonis dari `taxonomy.yaml` → kode berprefiks komoditas |
+| `tak_terdeteksi` | `low_confidence`, `far_from_known` | `unknown` + `result.invalid_reason` | Bukan kelas penyakit; jangan dibuka episode |
+| `foto_ditolak` | `background_failed`, `no_leaf` | `invalid_image` | Status tolak, bukan penyakit |
 
 Mapping ini **versi-terikat**: jangan pernah menimpa mapping model lama. Model
 lama tetap memakai label aslinya sampai di-retire; jangan menimpa baris
-`ml_labels`-nya. Nilai `backend_category` mengikuti enum yang sudah ada di
-layanan vision (`healthy | fungus | bacteria | virus | pest |
-nutrient_deficiency | unknown`) — jangan mengarang kategori baru tanpa mengubah
-enum dan kontrak.
+`ml_labels`-nya. Nilai `backend_status` mengikuti kontrak draft 2
+(`sehat | sakit | tak_terdeteksi | foto_ditolak`) dan diterjemahkan ke status
+runtime seperti di §3.5.
 
 ✅ **Konflik status sudah diselesaikan:** layanan vision yang menentukan `status`
 (`decide_status()` di `app/services/decision.py`: `confident ≥ 0,75`,
 `uncertain ≥ 0,50`, kualitas gambar menang). Backend **hanya menyimpan** status
 itu di `scans` dan tidak menghitung ulang; frontend juga tidak. Ini mengikuti
-`design.md` 11.2 dan `contracts/API.md`.
-
+`design.md` 11.2 dan `contracts/API.md`. Status draft 2 **belum** dipakai runtime.
 
 ### 3.4 Penyelarasan komoditas — SELESAI
 
@@ -162,6 +161,28 @@ Dataset training di `design.md` 19.4 (tomat/pepaya/zukini/jeruk) adalah
 Daftar komoditas runtime ada di `tanami-backend/app/domain.py::COMMODITIES_V2`;
 jangan menambah kode baru diam-diam tanpa perubahan kontrak.
 
+
+### 3.5 ⚠️ Pemetaan kontrak draft 2 → kontrak runtime
+
+Draft 2 ML (`design.md` 19.10) belum dipakai kode manapun. Kalau nanti dipasang,
+backend harus menerjemahkan:
+
+| Draft 2 ML | Runtime sekarang (11.3 / `contracts/API.md`) | Catatan |
+|---|---|---|
+| `crop: "tomat"` | `commodity_code: "mango"` | Nama tanaman bebas vs kode komoditas tetap. Perlu daftar kanonik. |
+| `status: "sehat"` | `status: "confident"` + `result.top.disease_code = "healthy"` | Bukan status yang sama. |
+| `status: "sakit"` | `status: "confident"` + `result.top.disease_code = <kode 11.5>` | `disease` harus dipetakan ke kode berprefiks komoditas. |
+| `status: "tak_terdeteksi"` | `status: "unknown"` | `rejected_reason: low_confidence/far_from_known` bisa masuk `result.invalid_reason` atau `raw`. |
+| `status: "foto_ditolak"` | `status: "invalid_image"` | `background_failed`/`no_leaf` → `invalid_reason`. |
+| `disease` | `result.top.disease_code` | Butuh `taxonomy.yaml` → `ml_labels`. |
+| `confidence` | `confidence` | Sama. |
+| `top_k` | `result.alternatives` | Format beda (`{label,p}` vs `{disease_code,label,cause_category,confidence}`). |
+| `rejected_reason` | `result.invalid_reason` / `raw` | Perlu disepakati. |
+| envelope diputuskan tim | `{ "data": … }` | Draft 2 belum menyebut envelope. |
+
+**Belum diputuskan:** apakah terjemahan ini dilakukan di backend (disarankan,
+kontrak klien tidak berubah) atau kontrak 11.3 diubah mengikuti draft 2.
+Lihat `design.md` keputusan terbuka 21.
 
 ## 4. Alur data end-to-end (setelah integrasi)
 

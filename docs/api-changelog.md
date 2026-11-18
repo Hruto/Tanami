@@ -125,10 +125,10 @@ final res = await req.send();
 
 Backend mengirim ke model: `commodity_code` (hasil turunan: `mango`/`citrus`/
 `strawberry`) + gambar. Layanan vision menentukan `status` (`decide_status()`);
-backend hanya menyimpannya di `scans`. Desain ML v2 Memet memakai 5 kategori
-(`sehat`, `jamur`, `bakteri`, `virus`, `lainnya`) sebagai **pengelompokan
-training**, bukan label runtime. Runtime memakai kode penyakit `design.md` 11.5;
-pemetaannya ada di tabel `ml_labels` (`docs/data-integration.md` §3.3).
+backend hanya menyimpannya di `scans`. Desain ML Memet **draft 2** memakai
+output nama penyakit langsung + status `sehat/sakit/tak_terdeteksi/foto_ditolak`;
+ini **belum** dipakai runtime. Runtime memakai kode penyakit `design.md` 11.5;
+pemetaan dan konfliknya ada di `docs/data-integration.md` §3.3/§3.5.
 
 ## 7. Cara memperbarui dokumentasi ini
 
@@ -160,3 +160,26 @@ keputusan tiga komoditas. `contracts/openapi.json` tetap dihasilkan dari kode.
 Dampak klien: kirim `commodity_code` eksplisit, `type=disease`, dan jangan
 menghitung `status` sendiri. Karena enum dan arti `status` berubah, versi kontrak
 naik ke `2.0.0` (lihat `contracts/API.md` bagian 8).
+
+---
+
+## 9. Draft 2 ML — belum ada perubahan kontrak klien
+
+`design (4).md` (draft 2, Memet) **menggantikan** desain 5 kategori di
+`design.md` 19. Poin penting:
+
+| Draft 1 | Draft 2 |
+|---|---|
+| 5 kategori `sehat/jamur/bakteri/virus/lainnya` | kategori dibuang; output nama penyakit kanonis |
+| ≥150 gambar per kategori, mode ketat/loose | ≥100 gambar per penyakit, ≥4 penyakit per tanaman |
+| tanaman mengikuti komoditas app | tanaman dipilih dari jumlah penyakit di dataset (gelombang 1: tomat, padi, jagung, apel) |
+| satu ambang keyakinan | tiga lapis tolak: ambang, skor anomali, hard-negative |
+| `config.json` opsional | `config.json` wajib per tanaman (kelas, ambang, versi fitur) |
+
+Kontrak output draft 2 (`crop`, `status`, `disease`, `confidence`, `top_k`,
+`rejected_reason`) **tidak sama** dengan `POST /v1/predict` sekarang. Belum ada
+perubahan pada `contracts/openapi.json` atau klien. Sebelum diimplementasikan,
+harus diputuskan apakah backend menerjemahkan draft 2 ke kontrak 11.3 atau
+kontrak 11.3 diubah. Lihat `design.md` keputusan terbuka 21 dan
+`docs/data-integration.md` §3.5.
+

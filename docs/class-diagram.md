@@ -340,9 +340,9 @@ Manifest yang **aktif** adalah `disease-mango-v0.1.0`,
 `disease-citrus-v0.1.0`, dan `disease-strawberry-v0.1.0` (shadow opsional
 `-v0.2.0-rc1`), dengan label per komoditas sesuai `design.md` 11.5 (mango 8,
 citrus 5, strawberry 5). `StubPredictor` deterministik dan ditolak di
-production; produksi memakai `OnnxPredictor`. Lima kategori ML v2 adalah
-pengelompokan training, dipetakan via `ml_labels`. Lihat
-`docs/data-integration.md`.
+production; produksi memakai `OnnxPredictor`. Draft 2 ML (`design.md` 19)
+**belum mengubah class diagram ini** — kontrak outputnya masih perlu dipetakan
+atau disepakati (lihat `docs/data-integration.md` §3.5).
 
 ## 5. Kenapa ini OOP, bukan DFD
 
