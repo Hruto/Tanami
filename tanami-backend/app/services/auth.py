@@ -33,7 +33,14 @@ from app.core.security import (
 )
 from app.domain import UserRole
 from app.models.user import User
-from app.schemas.auth import LoginRequest, RegisterRequest, TokenPair
+from app.schemas.auth import (
+    LoginRequest,
+    ProfileUpdateOut,
+    RegisterRequest,
+    TokenPair,
+    UserUpdate,
+)
+from app.services.content import UserService
 
 logger = get_logger("auth")
 
@@ -240,8 +247,8 @@ class AuthService:
         await self.redis.delete(index_key)
         return len(session_ids)
 
-    async def change_password(self, user: User, current: str, new: str) -> TokenPair:
-        """Replace the password, log out every device, and keep this one in."""
+    @staticmethod
+    def _validate_password_change(user: User, current: str, new: str) -> None:
         if not verify_password(current, user.password_hash):
             raise ValidationError(
                 "Kata sandi saat ini salah.", details={"field": "current_password"}
@@ -251,8 +258,35 @@ class AuthService:
                 "Kata sandi baru harus berbeda dari yang lama.",
                 details={"field": "new_password"},
             )
+
+    async def change_password(self, user: User, current: str, new: str) -> TokenPair:
+        """Replace the password, log out every device, and keep this one in."""
+        self._validate_password_change(user, current, new)
         user.password_hash = hash_password(new)
         await self.revoke_all_sessions(user.id)
         tokens = await self._issue_tokens(user)
         await self.session.commit()
         return tokens
+
+    async def update_profile(self, user: User, payload: UserUpdate) -> ProfileUpdateOut:
+        """Satu transaksi: profil, opsional password, dan sesi/token baru."""
+        users = UserService(self.session)
+        data = payload.model_dump(
+            exclude_unset=True,
+            exclude={"current_password", "new_password"},
+        )
+        # Cek konflik identitas lebih dulu supaya 409 tidak menyisakan mutasi.
+        await users.ensure_identifier_free(user, data)
+
+        tokens: TokenPair | None = None
+        if payload.new_password is not None:
+            # Keduanya pasti ada berkat validator UserUpdate.
+            current = payload.current_password or ""
+            self._validate_password_change(user, current, payload.new_password)
+            user.password_hash = hash_password(payload.new_password)
+            await self.revoke_all_sessions(user.id)
+            tokens = await self._issue_tokens(user)
+
+        users.apply_update(user, data)
+        await self.session.commit()
+        return ProfileUpdateOut(**users.to_out(user).model_dump(), tokens=tokens)

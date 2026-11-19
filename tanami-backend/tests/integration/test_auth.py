@@ -82,29 +82,100 @@ async def test_spoofed_forwarded_for_does_not_bypass_login_limit(client: AsyncCl
     assert 429 in statuses
 
 
-async def test_password_change_logs_out_other_devices(client: AsyncClient) -> None:
-    first = await register(client, email="ganti@example.com")
-    second = await login(client, email="ganti@example.com")
-    url = "/api/v1/users/me/password"
-    wrong = await client.post(
-        url,
-        json={"current_password": "salah-123", "new_password": "sandi-baru-456"},
-        headers=auth_headers(first),
-    )
-    assert wrong.status_code == 400
-    changed = await client.post(
-        url,
-        json={"current_password": "sandi-keren-123", "new_password": "sandi-baru-456"},
+async def test_profile_update_changes_username_and_password_in_one_call(
+    client: AsyncClient,
+) -> None:
+    first = await register(client, email="satu@example.com", username="satu")
+    second = await login(client, email="satu@example.com")
+    changed = await client.patch(
+        "/api/v1/users/me",
+        json={
+            "username": "satu.baru",
+            "full_name": "Satu Baru",
+            "current_password": "sandi-keren-123",
+            "new_password": "sandi-baru-456",
+        },
         headers=auth_headers(first),
     )
     assert changed.status_code == 200
+    data = changed.json()["data"]
+    assert (data["username"], data["full_name"]) == ("satu.baru", "Satu Baru")
+    tokens = data["tokens"]
+    assert tokens["token_type"] == "bearer"
+    # Perangkat lain dicabut, perangkat yang sedang dipakai tetap hidup.
     assert (await client.get("/api/v1/users/me", headers=auth_headers(second))).status_code == 401
-    fresh = changed.json()["data"]
-    assert (await client.get("/api/v1/users/me", headers=auth_headers(fresh))).status_code == 200
-    relogin = await client.post(
-        "/api/v1/auth/login", json={"email": "ganti@example.com", "password": "sandi-baru-456"}
+    assert (await client.get("/api/v1/users/me", headers=auth_headers(tokens))).status_code == 200
+    old = await client.post(
+        "/api/v1/auth/login",
+        json={"email": "satu@example.com", "password": "sandi-keren-123"},
     )
-    assert relogin.status_code == 200
+    new = await client.post(
+        "/api/v1/auth/login",
+        json={"email": "satu@example.com", "password": "sandi-baru-456"},
+    )
+    assert old.status_code == 401
+    assert new.status_code == 200
+
+
+async def test_profile_update_password_fields_must_be_paired(client: AsyncClient) -> None:
+    tokens = await register(client, email="pasangan@example.com")
+    payloads = [
+        {"new_password": "sandi-baru-456"},
+        {"current_password": "sandi-keren-123"},
+    ]
+    for payload in payloads:
+        response = await client.patch(
+            "/api/v1/users/me", json=payload, headers=auth_headers(tokens)
+        )
+        assert response.status_code == 400
+        assert "berpasangan" in response.json()["error"]["message"]
+
+
+async def test_profile_update_wrong_password_does_not_mutate_profile(client: AsyncClient) -> None:
+    tokens = await register(client, email="salah@example.com", username="salah")
+    response = await client.patch(
+        "/api/v1/users/me",
+        json={
+            "username": "diganti",
+            "current_password": "salah-123",
+            "new_password": "sandi-baru-456",
+        },
+        headers=auth_headers(tokens),
+    )
+    assert response.status_code == 400
+    assert "Kata sandi saat ini salah" in response.json()["error"]["message"]
+    me = await client.get("/api/v1/users/me", headers=auth_headers(tokens))
+    assert me.json()["data"]["username"] == "salah"
+
+
+async def test_profile_update_conflict_does_not_change_password(client: AsyncClient) -> None:
+    await register(client, email="dipakai2@example.com", username="dipakai2")
+    tokens = await register(client, email="atomik@example.com", username="atomik")
+    response = await client.patch(
+        "/api/v1/users/me",
+        json={
+            "username": "dipakai2",
+            "current_password": "sandi-keren-123",
+            "new_password": "sandi-baru-456",
+        },
+        headers=auth_headers(tokens),
+    )
+    assert response.status_code == 409
+    still_old = await client.post(
+        "/api/v1/auth/login",
+        json={"email": "atomik@example.com", "password": "sandi-keren-123"},
+    )
+    assert still_old.status_code == 200
+
+
+async def test_legacy_password_endpoint_is_removed(client: AsyncClient) -> None:
+    tokens = await register(client, email="lama@example.com")
+    response = await client.post(
+        "/api/v1/users/me/password",
+        json={"current_password": "sandi-keren-123", "new_password": "sandi-baru-456"},
+        headers=auth_headers(tokens),
+    )
+    assert response.status_code == 404
 
 
 async def test_profile_update_and_identifier_conflict(client: AsyncClient) -> None:

@@ -75,7 +75,6 @@ DESIGN_ENDPOINTS: list[tuple[str, str]] = [
     ("post", "/forum/reports"),
     ("post", "/uploads/forum-image"),
     # Requirements v1 (design.md 0.2)
-    ("post", "/users/me/password"),
     ("get", "/devices"),
     ("get", "/plant-types"),
     ("get", "/plants"),

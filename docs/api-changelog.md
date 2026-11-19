@@ -5,7 +5,7 @@ Catatan resmi untuk tim frontend dan ML. Dua commit yang mendasari dokumen ini:
 - `2a53bea` — varietas bebas, umur pembibitan, placement per tanaman, progress panen, irigasi, kualitas panen
 - `22831aa` — create tanaman sekali kirim dengan thumbnail
 
-Kontrak tergenerate: `contracts/openapi.json` (**67 path**). Jangan menyalin contoh dari `docs/design.md` yang lama tanpa mengecek file ini.
+Kontrak tergenerate: `contracts/openapi.json` (**66 path**). Jangan menyalin contoh dari `docs/design.md` yang lama tanpa mengecek file ini.
 
 ---
 
@@ -21,6 +21,7 @@ Kontrak tergenerate: `contracts/openapi.json` (**67 path**). Jangan menyalin con
 | Hasil panen | `quality_note` string | `quality` (4 kategori) + `success_pct` | backend hitung persen & kategori |
 | Irigasi | jadwal statis | bisa diubah + riwayat + saran cuaca | klien kirim `schedule` |
 | Perkembangan | tidak ada ringkasan | `GET /plants/{id}/progress` | backend hitung dari profil + episode |
+| Update profil | dua endpoint (`PATCH /users/me` + `POST /users/me/password`) | satu `PATCH /users/me`, password opsional | klien kirim field profil + password sekaligus |
 
 ---
 
@@ -32,6 +33,7 @@ Kontrak tergenerate: `contracts/openapi.json` (**67 path**). Jangan menyalin con
 |---|---|---|
 | `DELETE` | `/api/v1/farms/{farm_id}` | tidak ada (data tidak dihapus) |
 | `DELETE` | `/api/v1/plants/{plant_id}` | `POST /api/v1/plants/{plant_id}/end` |
+| `POST` | `/api/v1/users/me/password` | `PATCH /api/v1/users/me` dengan `current_password` + `new_password` |
 
 ### Ditambah
 
@@ -53,6 +55,7 @@ Kontrak tergenerate: `contracts/openapi.json` (**67 path**). Jangan menyalin con
 | `PATCH` | `/api/v1/plants/{id}` | menerima `variety`, `nursery_started_at`, `placement` |
 | `POST` | `/api/v1/plants/{id}/harvests` | `quality` + `quantity_kg` + `note`; `quality_note` ditolak |
 | `PATCH` | `/api/v1/plants/{id}/harvests/{harvest_id}` | sama seperti di atas |
+| `PATCH` | `/api/v1/users/me` | menerima `current_password` + `new_password`; respons `data.tokens` saat sandi diganti |
 
 ---
 
@@ -182,4 +185,34 @@ perubahan pada `contracts/openapi.json` atau klien. Sebelum diimplementasikan,
 harus diputuskan apakah backend menerjemahkan draft 2 ke kontrak 11.3 atau
 kontrak 11.3 diubah. Lihat `design.md` keputusan terbuka 21 dan
 `docs/data-integration.md` §3.5.
+
+---
+
+## 10. Profil disatukan di `PATCH /api/v1/users/me`
+
+`POST /api/v1/users/me/password` **dihapus**. Frontend cukup memanggil
+`PATCH /api/v1/users/me` untuk mengubah profil dan/atau kata sandi.
+
+```http
+PATCH /api/v1/users/me
+Authorization: Bearer <access_token>
+Content-Type: application/json
+
+{
+  "username": "nama.baru",
+  "full_name": "Nama Baru",
+  "current_password": "***",
+  "new_password": "***"
+}
+```
+
+Aturan:
+
+- `current_password` dan `new_password` wajib berpasangan; kirim salah satu saja → `400`.
+- Tanpa kedua field, tetap `PATCH` biasa (`email`, `username`, `full_name`, `consent_training_data`) dan `data.tokens` bernilai `null`.
+- Password baru minimal 8 karakter dan harus berbeda dari lama.
+- Username/email bentrok → `409` dan tidak ada perubahan sama sekali, termasuk password.
+- Password lama salah → `400`, profil tidak berubah.
+- Saat password diganti, semua sesi dicabut dan `data.tokens` berisi token pair baru. **Frontend wajib menyimpan token ini**; header lama tidak lagi valid.
+
 

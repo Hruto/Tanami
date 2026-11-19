@@ -210,7 +210,7 @@ Daftar posting -> detail -> komentar / suka / laporkan. Buat posting: judul, isi
 | S19 | Detail Scan | `GET /scans/{id}` | Gambar dihapus |
 | S20 | Daftar/Detail Pengingat | `GET /reminders`, `GET /reminders/{id}`, `PATCH /reminders/{id}` | Kosong |
 | S21 | Forum - Daftar/Detail/Buat | `/forum/*` | Dilaporkan/dihapus, unggah gagal |
-| S22 | Akun dan Pengaturan | `GET/PATCH /users/me`, `POST /users/me/password`, `GET/PATCH /users/me/notification-settings` | |
+| S22 | Akun dan Pengaturan | `GET/PATCH /users/me` (profil + opsional password), `GET/PATCH /users/me/notification-settings` | |
 | S23 | Info Penyakit | `GET /diseases/{code}` | |
 | S24 | Sumber Data | `GET /crop-profiles` + statis | Atribusi BMKG, sumber profil tanaman, sumber dataset |
 
@@ -600,8 +600,7 @@ Konten ini **dibuat dan ditinjau ahli**. Tidak ada angka dosis sampai ada tinjau
 | POST | `/auth/login` | `{ "email" }` **atau** `{ "username" }` + `"password"` -> `{ "access_token", "refresh_token", "expires_in" }` |
 | POST | `/auth/refresh` | `{ "refresh_token" }` (token dirotasi) |
 | POST | `/auth/logout` | Mencabut refresh token |
-| GET/PATCH | `/users/me` | Profil; ubah `email`, `username`, `full_name`, `consent_training_data` |
-| POST | `/users/me/password` | `{ "current_password", "new_password" }`; perangkat lain logout, respons berisi token baru |
+| GET/PATCH | `/users/me` | Profil; ubah `email`, `username`, `full_name`, `consent_training_data`. Sertakan `current_password` + `new_password` untuk ganti sandi dalam satu permintaan; respons memuat `data.tokens` (simpan di klien) |
 | DELETE | `/users/me` | Hapus akun (dihapus permanen setelah 30 hari, `tqa.md` 9) |
 | GET/PATCH | `/users/me/notification-settings` | `enabled` per `reminder_type`, `quiet_hours_start/end`, `photo_reminder_days` (0-60, 0 = mati), `monitoring_reminder_days` |
 | GET/POST | `/devices` | Daftar / daftarkan token FCM `{ "fcm_token", "platform" }` |

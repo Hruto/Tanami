@@ -61,14 +61,14 @@ Everything in `design.md` section 10 is implemented and checked by `tests/contra
 | R3 Deteksi | `POST /detection-plants`, `POST /scans` with `detection_plant_id`, `GET /detection-plants/{id}`, `POST /detection-plants/{id}/end` |
 | R4 History Deteksi | `GET /detection-plants?status=ended`, `GET /scans/{id}`, `POST /detection-plants/{id}/reactivate` |
 | R5 Forum | `/forum/posts...`, `PUT/DELETE /forum/posts/{id}/like`, comments, reports |
-| R6 Profil | `GET/PATCH /users/me` (email, username, full name), `POST /users/me/password`, `/users/me/notification-settings` (`photo_reminder_days`, `monitoring_reminder_days`), `POST /auth/logout`, `DELETE /users/me` |
+| R6 Profil | `GET/PATCH /users/me` (email, username, full name, opsional `current_password` + `new_password`), `/users/me/notification-settings` (`photo_reminder_days`, `monitoring_reminder_days`), `POST /auth/logout`, `DELETE /users/me` |
 | R7 Pengingat | jobs `care_reminders` (watering/photo/monitoring), `GET /reminders`, `GET /home` |
 
 Staff and extra endpoints:
 
 | Endpoint | Who | Purpose |
 |---|---|---|
-| `POST /users/me/password` | user | Change password; other devices are logged out, a fresh token pair is returned |
+| `PATCH /users/me` | user | Ubah profil dan/atau password; token pair baru dikembalikan saat password diganti |
 | `GET/DELETE /devices...` | user | List / remove push devices |
 | `DELETE /forum/comments/{id}` | author, moderator | Remove a comment |
 | `GET /moderation/reports` | moderator, admin | Reported content awaiting review |

@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 from datetime import UTC, datetime
+from typing import Any
 from uuid import UUID
 
 from sqlalchemy import select
@@ -83,7 +84,13 @@ class UserService:
 
     async def update(self, user: User, payload: UserUpdate) -> UserOut:
         data = payload.model_dump(exclude_unset=True)
-        await self._ensure_identifier_free(user, data)
+        await self.ensure_identifier_free(user, data)
+        self.apply_update(user, data)
+        await self.session.commit()
+        return self._out(user)
+
+    def apply_update(self, user: User, data: dict[str, Any]) -> None:
+        """Terapkan perubahan profil tanpa commit (dipakai endpoint gabungan)."""
         if data.get("full_name"):
             user.full_name = data["full_name"]
         if data.get("username"):
@@ -94,10 +101,13 @@ class UserService:
             enabled = bool(data["consent_training_data"])
             user.consent_training_data = enabled
             user.consent_at = datetime.now(UTC) if enabled else None
-        await self.session.commit()
+        user.updated_at = datetime.now(UTC)
+
+    def to_out(self, user: User) -> UserOut:
+        """Versi publik dari _out, dipakai service lain."""
         return self._out(user)
 
-    async def _ensure_identifier_free(self, user: User, data: dict[str, object]) -> None:
+    async def ensure_identifier_free(self, user: User, data: dict[str, Any]) -> None:
         """409 instead of a unique-index violation (and a 500) on PATCH."""
         checks = []
         if data.get("email"):

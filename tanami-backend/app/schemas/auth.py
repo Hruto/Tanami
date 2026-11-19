@@ -66,11 +66,6 @@ class LoginRequest(ApiModel):
         return self
 
 
-class PasswordChange(ApiModel):
-    current_password: str = Field(min_length=1, max_length=128)
-    new_password: str = Field(min_length=_PASSWORD_MIN, max_length=128)
-
-
 class RefreshRequest(ApiModel):
     refresh_token: str = Field(min_length=10, max_length=512)
 
@@ -93,11 +88,19 @@ class UserOut(ApiModel):
     created_at: datetime
 
 
+class ProfileUpdateOut(UserOut):
+    """Hasil PATCH /users/me: profil + token baru saat password ikut diganti."""
+
+    tokens: TokenPair | None = None
+
+
 class UserUpdate(ApiModel):
     email: EmailStr | None = None
     username: str | None = Field(default=None, min_length=3, max_length=32)
     full_name: str | None = Field(default=None, min_length=1, max_length=80)
     consent_training_data: bool | None = None
+    current_password: str | None = Field(default=None, min_length=1, max_length=128)
+    new_password: str | None = Field(default=None, min_length=_PASSWORD_MIN, max_length=128)
 
     @field_validator("username")
     @classmethod
@@ -113,6 +116,15 @@ class UserUpdate(ApiModel):
     def _no_null_required(self) -> UserUpdate:
         if "email" in self.model_fields_set and self.email is None:
             raise ValidationError("Email tidak boleh dikosongkan.", details={"field": "email"})
+        return self
+
+    @model_validator(mode="after")
+    def _password_pair(self) -> UserUpdate:
+        if (self.current_password is None) != (self.new_password is None):
+            raise ValidationError(
+                "current_password dan new_password harus dikirim berpasangan.",
+                details={"field": "current_password/new_password"},
+            )
         return self
 
 

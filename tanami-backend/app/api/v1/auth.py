@@ -25,7 +25,7 @@ from app.schemas.auth import (
     LoginRequest,
     NotificationSettingsOut,
     NotificationSettingsUpdate,
-    PasswordChange,
+    ProfileUpdateOut,
     RefreshRequest,
     RegisterRequest,
     TokenPair,
@@ -105,21 +105,15 @@ async def me(user: CurrentUser, session: SessionDep) -> Envelope[UserOut]:
 
 @router.patch("/users/me")
 async def update_me(
-    payload: UserUpdate, user: CurrentUser, session: SessionDep
-) -> Envelope[UserOut]:
-    return Envelope(data=await UserService(session).update(user, payload))
+    payload: UserUpdate, user: CurrentUser, auth: AuthServiceDep
+) -> Envelope[ProfileUpdateOut]:
+    """Edit profil dan/atau password dalam satu permintaan.
 
-
-@router.post("/users/me/password")
-async def change_password(
-    payload: PasswordChange, user: CurrentUser, auth: AuthServiceDep
-) -> Envelope[TokenPair]:
-    """Change the password; every other device is logged out (TQA 9).
-
-    The response carries a fresh token pair so this device stays signed in.
+    Kirim ``current_password`` + ``new_password`` bersama field profil lain
+    untuk mengganti kata sandi. Response memuat ``data.tokens`` (token pair
+    baru) saat password diganti; frontend wajib menyimpannya.
     """
-    tokens = await auth.change_password(user, payload.current_password, payload.new_password)
-    return Envelope(data=tokens)
+    return Envelope(data=await auth.update_profile(user, payload))
 
 
 @router.delete("/users/me", status_code=status.HTTP_202_ACCEPTED)
