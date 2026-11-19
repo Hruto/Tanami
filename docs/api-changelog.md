@@ -210,6 +210,7 @@ Aturan:
 
 - `current_password` dan `new_password` wajib berpasangan; kirim salah satu saja → `400`.
 - Tanpa kedua field, tetap `PATCH` biasa (`email`, `username`, `full_name`, `consent_training_data`) dan `data.tokens` bernilai `null`.
+- **Foto/avatar profil belum ada:** tidak ada kolom `avatar`/`avatar_url`, tidak ada `multipart` di endpoint ini, dan tidak ada endpoint upload avatar. Jika frontend membutuhkannya, itu fitur baru (kolom + migrasi + upload + `avatar_url` di respons, lalu perbarui kontrak).
 - Password baru minimal 8 karakter dan harus berbeda dari lama.
 - Username/email bentrok → `409` dan tidak ada perubahan sama sekali, termasuk password.
 - Password lama salah → `400`, profil tidak berubah.

@@ -209,7 +209,7 @@ Lihat `design.md` keputusan terbuka 21.
 1. ✅ Komoditas sudah diputuskan (tiga buah); langkah ini selesai.
 2. Pastikan kode penyakit `design.md` 11.5 ada di seed `diseases` — jangan ubah
    kode lama yang masih dipakai mapping versi-terikat.
-3. Buat migrasi `0007_ml_integration.py` berisi 4 tabel di §3.2. Jalankan
+3. Buat migrasi `0008_ml_integration.py` berisi 4 tabel di §3.2. Jalankan
    `test_models_and_migrations_agree` untuk cek drift.
 4. Isi `ml_models` + `ml_labels` dari tiga manifest aktif (8/5/5 label sesuai
    11.5) sebagai data pertama — ini menguji mekanisme mapping tanpa mengubah model.

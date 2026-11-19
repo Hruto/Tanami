@@ -32,7 +32,7 @@ py -3.12 -m venv .venv
 .\.venv\Scripts\activate
 pip install -e ".[dev]"
 copy .env.example .env      # set TANAMI_JWT_SECRET (>= 32 chars)
-alembic upgrade head        # 0001 -> 0004
+alembic upgrade head        # 0001 -> 0007
 uvicorn app.asgi:app --reload --port 8000
 ```
 
@@ -55,13 +55,13 @@ Everything in `design.md` section 10 is implemented and checked by `tests/contra
 
 | Requirement | Endpoints |
 |---|---|
-| R0 Tambah Kebun | `POST/GET/PATCH/DELETE /farms...` (`placement`: `indoor`/`outdoor`), `/regions/search`, `/regions/resolve` |
-| R1 Tracking | `GET /plant-types`, `POST /farms/{id}/plants`, `GET/PATCH /plants/{id}` (`age_days`, `next_watering_on`), `/plants/{id}/photos`, `/plants/{id}/care-logs`, `POST /plants/{id}/end` |
+| R0 Tambah Kebun | `GET/POST /farms`, `GET/PATCH /farms/{id}` (tanpa `DELETE`; `placement` per tanaman), `/regions/search`, `/regions/resolve` |
+| R1 Tracking | `GET /plant-types`, `POST /farms/{id}/plants` atau `POST /farms/{id}/plants/with-photo` (multipart + thumbnail), `GET/PATCH /plants/{id}` (`age_days`, `next_watering_on`, `placement`), `PATCH /plants/{id}/irrigation`, `GET /plants/{id}/irrigation/history`, `GET /plants/{id}/irrigation-advice`, `GET /plants/{id}/progress`, `/plants/{id}/photos`, `/plants/{id}/care-logs`, `POST /plants/{id}/end` |
 | R2 History Tracking | `GET /plants?status=ended`, `GET /plants/{id}`, `GET /plants/{id}/timeline` |
-| R3 Deteksi | `POST /detection-plants`, `POST /scans` with `detection_plant_id`, `GET /detection-plants/{id}`, `POST /detection-plants/{id}/end` |
-| R4 History Deteksi | `GET /detection-plants?status=ended`, `GET /scans/{id}`, `POST /detection-plants/{id}/reactivate` |
+| R3 Deteksi | `POST /scans` (wajib `plant_id`), `GET /scans`, `GET /scans/{id}`, `POST /scans/{id}/confirm-disease` |
+| R4 History Deteksi | `GET /scans?status=&commodity_code=&disease_code=&plant_id=&from=&to=`, `PUT /scans/{id}/feedback`, `DELETE /scans/{id}` |
 | R5 Forum | `/forum/posts...`, `PUT/DELETE /forum/posts/{id}/like`, comments, reports |
-| R6 Profil | `GET/PATCH /users/me` (email, username, full name, opsional `current_password` + `new_password`), `/users/me/notification-settings` (`photo_reminder_days`, `monitoring_reminder_days`), `POST /auth/logout`, `DELETE /users/me` |
+| R6 Profil | `GET/PATCH /users/me` (email, username, full name, opsional `current_password` + `new_password`; **foto/avatar profil belum ada**), `/users/me/notification-settings` (`photo_reminder_days`, `monitoring_reminder_days`), `POST /auth/logout`, `DELETE /users/me` |
 | R7 Pengingat | jobs `care_reminders` (watering/photo/monitoring), `GET /reminders`, `GET /home` |
 
 Staff and extra endpoints:
@@ -137,7 +137,7 @@ app/
   providers/     vision client, storage, images, push (FCM v1), weather (BMKG)
   jobs/          APScheduler jobs
   data/          seed data (diseases, regions)
-migrations/      Alembic (0001-0004)
+migrations/      Alembic (0001-0007)
 contracts/       openapi.json (generated)
 tests/           unit / integration / contract
 ```

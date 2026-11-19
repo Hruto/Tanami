@@ -85,7 +85,7 @@ Perubahan stack setelah sprint 2 memerlukan persetujuan seluruh tim karena biaya
 
 **Struktur repo (saat ini):**
 - Repo `tanami`: root = layanan inferensi `tanami-vision`; folder `tanami-backend/` = API, database, job; folder `tanami-admin/` = ruang kerja tim (React + Vite + TypeScript, tanpa pustaka UI); `design.md` dan `tqa.md` di `docs/` (bersama `architecture.md`).
-- `tanami-app` (frontend), repo terpisah.
+- `mobile/` (frontend Flutter, repo ini) + `tanami-admin/` (ruang kerja tim, React + Vite + TypeScript).
 - `tanami-ml` (eksperimen, training, evaluasi, data card), repo terpisah atau digabung bila tim lebih nyaman.
 
 **Alur branch:** GitHub Flow.

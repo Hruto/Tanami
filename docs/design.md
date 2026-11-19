@@ -82,7 +82,7 @@ v2 mengubah **cara kerja tracking, scan, dan history**. Bagian lain (design syst
 | P0 | **Scan Penyakit Daun (R3, diubah)** | Pilih tanaman terdaftar -> foto daun -> nama penyakit, keyakinan %, gejala, pencegahan, penanganan; konfirmasi penyakit -> perkiraan panen bisa mundur |
 | P0 | **Riwayat Tanaman (R2)** dan **Riwayat Scan (R4, diubah)** | Riwayat Tanaman: tanaman yang selesai/dihentikan, status akhir, jumlah panen, alasan, penyakit. Riwayat Scan: semua hasil scan dengan filter penyakit, jenis tanaman, dan tanaman |
 | P1 | **Notifikasi dan Pengingat (R7)** | Siram, foto, pemantauan, tindak lanjut penyakit, **panen sudah dekat**, **cek catatan panen**, masa produktif hampir habis |
-| P1 | **Profil dan Pengaturan (R6)** | Email, username, nama lengkap, ganti password, periode pengingat, logout, hapus akun |
+| P1 | **Profil dan Pengaturan (R6)** | Email, username, nama lengkap, ganti password, periode pengingat, logout, hapus akun (foto profil belum ada) |
 | P2 | **Forum Komunitas (R5)** | Posting (teks + foto), lihat, komentar, suka, laporan dan moderasi |
 | P2 | **Cek cepat** | Scan tanpa memilih tanaman (pilih jenis saja); hasil ditampilkan, **tidak disimpan** |
 | Tambahan | Reminder cuaca BMKG | Hanya untuk kebun `outdoor`; memakai perkiraan panen dari 8.4 |
@@ -210,7 +210,7 @@ Daftar posting -> detail -> komentar / suka / laporkan. Buat posting: judul, isi
 | S19 | Detail Scan | `GET /scans/{id}` | Gambar dihapus |
 | S20 | Daftar/Detail Pengingat | `GET /reminders`, `GET /reminders/{id}`, `PATCH /reminders/{id}` | Kosong |
 | S21 | Forum - Daftar/Detail/Buat | `/forum/*` | Dilaporkan/dihapus, unggah gagal |
-| S22 | Akun dan Pengaturan | `GET/PATCH /users/me` (profil + opsional password), `GET/PATCH /users/me/notification-settings` | |
+| S22 | Akun dan Pengaturan | `GET/PATCH /users/me` (profil + opsional password), `GET/PATCH /users/me/notification-settings` | Foto profil belum ada |
 | S23 | Info Penyakit | `GET /diseases/{code}` | |
 | S24 | Sumber Data | `GET /crop-profiles` + statis | Atribusi BMKG, sumber profil tanaman, sumber dataset |
 
@@ -507,22 +507,24 @@ Semua tabel punya `id` (UUID), `created_at`, `updated_at` (`timestamptz`, UTC). 
 
 **users** (R6): `email` (unik, wajib), `username` (unik, `[a-z0-9_.]{3,32}`), `full_name`, `password_hash` (Argon2id), `role`, `consent_training_data`, `consent_at`, `notification_settings` (JSONB: sakelar per `reminder_type`, jam tenang, `photo_reminder_days`, `monitoring_reminder_days`), `deleted_at`, **`plant_code_seq`** (baru, JSONB penghitung kode per jenis).
 
-**farms** (R0): tidak berubah. `user_id`, `name`, `adm4_code`, `placement`, `lat`, `lon`, `area_m2`, `archived_at`.
+**farms** (R0): kolom DB tetap `user_id`, `name`, `adm4_code`, `placement`, `lat`, `lon`, `area_m2`, `archived_at`. **API tidak lagi menerima `placement`** (pindah ke tanaman) dan **tidak punya `DELETE`**; `placement`/`archived_at` hanya warisan skema.
 
 **crop_profiles** (baru): `commodity_code`, `planting_material` (unik bersama), `first_harvest_min_days`, `first_harvest_max_days`, `harvest_cycle_min_days`, `harvest_cycle_max_days`, `productive_years`, `harvest_pattern_note`, `source` (wajib sebelum rilis), `reviewed_by`, `reviewed_at`. Constraint: min <= maks, semua > 0.
 
 **plants** (R1, R2):
-- Tetap: `farm_id`, `commodity_code`, `label`, `variety`, `planted_at`, `health_status`, `irrigation_schedule`, `ended_at`, `end_note`.
-- **Baru:** `code` (unik per pengguna), `planting_material`, `quantity` (int >= 1, default 1), `productive_until` (date, dihitung saat dibuat atau saat `planted_at`/`planting_material` diubah), `end_reason` (enum baru), `end_disease_codes` (text[], hanya untuk `disease`), `end_cause_note`, `outcome`.
+- Tetap: `farm_id`, `commodity_code`, `label`, `variety`, `planting_material`, `nursery_started_at`, `planted_at`, `placement`, `quantity`, `irrigation_schedule`, `productive_until`, `health_status`, `ended_at`, `end_reason`, `end_note`, `end_disease_codes`, `end_cause_note`, `outcome`.
+- **Baru pasca-rapat:** `nursery_started_at` (dasar umur), `placement` per tanaman, `quantity` (int >= 1, default 1), `productive_until` (dihitung saat dibuat atau saat tanggal/bahan tanam berubah), `end_reason` (enum baru), `end_disease_codes` (text[], hanya untuk `disease`), `end_cause_note`, `outcome`.
 - **Dihapus:** `growth_stage`, `final_result`, `yield_percent`, `expected_harvest_min/max`.
 - Nilai turunan (`lifecycle_phase`, `next_harvest`, `harvest_count`) **dihitung saat dibaca**, tidak disimpan, agar tidak basi.
-- Constraint: `ended_at`, `end_reason`, dan `outcome` kosong bersamaan atau terisi bersamaan; `end_disease_codes` tidak kosong atau `end_cause_note` terisi bila `end_reason = 'disease'`; `planted_at` tidak di masa depan (dicek di service karena bergantung zona waktu).
+- Constraint: `ended_at`, `end_reason`, dan `outcome` kosong bersamaan atau terisi bersamaan; `end_disease_codes` tidak kosong atau `end_cause_note` terisi bila `end_reason = 'disease'`; `planted_at` tidak di masa depan dan tidak lebih awal dari `nursery_started_at` (dicek di service karena bergantung zona waktu).
 
-**harvest_records**: `plant_id`, `recorded_by`, `harvested_at`, `quantity_kg`, `quality_note`, **`sequence`** (baru; unik per `plant_id`; diberikan backend = panen ke-n berdasarkan urutan `harvested_at`, dinomori ulang bila catatan dihapus atau tanggalnya diubah).
+**harvest_records**: `plant_id`, `recorded_by`, `harvested_at`, `quantity_kg`, **`quality`** (`gagal`/`kurang_optimal`/`normal`/`panen_raya`), **`success_pct`** (`quantity_kg ÷ EXPECTED_YIELD_KG[commodity] × 100`), **`sequence`** (unik per `plant_id`; diberikan backend = panen ke-n), `quality_note` (warisan, tidak dipakai API baru).
 
 **disease_episodes** (baru): `plant_id`, `disease_code`, `status` (`open`/`resolved`), `opened_at`, `opened_by_scan_id` (boleh null bila scan dihapus), `last_seen_at`, `delay_days` (salinan saat dibuka), `resolved_at`, `close_reason`. Indeks unik parsial: satu episode `open` per (`plant_id`, `disease_code`).
 
 **plant_photos** (R1), **care_logs** (R2): tidak berubah.
+
+**irrigation_changes** (pasca-rapat): `plant_id`, `changed_by`, `changed_at`, `from_schedule`, `to_schedule`, `reason` (opsional). Dipakai `PATCH /plants/{id}/irrigation` dan `GET /plants/{id}/irrigation/history`; saran sistem boleh ditimpa pengguna.
 
 **scans**: `user_id`, **`plant_id` wajib (NOT NULL)**, **`disease_episode_id`** (baru, opsional: terisi bila scan ini dikonfirmasi), `commodity_code` (disalin dari tanaman), `scan_type` (`disease`), `image_key`, `client_uuid` (idempoten), `captured_at`, `status`, `model_version`, `result` (JSONB, bagian 11), `disease_code`, `quality`, `confidence`. **Dihapus:** `detection_plant_id`. Cek cepat **tidak** membuat baris di tabel ini.
 
@@ -600,7 +602,7 @@ Konten ini **dibuat dan ditinjau ahli**. Tidak ada angka dosis sampai ada tinjau
 | POST | `/auth/login` | `{ "email" }` **atau** `{ "username" }` + `"password"` -> `{ "access_token", "refresh_token", "expires_in" }` |
 | POST | `/auth/refresh` | `{ "refresh_token" }` (token dirotasi) |
 | POST | `/auth/logout` | Mencabut refresh token |
-| GET/PATCH | `/users/me` | Profil; ubah `email`, `username`, `full_name`, `consent_training_data`. Sertakan `current_password` + `new_password` untuk ganti sandi dalam satu permintaan; respons memuat `data.tokens` (simpan di klien) |
+| GET/PATCH | `/users/me` | Profil; ubah `email`, `username`, `full_name`, `consent_training_data`. Sertakan `current_password` + `new_password` untuk ganti sandi dalam satu permintaan; respons memuat `data.tokens` (simpan di klien). **Foto/avatar profil belum ada di v0.3** |
 | DELETE | `/users/me` | Hapus akun (dihapus permanen setelah 30 hari, `tqa.md` 9) |
 | GET/PATCH | `/users/me/notification-settings` | `enabled` per `reminder_type`, `quiet_hours_start/end`, `photo_reminder_days` (0-60, 0 = mati), `monitoring_reminder_days` |
 | GET/POST | `/devices` | Daftar / daftarkan token FCM `{ "fcm_token", "platform" }` |
@@ -610,16 +612,20 @@ Konten ini **dibuat dan ditinjau ahli**. Tidak ada angka dosis sampai ada tinjau
 
 | Metode | Path | Keterangan |
 |---|---|---|
-| GET/POST | `/farms` | Daftar / buat kebun `{ "name", "adm4_code", "placement", "lat"?, "lon"?, "area_m2"? }` |
-| GET/PATCH/DELETE | `/farms/{farm_id}` | Detail / ubah / arsipkan (tanaman aktifnya diakhiri dengan alasan `other`, catatan "Kebun diarsipkan") |
+| GET/POST | `/farms` | Daftar / buat kebun `{ "name", "adm4_code", "lat"?, "lon"?, "area_m2"? }`. `placement` **tidak diterima** (pindah ke tanaman) |
+| GET/PATCH | `/farms/{farm_id}` | Detail / ubah. **Tidak ada `DELETE`**; data kebun tidak dihapus |
 | GET | `/plant-types` | `[{ code, label, detection_supported, materials: [{ code, label, is_default }], profile_summary }]` |
-| GET/POST | `/farms/{farm_id}/plants` | Daftar / buat tanaman `{ "label", "commodity_code", "planting_material", "planted_at", "quantity"?, "variety"?, "irrigation_schedule" }` |
+| GET/POST | `/farms/{farm_id}/plants` | Daftar / buat tanaman `{ "label", "variety", "nursery_started_at", "placement"?, "planted_at"?, "planting_material"?, "quantity"?, "irrigation_schedule"? }`. `commodity_code` ditolak; backend menurunkannya dari `variety` |
+| POST | `/farms/{farm_id}/plants/with-photo` | Sama seperti di atas, `multipart/form-data` + `photo` opsional. Foto divalidasi sebelum create dan langsung menjadi `cover_photo_url` |
 | GET | `/plants?status=active\|ended&commodity_code=&outcome=&cursor=` | Tanaman aktif (Tracking) atau diakhiri (Riwayat Tanaman) |
-| GET/PATCH | `/plants/{plant_id}` | Detail (lihat contoh) / ubah `label`, `variety`, `quantity`, `irrigation_schedule`, `planted_at`, `planting_material` (perkiraan dihitung ulang) |
+| GET/PATCH | `/plants/{plant_id}` | Detail / ubah `label`, `variety`, `nursery_started_at`, `planted_at`, `placement`, `quantity`, `irrigation_schedule`, `planting_material` (perkiraan dihitung ulang) |
 | POST | `/plants/{plant_id}/end` | `{ "reason", "disease_codes"?, "cause_note"?, "note"? }` (aturan 8.6) -> tanaman dengan `outcome` |
-| DELETE | `/plants/{plant_id}` | Singkatan akhiri tracking dengan alasan `other` |
-| GET/POST | `/plants/{plant_id}/harvests` | Daftar panen (urut `sequence`) / catat panen `{ "harvested_at"?, "quantity_kg"?, "quality_note"? }` -> `{ id, sequence, ..., "next_harvest": {...} }` |
+| GET/POST | `/plants/{plant_id}/harvests` | Daftar panen (urut `sequence`) / catat panen `{ "harvested_at"?, "quantity_kg"?, "quality"?, "note"? }` -> `{ id, sequence, ..., "quality_label", "success_pct", "next_harvest" }` |
 | PATCH/DELETE | `/plants/{plant_id}/harvests/{harvest_id}` | Ubah / hapus catatan panen (nomor urut dihitung ulang) |
+| PATCH | `/plants/{plant_id}/irrigation` | `{ "schedule", "reason"? }`; perubahan dicatat di `irrigation_changes` |
+| GET | `/plants/{plant_id}/irrigation/history` | Riwayat perubahan jadwal, terbaru dulu |
+| GET | `/plants/{plant_id}/irrigation-advice` | Saran sistem; `weather_used: false` untuk indoor |
+| GET | `/plants/{plant_id}/progress` | Umur, fase, persen menuju panen, keterlambatan penyakit |
 | GET | `/plants/{plant_id}/disease-episodes?status=` | Episode penyakit tanaman, masing-masing dengan `scan_ids` |
 | PATCH | `/disease-episodes/{episode_id}` | `{ "status": "resolved" }` -> `close_reason = user_marked_healed` |
 | GET/POST | `/plants/{plant_id}/photos` | Foto perkembangan (multipart `image`, `caption`?, `taken_at`?) |
@@ -636,7 +642,8 @@ Potongan `GET /plants/{id}` (tanaman aktif):
   "id": "7c2a...", "code": "MGA-001", "label": "Mangga Depan Rumah",
   "commodity_code": "mango", "commodity_label": "Mangga", "variety": "Harum Manis",
   "planting_material": "grafted", "quantity": 1,
-  "planted_at": "2021-08-01", "age_days": 1926,
+  "nursery_started_at": "2021-06-01", "planted_at": "2021-08-01", "age_days": 1926,
+  "placement": "outdoor", "cover_photo_url": "https://cdn.example/plant.jpg",
   "lifecycle_phase": "productive", "productive_until": "2061-08-01",
   "health_status": "sick",
   "harvest_count": 2, "last_harvest_at": "2025-12-10",
@@ -1061,7 +1068,7 @@ app/
                      # admin, maintenance
   providers/         # vision client, storage, images, push (FCM v1), weather (BMKG)
   jobs/              # scheduler (bagian 12.3)
-migrations/          # Alembic 0001-0004 (v0.3) + 0005 (v2)
+migrations/          # Alembic 0001-0007 (0001-0004 v0.3, 0005 v2, 0006 pasca-rapat, 0007 default scan)
 contracts/           # openapi.json (dibuat otomatis)
 tests/
   unit/ integration/ contract/
@@ -1070,16 +1077,15 @@ docs/                # data-model.md, backend-audit.md, adr/
 
 **Layanan vision (`tanami-vision`, root repo)**: inferensi stateless, ONNX Runtime, manifest model **per jenis tanaman**; `POST /predict` menerima `commodity_code`.
 
-**Frontend (`tanami-app`)**
+**Frontend (`mobile/`, Flutter)**
 ```
-src/
-  app/               # rute/layar (expo-router)
-  features/          # auth, gardens, plants (tracking + panen + episode), scan, history, reminders,
-                     # forum, profile
-  components/        # komponen design system
-  api/               # klien API + tipe hasil generate dari openapi.json
-  hooks/  stores/  offline/  theme/  i18n/  utils/
+lib/
+  core/              # api client/config, token storage, tema, konstanta
+  features/          # auth (sudah ada); rencana: gardens, plants, scan, history,
+                     # reminders, forum, profile
+  main.dart
 ```
+Saat ini `mobile/` baru memuat alur auth (welcome/login/register) + API client; layar fitur lain menyusul. Kontrak API diambil dari `tanami-backend/contracts/openapi.json`.
 
 **ML (`tanami-ml`)**
 ```
@@ -1130,7 +1136,8 @@ data/  notebooks/  src/  configs/  reports/   # reports/datasets.md wajib (sumbe
 | 0.3 | 2026-11-08 | Ruang kerja tim `tanami-admin` (10.11) dan endpoint staf. | Tim |
 | 2.0 | 2026-11-09 | Fokus mangga/jeruk/stroberi. Tracking berbasis profil tanaman (8.3-8.4) dengan panen bertahap dan perkiraan panen berupa rentang. Episode penyakit dan keterlambatan panen (8.5). Akhiri tracking dengan alasan baru dan status akhir (8.6), selesai otomatis saat masa produktif habis. Scan wajib memilih tanaman; `detection_plants` dihapus; Cek cepat tanpa simpan. Riwayat Tanaman + Riwayat Scan dengan filter. Kontrak ML per jenis tanaman, kelas dan dataset baru, kalibrasi wajib (11). Scan kematangan dan `final_result` dipensiunkan. | Tim |
 | 2.1 | 2026-11-17 | Pasca-rapat: varietas teks bebas sebagai input, umur dari tanggal mulai pembibitan, `placement` per tanaman, arsip dihapus, progress panen + kualitas hasil, irigasi bisa diubah, thumbnail sekali kirim. Desain ML v2 Memet ditambahkan sebagai bagian 19; pemetaan database aplikasi ↔ ML di `docs/data-integration.md`. | Tim |
-| 2.2 | 2026-11-17 | Bagian 19 diperbarui ke **draft 2** ML: 4/5 kategori dibuang, output nama penyakit langsung, mekanisme tolak tiga lapis, gelombang 1 tomat/padi/jagung/apel, `taxonomy.yaml`, kontrak output baru. Konflik dengan runtime dicatat di 19.14 dan keputusan terbuka 19-22. | Tim |
+| 2.2 | 2026-11-17 | Bagian 19 diperbarui ke **draft 2** ML: 4/5 kategori dibuang, output nama penyakit langsung, mekanisme tolak tiga lapis, gelombang 1 tomat/padi/jagung/apel, `taxonomy.yaml`, kontrak output baru. Konflik dengan runtime dicatat di 19.14 dan keputusan terbuka 19-22. |
+| 2.3 | 2026-11-19 | `PATCH /users/me` menyatukan edit profil + password (`current_password`/`new_password`, respons `data.tokens`); `POST /users/me/password` dihapus. `data-model.md` diregenerasi dari `Base.metadata`; migrasi `0001`–`0007`; `mobile/` (Flutter) jadi satu-satunya klien mobile di repo. | Tim |
 
 ---
 
@@ -1407,9 +1414,8 @@ Kode sudah selaras dengan design v2 (tiga komoditas). Rincian pekerjaan per tim:
 
 | Tim | Pekerjaan |
 |---|---|
-| **Backend** | Migrasi `0005`: tabel `crop_profiles` dan `disease_episodes`; ubah `plants` (kolom baru/dihapus 9.2), `harvest_records.sequence`, `scans.plant_id` NOT NULL + `disease_episode_id`, `diseases.harvest_delay_days`; hapus `detection_plants` (scan lama tanpa tanaman: dibuatkan tanaman dari detection plant yang tertaut, sisanya dihapus atau diarsipkan; data uji boleh dibuang). Layanan `harvest_estimate` dan `disease_episode` dengan tes unit untuk semua aturan 8.4-8.6. Endpoint 10.5/10.6/10.8/10.10 baru; hapus `/detection-plants*`. Pengingat baru 12.1 dan job `complete_productive_period`. Seed `crop_profiles` dan basis penyakit 11.5. Perbarui `contracts/openapi.json` dan tes kontrak. |
+| **Backend** | Migrasi `0001`–`0007`: `0005` (crop_profiles, disease_episodes, plants v2, hapus detection_plants), `0006` (nursery_started_at, placement per tanaman, irrigation_changes, quality/success_pct), `0007` (default `scans.commodity_code` → `mango`). Endpoint 10.5/10.6/10.8/10.10; hapus `/detection-plants*`; `PATCH /users/me` menangani profil + password dalam satu permintaan. Perbarui `contracts/openapi.json` dan tes kontrak. |
 | **Vision/ML** | `POST /v1/predict` menerima `commodity_code` (default `mango`); manifest model per jenis; kelas 11.5; `invalid_reason`. Service berjalan di port 8001, stateless tanpa database; model aktif + shadow dimuat lewat `ModelRegistry`, reload via `POST /v1/models/reload`. Model cabai dan ripeness dipensiunkan: **SELESAI**. Rencana berikutnya mengikuti draft 2 (bagian 19): `00_audit` untuk tomat/padi/jagung/apel, `taxonomy.yaml`, tiga lapis tolak, kontrak output baru—**belum diimplementasikan**, menunggu keputusan terbuka 19-22. |
-| **Frontend (`tanami-app`)** | Navigasi 5 tab baru (bagian 4); layar S06, S07, S10-S18; Kartu Perkiraan Panen, Timeline Fase, Kartu Konfirmasi Penyakit, Lencana Status Akhir, filter Riwayat Scan; hapus layar Daftar/History Deteksi; antrean offline untuk catatan panen. |
+| **Frontend (`mobile/`, Flutter)** | Navigasi 5 tab baru (bagian 4); layar S06, S07, S10-S18; Kartu Perkiraan Panen, Timeline Fase, Kartu Konfirmasi Penyakit, Lencana Status Akhir, filter Riwayat Scan; hapus layar Daftar/History Deteksi; antrean offline untuk catatan panen. Saat ini baru auth (welcome/login/register). |
 | **Admin (`tanami-admin`)** | Ringkasan dengan status akhir dan statistik per jenis; Basis penyakit dengan filter jenis dan `harvest_delay_days`; layar Profil tanaman; `allowed_labels` per jenis di Tinjauan deteksi. |
-| **Dokumen** | `tqa.md` dan `architecture.md` sudah selaras dengan v2. Dokumen implementasi (`tanami-backend/README.md`, `tanami-backend/docs/data-model.md`, `contracts/API.md`, `models/README.md`) sudah diselaraskan dengan design v2
-(tiga komoditas; tanpa catatan "masih v0.3"). Nomor bagian 1-18 sengaja dipertahankan agar referensi "design 10.6", "design 12.4", dll. di kode tetap menunjuk topik yang sama. Dokumen pendukung baru: `api-changelog.md`, `class-diagram.md`, `data-integration.md`, `panduan-dokumentasi.md`. Bagian 19 ditambahkan (bukan menggantikan nomor lama). |
+| **Dokumen** | `tqa.md`, `architecture.md`, `tanami-backend/README.md`, dan `tanami-backend/docs/data-model.md` diselaraskan dengan kode terbaru (tiga komoditas; `PATCH /users/me` untuk profil+password; migrasi `0001`–`0007`; tanpa `detection_plants`/arsip). Nomor bagian 1-18 dipertahankan agar referensi "design 10.6"/"12.4" tetap valid. Dokumen pendukung: `api-changelog.md`, `class-diagram.md`, `data-integration.md`, `panduan-dokumentasi.md`, `ml-router-architecture.md` (trial). |
