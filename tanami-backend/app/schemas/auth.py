@@ -82,6 +82,7 @@ class UserOut(ApiModel):
     email: str
     username: str
     full_name: str
+    avatar_url: str | None = None
     role: UserRole
     consent_training_data: bool
     consent_at: datetime | None

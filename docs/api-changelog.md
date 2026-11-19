@@ -5,7 +5,7 @@ Catatan resmi untuk tim frontend dan ML. Dua commit yang mendasari dokumen ini:
 - `2a53bea` — varietas bebas, umur pembibitan, placement per tanaman, progress panen, irigasi, kualitas panen
 - `22831aa` — create tanaman sekali kirim dengan thumbnail
 
-Kontrak tergenerate: `contracts/openapi.json` (**66 path**). Jangan menyalin contoh dari `docs/design.md` yang lama tanpa mengecek file ini.
+Kontrak tergenerate: `contracts/openapi.json` (**67 path**). Jangan menyalin contoh dari `docs/design.md` yang lama tanpa mengecek file ini.
 
 ---
 
@@ -22,6 +22,7 @@ Kontrak tergenerate: `contracts/openapi.json` (**66 path**). Jangan menyalin con
 | Irigasi | jadwal statis | bisa diubah + riwayat + saran cuaca | klien kirim `schedule` |
 | Perkembangan | tidak ada ringkasan | `GET /plants/{id}/progress` | backend hitung dari profil + episode |
 | Update profil | dua endpoint (`PATCH /users/me` + `POST /users/me/password`) | satu `PATCH /users/me`, password opsional | klien kirim field profil + password sekaligus |
+| Foto profil | tidak ada | `POST/DELETE /users/me/avatar`, `avatar_url` di `UserOut` | unggah multipart `photo`, hapus untuk mengosongkan |
 
 ---
 
@@ -44,6 +45,8 @@ Kontrak tergenerate: `contracts/openapi.json` (**66 path**). Jangan menyalin con
 | `GET` | `/api/v1/plants/{plant_id}/irrigation/history` | riwayat perubahan jadwal, terbaru dulu |
 | `GET` | `/api/v1/plants/{plant_id}/irrigation-advice` | saran sistem (`weather_used: false` untuk indoor) |
 | `GET` | `/api/v1/plants/{plant_id}/progress` | umur, fase, persen menuju panen, delay penyakit |
+| `POST` | `/api/v1/users/me/avatar` | unggah foto profil (multipart `photo`) |
+| `DELETE` | `/api/v1/users/me/avatar` | hapus foto profil |
 
 ### Diubah
 
@@ -55,7 +58,7 @@ Kontrak tergenerate: `contracts/openapi.json` (**66 path**). Jangan menyalin con
 | `PATCH` | `/api/v1/plants/{id}` | menerima `variety`, `nursery_started_at`, `placement` |
 | `POST` | `/api/v1/plants/{id}/harvests` | `quality` + `quantity_kg` + `note`; `quality_note` ditolak |
 | `PATCH` | `/api/v1/plants/{id}/harvests/{harvest_id}` | sama seperti di atas |
-| `PATCH` | `/api/v1/users/me` | menerima `current_password` + `new_password`; respons `data.tokens` saat sandi diganti |
+| `PATCH` | `/api/v1/users/me` | menerima `current_password` + `new_password`; respons `data.tokens` saat sandi diganti; `UserOut.avatar_url` |
 
 ---
 
@@ -210,10 +213,74 @@ Aturan:
 
 - `current_password` dan `new_password` wajib berpasangan; kirim salah satu saja → `400`.
 - Tanpa kedua field, tetap `PATCH` biasa (`email`, `username`, `full_name`, `consent_training_data`) dan `data.tokens` bernilai `null`.
-- **Foto/avatar profil belum ada:** tidak ada kolom `avatar`/`avatar_url`, tidak ada `multipart` di endpoint ini, dan tidak ada endpoint upload avatar. Jika frontend membutuhkannya, itu fitur baru (kolom + migrasi + upload + `avatar_url` di respons, lalu perbarui kontrak).
+- **Foto/avatar profil sudah tersedia (2026-11-19):** `POST /api/v1/users/me/avatar` (`multipart/form-data`, field `photo`, JPEG/PNG/WebP divalidasi dari isi), `DELETE /api/v1/users/me/avatar` untuk menghapus. `GET/PATCH /users/me` mengembalikan `avatar_url` (null bila belum ada); respons upload/hapus adalah `UserOut`.
 - Password baru minimal 8 karakter dan harus berbeda dari lama.
 - Username/email bentrok → `409` dan tidak ada perubahan sama sekali, termasuk password.
 - Password lama salah → `400`, profil tidak berubah.
 - Saat password diganti, semua sesi dicabut dan `data.tokens` berisi token pair baru. **Frontend wajib menyimpan token ini**; header lama tidak lagi valid.
+
+## 11. Foto profil (avatar) — 2026-11-19
+
+Profil kini punya foto. Alur yang dipakai frontend:
+
+1. `POST /api/v1/users/me/avatar` dengan `multipart/form-data`, field `photo`.
+   - Menerima JPEG/PNG/WebP; file divalidasi dari isi, bukan ekstensi.
+   - Maks. ukuran/piksel mengikuti batas unggah backend.
+   - Response `200` berisi `UserOut` dengan `avatar_url` baru.
+2. Menampilkan foto: pakai `avatar_url` dari `GET /users/me` (atau respons upload). URL sudah siap pakai; frontend tidak perlu menyusun path storage.
+3. `DELETE /api/v1/users/me/avatar` menghapus foto dan mengembalikan `avatar_url: null`.
+
+Catatan:
+
+- `PATCH /users/me` tetap JSON dan **tidak** menerima `avatar_url`/`avatar`/file. Foto tidak bisa diubah lewat `PATCH`.
+- Mengganti foto tidak menghapus sesi; token tetap valid.
+- Upload foto yang tidak valid tidak mengubah foto lama (diverifikasi tes).
+- Kolom DB `users.avatar_key` menyimpan object key; `avatar_url` diturunkan dari storage provider saat membaca.
+
+Contoh respons `UserOut`:
+
+```json
+{
+  "data": {
+    "id": "0b6f...",
+    "email": "petani@example.com",
+    "username": "petani",
+    "full_name": "Petani",
+    "avatar_url": "/media/avatar/0b6f.../a1b2c3.jpg",
+    "role": "farmer",
+    "consent_training_data": false,
+    "consent_at": null,
+    "created_at": "2026-11-19T00:00:00Z"
+  }
+}
+```
+
+Contoh Flutter (unggah):
+
+```dart
+final uri = Uri.parse('$baseUrl/users/me/avatar');
+final req = http.MultipartRequest('POST', uri)
+  ..headers.addAll(authHeaders)
+  ..files.add(await http.MultipartFile.fromPath('photo', imagePath));
+final streamed = await req.send();
+final res = await http.Response.fromStream(streamed);
+final avatarUrl = jsonDecode(res.body)['data']['avatar_url'];
+```
+
+Hapus foto:
+
+```dart
+final res = await http.delete(
+  Uri.parse('$baseUrl/users/me/avatar'),
+  headers: authHeaders,
+);
+// respons: data.avatar_url == null
+```
+
+### 11.1. Perubahan kontrak
+
+- `UserOut` mendapat field `avatar_url: string | null`.
+- `POST /users/me/avatar` memakai `multipart/form-data`; bukan endpoint JSON.
+- Tidak ada perubahan pada `TokenPair` atau alur login/refresh.
 
 

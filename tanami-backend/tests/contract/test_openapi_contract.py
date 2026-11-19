@@ -29,6 +29,8 @@ DESIGN_ENDPOINTS: list[tuple[str, str]] = [
     ("get", "/users/me"),
     ("patch", "/users/me"),
     ("delete", "/users/me"),
+    ("post", "/users/me/avatar"),
+    ("delete", "/users/me/avatar"),
     ("post", "/devices"),
     ("get", "/farms"),
     ("post", "/farms"),

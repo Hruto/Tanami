@@ -54,6 +54,7 @@ Struktur backend sudah rapi dan mengikuti design (route tipis, logika di `servic
 ## 5. Fitur yang ditambahkan
 
 * `PATCH /users/me` kini menerima `current_password` + `new_password` bersama field profil; route terpisah `POST /users/me/password` sudah dihapus.
+* Foto profil: `POST/DELETE /users/me/avatar` (multipart `photo`, validasi isi, object key di `users.avatar_key`, `avatar_url` di `UserOut`).
 * Moderasi forum (design 13): antrean laporan, resolve `dismiss/hide/remove`, ubah status posting/komentar, hapus komentar.
 * Admin: ubah peran (verifikasi ahli, angkat moderator), broadcast reminder `general`. Admin pertama dari `TANAMI_BOOTSTRAP_ADMINS`.
 * Review umpan balik model oleh ahli (TQA 8.4) beserta status persetujuan data latih pengguna.

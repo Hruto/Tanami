@@ -3,9 +3,10 @@
 from __future__ import annotations
 
 from datetime import UTC, datetime
+from typing import Annotated
 from uuid import UUID
 
-from fastapi import APIRouter, Request, Response, status
+from fastapi import APIRouter, File, Request, Response, UploadFile, status
 from sqlalchemy import delete, select
 
 from app.api.deps import (
@@ -14,11 +15,13 @@ from app.api.deps import (
     RateLimiterDep,
     SessionDep,
     SettingsDep,
+    StorageDep,
 )
 from app.core.context import set_user_id
-from app.core.errors import NotFound
+from app.core.errors import NotFound, ValidationError
 from app.core.middleware import client_ip
 from app.models.reminder import Device
+from app.providers.images import new_object_key, validate_and_normalise
 from app.schemas.auth import (
     DeviceCreate,
     DeviceOut,
@@ -99,21 +102,55 @@ async def logout(payload: RefreshRequest, auth: AuthServiceDep) -> Response:
 
 
 @router.get("/users/me")
-async def me(user: CurrentUser, session: SessionDep) -> Envelope[UserOut]:
-    return Envelope(data=await UserService(session).profile(user))
+async def me(user: CurrentUser, session: SessionDep, storage: StorageDep) -> Envelope[UserOut]:
+    return Envelope(data=await UserService(session, storage).profile(user))
 
 
 @router.patch("/users/me")
 async def update_me(
-    payload: UserUpdate, user: CurrentUser, auth: AuthServiceDep
+    payload: UserUpdate,
+    user: CurrentUser,
+    auth: AuthServiceDep,
+    storage: StorageDep,
 ) -> Envelope[ProfileUpdateOut]:
     """Edit profil dan/atau password dalam satu permintaan.
 
     Kirim ``current_password`` + ``new_password`` bersama field profil lain
     untuk mengganti kata sandi. Response memuat ``data.tokens`` (token pair
-    baru) saat password diganti; frontend wajib menyimpannya.
+    baru) saat password diganti; frontend wajib menyimpannya. Foto profil
+    memakai endpoint terpisah ``POST /users/me/avatar``.
     """
-    return Envelope(data=await auth.update_profile(user, payload))
+    return Envelope(data=await auth.update_profile(user, payload, storage))
+
+
+@router.post("/users/me/avatar")
+async def upload_avatar(
+    user: CurrentUser,
+    session: SessionDep,
+    settings: SettingsDep,
+    storage: StorageDep,
+    photo: Annotated[UploadFile, File()],
+) -> Envelope[UserOut]:
+    """Unggah foto profil. File divalidasi dari isi, bukan ekstensi."""
+    raw = await photo.read()
+    if not raw:
+        raise ValidationError("Foto wajib diisi.", details={"field": "photo"})
+    validated = validate_and_normalise(
+        raw,
+        max_bytes=settings.max_scan_upload_bytes,
+        max_side=settings.max_image_side,
+        max_pixels=settings.max_image_pixels,
+    )
+    key = new_object_key("avatar", user_id=str(user.id), extension=validated.extension)
+    await storage.put(key, validated.data, validated.content_type)
+    return Envelope(data=await UserService(session, storage).set_avatar(user, key))
+
+
+@router.delete("/users/me/avatar")
+async def delete_avatar(
+    user: CurrentUser, session: SessionDep, storage: StorageDep
+) -> Envelope[UserOut]:
+    return Envelope(data=await UserService(session, storage).clear_avatar(user))
 
 
 @router.delete("/users/me", status_code=status.HTTP_202_ACCEPTED)

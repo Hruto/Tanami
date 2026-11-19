@@ -13,6 +13,7 @@ from app.core.errors import Conflict, NotFound
 from app.domain import ReminderType
 from app.models.content import Disease
 from app.models.user import User
+from app.providers.storage import StorageProvider
 from app.schemas.auth import (
     NotificationSettingsOut,
     NotificationSettingsUpdate,
@@ -76,8 +77,9 @@ class DiseaseService:
 
 
 class UserService:
-    def __init__(self, session: AsyncSession) -> None:
+    def __init__(self, session: AsyncSession, storage: StorageProvider | None = None) -> None:
         self.session = session
+        self.storage = storage
 
     async def profile(self, user: User) -> UserOut:
         return self._out(user)
@@ -87,6 +89,23 @@ class UserService:
         await self.ensure_identifier_free(user, data)
         self.apply_update(user, data)
         await self.session.commit()
+        return self._out(user)
+
+    async def set_avatar(self, user: User, key: str) -> UserOut:
+        """Point the profile at a freshly uploaded object and drop the old one."""
+        previous = user.avatar_key
+        user.avatar_key = key
+        await self.session.commit()
+        if self.storage is not None and previous and previous != key:
+            await self.storage.delete(previous)
+        return self._out(user)
+
+    async def clear_avatar(self, user: User) -> UserOut:
+        previous = user.avatar_key
+        user.avatar_key = None
+        await self.session.commit()
+        if self.storage is not None and previous:
+            await self.storage.delete(previous)
         return self._out(user)
 
     def apply_update(self, user: User, data: dict[str, Any]) -> None:
@@ -181,11 +200,17 @@ class UserService:
         }
 
     def _out(self, user: User) -> UserOut:
+        avatar_url = (
+            self.storage.public_url(user.avatar_key)
+            if self.storage is not None and user.avatar_key
+            else None
+        )
         return UserOut(
             id=str(user.id),
             email=user.email,
             username=user.username,
             full_name=user.full_name,
+            avatar_url=avatar_url,
             role=user.role,
             consent_training_data=user.consent_training_data,
             consent_at=user.consent_at,

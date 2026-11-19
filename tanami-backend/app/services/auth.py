@@ -33,6 +33,7 @@ from app.core.security import (
 )
 from app.domain import UserRole
 from app.models.user import User
+from app.providers.storage import StorageProvider
 from app.schemas.auth import (
     LoginRequest,
     ProfileUpdateOut,
@@ -268,9 +269,11 @@ class AuthService:
         await self.session.commit()
         return tokens
 
-    async def update_profile(self, user: User, payload: UserUpdate) -> ProfileUpdateOut:
+    async def update_profile(
+        self, user: User, payload: UserUpdate, storage: StorageProvider
+    ) -> ProfileUpdateOut:
         """Satu transaksi: profil, opsional password, dan sesi/token baru."""
-        users = UserService(self.session)
+        users = UserService(self.session, storage)
         data = payload.model_dump(
             exclude_unset=True,
             exclude={"current_password", "new_password"},

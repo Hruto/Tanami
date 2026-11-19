@@ -5,7 +5,7 @@ from __future__ import annotations
 from app.core.state import AppState
 from httpx import AsyncClient
 
-from tests.helpers import auth_headers, login, register, register_payload
+from tests.helpers import auth_headers, image_bytes, login, register, register_payload
 
 BAD_LOGIN = {"email": "x@example.com", "password": "salah-123"}
 
@@ -176,6 +176,87 @@ async def test_legacy_password_endpoint_is_removed(client: AsyncClient) -> None:
         headers=auth_headers(tokens),
     )
     assert response.status_code == 404
+
+
+async def test_profile_starts_without_avatar(client: AsyncClient) -> None:
+    tokens = await register(client, email="tanpa-avatar@example.com")
+    me = await client.get("/api/v1/users/me", headers=auth_headers(tokens))
+    assert me.status_code == 200
+    assert me.json()["data"]["avatar_url"] is None
+
+
+async def test_upload_avatar_returns_url_and_persists(client: AsyncClient) -> None:
+    tokens = await register(client, email="avatar@example.com")
+    response = await client.post(
+        "/api/v1/users/me/avatar",
+        files={"photo": ("avatar.jpg", image_bytes(), "image/jpeg")},
+        headers=auth_headers(tokens),
+    )
+    assert response.status_code == 200, response.text
+    avatar_url = response.json()["data"]["avatar_url"]
+    assert avatar_url and avatar_url.startswith("/media/avatar/")
+    me = await client.get("/api/v1/users/me", headers=auth_headers(tokens))
+    assert me.json()["data"]["avatar_url"] == avatar_url
+
+
+async def test_avatar_rejects_non_image_and_keeps_old(client: AsyncClient) -> None:
+    tokens = auth_headers(await register(client, email="avatar-tolak@example.com"))
+    first = await client.post(
+        "/api/v1/users/me/avatar",
+        files={"photo": ("avatar.png", image_bytes(fmt="PNG"), "image/png")},
+        headers=tokens,
+    )
+    assert first.status_code == 200
+    before = first.json()["data"]["avatar_url"]
+    bad = await client.post(
+        "/api/v1/users/me/avatar",
+        files={"photo": ("bukan.jpg", b"ini bukan gambar", "image/jpeg")},
+        headers=tokens,
+    )
+    assert bad.status_code in (400, 415, 422)
+    me = await client.get("/api/v1/users/me", headers=tokens)
+    assert me.json()["data"]["avatar_url"] == before
+
+
+async def test_avatar_can_be_removed(client: AsyncClient) -> None:
+    tokens = auth_headers(await register(client, email="avatar-hapus@example.com"))
+    uploaded = await client.post(
+        "/api/v1/users/me/avatar",
+        files={"photo": ("avatar.jpg", image_bytes(), "image/jpeg")},
+        headers=tokens,
+    )
+    assert uploaded.status_code == 200
+    assert uploaded.json()["data"]["avatar_url"] is not None
+    removed = await client.delete("/api/v1/users/me/avatar", headers=tokens)
+    assert removed.status_code == 200
+    assert removed.json()["data"]["avatar_url"] is None
+    me = await client.get("/api/v1/users/me", headers=tokens)
+    assert me.json()["data"]["avatar_url"] is None
+
+
+async def test_avatar_requires_authentication(client: AsyncClient) -> None:
+    response = await client.post(
+        "/api/v1/users/me/avatar",
+        files={"photo": ("avatar.jpg", image_bytes(), "image/jpeg")},
+    )
+    assert response.status_code == 401
+
+
+async def test_profile_update_preserves_avatar(client: AsyncClient) -> None:
+    tokens = auth_headers(await register(client, email="avatar-tetap@example.com"))
+    uploaded = await client.post(
+        "/api/v1/users/me/avatar",
+        files={"photo": ("avatar.jpg", image_bytes(), "image/jpeg")},
+        headers=tokens,
+    )
+    avatar_url = uploaded.json()["data"]["avatar_url"]
+    changed = await client.patch(
+        "/api/v1/users/me",
+        json={"username": "avatar.baru"},
+        headers=tokens,
+    )
+    assert changed.status_code == 200
+    assert changed.json()["data"]["avatar_url"] == avatar_url
 
 
 async def test_profile_update_and_identifier_conflict(client: AsyncClient) -> None:

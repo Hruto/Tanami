@@ -1,6 +1,6 @@
 # Data model reference
 
-> **Status:** mengikuti `docs/design.md` v2 + perubahan pasca-rapat 17 Nov 2026. Sumber kebenaran: `app/models/*.py` dan `Base.metadata`; migrasi aktif `0001`–`0007`. Kolom warisan yang tidak dipakai API tetap ada bila diperlukan migrasi/downgrade.
+> **Status:** mengikuti `docs/design.md` v2 + perubahan pasca-rapat 17 Nov 2026. Sumber kebenaran: `app/models/*.py` dan `Base.metadata`; migrasi aktif `0001`–`0008`. Kolom warisan yang tidak dipakai API tetap ada bila diperlukan migrasi/downgrade.
 
 Dokumen ini mencatat tabel, kolom, kunci asing, indeks, dan constraint yang benar-benar ada di kode. Kalau model berubah, regenerate dari `Base.metadata` — jangan menyalin dari `design.md`.
 
@@ -91,6 +91,7 @@ erDiagram
 | `consent_training_data` | BOOLEAN | no | false |  |
 | `consent_at` | timestamptz | yes |  |  |
 | `notification_settings` | JSONB | no | '{}'::jsonb |  |
+| `avatar_key` | VARCHAR(512) | yes |  | Object key foto profil; `avatar_url` diturunkan API |
 | `plant_code_seq` | JSONB | no | '{}'::jsonb |  |
 | `deleted_at` | timestamptz | yes |  |  |
 | `created_at` | timestamptz | no | now() |  |
@@ -100,7 +101,7 @@ erDiagram
 
 **Indexes:** `uq_users_username` (`username`, unique); `uq_users_email` (`email`, unique).
 
-**Tidak ada kolom foto/avatar profil** pada tabel `users` (v0.3). Profil hanya menyimpan identitas dan preferensi; foto tanaman ada di `plant_photos`, bukan foto pengguna.
+**Foto profil:** `users.avatar_key` menyimpan object key di storage (bukan URL); `avatar_url` di response `UserOut` diturunkan oleh storage provider saat membaca. Foto tanaman tetap di `plant_photos`, terpisah dari foto pengguna.
 
 ### `farms`
 
@@ -494,5 +495,6 @@ erDiagram
 | `0005` | `0005_design_v2.py` | v2: `crop_profiles`, `disease_episodes`, `plants.code`/`planting_material`/`quantity`/`productive_until`, hapus `growth_stage`/`final_result`/`yield_percent`/range panen, `detection_plants` dibuang. |
 | `0006` | `0006_post_meeting.py` | `plants.nursery_started_at`, `plants.placement`, `irrigation_changes`, `harvest_records.quality`/`success_pct`. Kolom lama `farms.placement`/`archived_at` sengaja dibiarkan. |
 | `0007` | `0007_scan_commodity_default.py` | Default `scans.commodity_code` `chili` → `mango`; baris lama tidak diubah. |
+| `0008` | `0008_user_avatar.py` | `users.avatar_key` (object key foto profil, nullable). |
 
-Migrasi `0001`–`0006` adalah riwayat; jangan menghapus kolom warisan yang masih dipakai uji migrasi. `0007` hanya mengubah default, bukan data.
+Migrasi `0001`–`0006` adalah riwayat; jangan menghapus kolom warisan yang masih dipakai uji migrasi. `0007` hanya mengubah default, bukan data. `0008` hanya menambah kolom nullable.

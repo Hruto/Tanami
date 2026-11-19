@@ -270,6 +270,20 @@
         "title": "Body_create_scan_api_v1_scans_post",
         "type": "object"
       },
+      "Body_upload_avatar_api_v1_users_me_avatar_post": {
+        "properties": {
+          "photo": {
+            "contentMediaType": "application/octet-stream",
+            "title": "Photo",
+            "type": "string"
+          }
+        },
+        "required": [
+          "photo"
+        ],
+        "title": "Body_upload_avatar_api_v1_users_me_avatar_post",
+        "type": "object"
+      },
       "Body_upload_forum_image_api_v1_uploads_forum_image_post": {
         "properties": {
           "image": {
@@ -4653,6 +4667,17 @@
         "additionalProperties": false,
         "description": "Hasil PATCH /users/me: profil + token baru saat password ikut diganti.",
         "properties": {
+          "avatar_url": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Avatar Url"
+          },
           "consent_at": {
             "anyOf": [
               {
@@ -5744,6 +5769,17 @@
       "UserOut": {
         "additionalProperties": false,
         "properties": {
+          "avatar_url": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Avatar Url"
+          },
           "consent_at": {
             "anyOf": [
               {
@@ -11238,7 +11274,7 @@
         ]
       },
       "patch": {
-        "description": "Edit profil dan/atau password dalam satu permintaan.\n\nKirim ``current_password`` + ``new_password`` bersama field profil lain\nuntuk mengganti kata sandi. Response memuat ``data.tokens`` (token pair\nbaru) saat password diganti; frontend wajib menyimpannya.",
+        "description": "Edit profil dan/atau password dalam satu permintaan.\n\nKirim ``current_password`` + ``new_password`` bersama field profil lain\nuntuk mengganti kata sandi. Response memuat ``data.tokens`` (token pair\nbaru) saat password diganti; frontend wajib menyimpannya. Foto profil\nmemakai endpoint terpisah ``POST /users/me/avatar``.",
         "operationId": "update_me_api_v1_users_me_patch",
         "parameters": [
           {
@@ -11291,6 +11327,113 @@
           }
         },
         "summary": "Update Me",
+        "tags": [
+          "auth"
+        ]
+      }
+    },
+    "/api/v1/users/me/avatar": {
+      "delete": {
+        "operationId": "delete_avatar_api_v1_users_me_avatar_delete",
+        "parameters": [
+          {
+            "in": "header",
+            "name": "authorization",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Authorization"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Envelope_UserOut_"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Delete Avatar",
+        "tags": [
+          "auth"
+        ]
+      },
+      "post": {
+        "description": "Unggah foto profil. File divalidasi dari isi, bukan ekstensi.",
+        "operationId": "upload_avatar_api_v1_users_me_avatar_post",
+        "parameters": [
+          {
+            "in": "header",
+            "name": "authorization",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Authorization"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "multipart/form-data": {
+              "schema": {
+                "$ref": "#/components/schemas/Body_upload_avatar_api_v1_users_me_avatar_post"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Envelope_UserOut_"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Upload Avatar",
         "tags": [
           "auth"
         ]

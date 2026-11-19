@@ -32,7 +32,7 @@ py -3.12 -m venv .venv
 .\.venv\Scripts\activate
 pip install -e ".[dev]"
 copy .env.example .env      # set TANAMI_JWT_SECRET (>= 32 chars)
-alembic upgrade head        # 0001 -> 0007
+alembic upgrade head        # 0001 -> 0008
 uvicorn app.asgi:app --reload --port 8000
 ```
 
@@ -61,7 +61,7 @@ Everything in `design.md` section 10 is implemented and checked by `tests/contra
 | R3 Deteksi | `POST /scans` (wajib `plant_id`), `GET /scans`, `GET /scans/{id}`, `POST /scans/{id}/confirm-disease` |
 | R4 History Deteksi | `GET /scans?status=&commodity_code=&disease_code=&plant_id=&from=&to=`, `PUT /scans/{id}/feedback`, `DELETE /scans/{id}` |
 | R5 Forum | `/forum/posts...`, `PUT/DELETE /forum/posts/{id}/like`, comments, reports |
-| R6 Profil | `GET/PATCH /users/me` (email, username, full name, opsional `current_password` + `new_password`; **foto/avatar profil belum ada**), `/users/me/notification-settings` (`photo_reminder_days`, `monitoring_reminder_days`), `POST /auth/logout`, `DELETE /users/me` |
+| R6 Profil | `GET/PATCH /users/me` (email, username, full name, opsional `current_password` + `new_password`), `POST/DELETE /users/me/avatar` (foto profil, multipart `photo`), `/users/me/notification-settings` (`photo_reminder_days`, `monitoring_reminder_days`), `POST /auth/logout`, `DELETE /users/me` |
 | R7 Pengingat | jobs `care_reminders` (watering/photo/monitoring), `GET /reminders`, `GET /home` |
 
 Staff and extra endpoints:
@@ -69,6 +69,7 @@ Staff and extra endpoints:
 | Endpoint | Who | Purpose |
 |---|---|---|
 | `PATCH /users/me` | user | Ubah profil dan/atau password; token pair baru dikembalikan saat password diganti |
+| `POST/DELETE /users/me/avatar` | user | Unggah/hapus foto profil (multipart `photo`, divalidasi dari isi); respons `UserOut.avatar_url` |
 | `GET/DELETE /devices...` | user | List / remove push devices |
 | `DELETE /forum/comments/{id}` | author, moderator | Remove a comment |
 | `GET /moderation/reports` | moderator, admin | Reported content awaiting review |
@@ -137,7 +138,7 @@ app/
   providers/     vision client, storage, images, push (FCM v1), weather (BMKG)
   jobs/          APScheduler jobs
   data/          seed data (diseases, regions)
-migrations/      Alembic (0001-0007)
+migrations/      Alembic (0001-0008)
 contracts/       openapi.json (generated)
 tests/           unit / integration / contract
 ```

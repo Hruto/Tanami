@@ -42,6 +42,10 @@ class User(Base):
     )
     consent_at: Mapped[datetime | None] = mapped_column(nullable=True)
 
+    # Object-storage key for the profile photo; the public URL is derived by the
+    # API from the storage provider (design 10.4).
+    avatar_key: Mapped[str | None] = mapped_column(String(512), nullable=True)
+
     # Per-reminder-type switches and quiet hours (design 10.8).
     notification_settings: Mapped[dict[str, object]] = mapped_column(
         JSONB, nullable=False, server_default=text("'{}'::jsonb")

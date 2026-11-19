@@ -252,7 +252,7 @@ Ambang keyakinan **berlaku sama di backend, frontend, dan dokumen ini** (sumber 
 **Privasi data pribadi** (mengacu pada UU No. 27 Tahun 2022 tentang Pelindungan Data Pribadi; konfirmasikan kewajiban rinci dengan pihak yang paham hukum)
 - Kumpulkan data seminimal mungkin: email, username, nama lengkap (R6). **Email tidak pernah ditampilkan ke pengguna lain**; di forum yang tampil hanya username dan nama lengkap.
 - Lokasi kebun disimpan pada tingkat **desa/kelurahan (kode adm4)** dan, jika perlu, koordinat; koordinat tidak ditampilkan ke pengguna lain.
-- Metadata lokasi (EXIF GPS) pada **semua** foto (deteksi, foto perkembangan, forum) **dibuang** sebelum disimpan. Foto forum hanya boleh berasal dari unggahan pengguna itu sendiri.
+- Metadata lokasi (EXIF GPS) pada **semua** foto (deteksi, foto perkembangan, foto forum, dan foto profil) **dibuang** sebelum disimpan. Foto forum hanya boleh berasal dari unggahan pengguna itu sendiri.
 - Pengguna memberi **persetujuan** eksplisit untuk penggunaan foto dalam pelatihan model. Persetujuan bisa ditarik.
 - Pengguna dapat menghapus akun dan datanya. Akun langsung dinonaktifkan dan semua sesi dicabut; job harian menghapus permanen baris dan foto setelah 30 hari.
 - Mengakhiri tracking atau deteksi **tidak** menghapus data (R2, R4); data tetap milik pengguna sampai akunnya dihapus.
