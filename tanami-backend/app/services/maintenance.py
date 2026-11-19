@@ -73,6 +73,8 @@ async def purge_deleted_accounts(
         keys = list(
             (await session.execute(select(Scan.image_key).where(Scan.user_id == user.id))).scalars()
         )
+        if user.avatar_key:
+            keys.append(user.avatar_key)
         for post_keys in (
             await session.execute(select(ForumPost.image_keys).where(ForumPost.user_id == user.id))
         ).scalars():

@@ -27,6 +27,7 @@ from tests.helpers import (
     create_plant,
     forecast,
     hourly_slots,
+    image_bytes,
     register,
     upload_scan,
 )
@@ -184,6 +185,12 @@ async def test_scan_followup_expiry_and_decay(client: AsyncClient, state: AppSta
 async def test_deleted_account_is_purged_with_photos(client: AsyncClient, state: AppState) -> None:
     headers, _, plant = await farmer(client)
     await upload_scan(client, headers, plant_id=plant["id"])
+    avatar = await client.post(
+        "/api/v1/users/me/avatar",
+        files={"photo": ("avatar.jpg", image_bytes(), "image/jpeg")},
+        headers=headers,
+    )
+    assert avatar.status_code == 200
     await client.delete("/api/v1/users/me", headers=headers)
     assert await run_account_purge(state) == 0  # grace period
     assert await run_account_purge(state, now=datetime.now(UTC) + timedelta(days=31)) == 1
