@@ -25,7 +25,7 @@ Dokumen ini adalah kesepakatan tim tentang standar kualitas teknis. Semua keputu
 | R3 | Scan Penyakit Daun: pilih tanaman terdaftar + foto, hasil (penyakit, keyakinan %, gejala, pencegahan, saran), konfirmasi penyakit yang dapat memundurkan perkiraan panen |
 | R4 | Riwayat Scan: daftar semua scan dengan filter jenis tanaman, penyakit, dan tanaman |
 | R5 | Forum Komunitas: posting, lihat, komentar, suka |
-| R6 | Profil dan Pengaturan: email, username, nama lengkap, password, periode pengingat, logout, hapus akun |
+| R6 | Profil dan Pengaturan: email, username, nama lengkap, foto profil (opsional), password, periode pengingat, logout, hapus akun |
 | R7 | Notifikasi dan Pengingat: foto, penyiraman, pemantauan, tindak lanjut penyakit, panen, berhenti saat tracking diakhiri, scan ulang manual |
 
 R1, R3, dan R4 di atas menyimpang dari dokumen requirement asli dan menunggu persetujuan pemilik requirement (`design.md` 17 #11).
