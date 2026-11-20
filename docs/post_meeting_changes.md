@@ -68,7 +68,7 @@ aplikasi; backend hanya menerima file JPG/PNG (batas ukuran & resolusi sesuai
 
 ## Aturan yang perlu diketahui frontend
 
-- `variety` bebas, tetapi harus menyebut `mangga`, `jeruk`, atau `stroberi`;
+- `variety` bebas, tetapi harus menyebut `mangga`, `jeruk`, atau `tomat`;
   selain itu ditolak 400.
 - `placement: indoor` → backend **tidak** memanggil BMKG; saran irigasi statis.
 - `success_pct = quantity_kg / target_panen_komiditas × 100`; kategori

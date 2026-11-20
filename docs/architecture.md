@@ -1,6 +1,6 @@
 # Arsitektur layanan inferensi
 
-> Selaras dengan `design.md` v2: satu layanan memuat tiga model penyakit daun — `disease-mango-v0.1.0`, `disease-citrus-v0.1.0`, dan `disease-strawberry-v0.1.0` (shadow opsional `-v0.2.0-rc1`). Backend selalu mengirim `commodity_code`; layanan vision yang menentukan `status`, backend hanya menyimpan.
+> Selaras dengan `design.md` v2: satu layanan memuat tiga model penyakit daun — `disease-mango-v0.1.0`, `disease-citrus-v0.1.0`, dan `disease-tomato-v0.1.0` (shadow opsional `-v0.2.0-rc1`). Backend selalu mengirim `commodity_code`; layanan vision yang menentukan `status`, backend hanya menyimpan.
 
 ## Keputusan: satu layanan inferensi terpisah dari backend
 

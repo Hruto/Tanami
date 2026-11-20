@@ -11,16 +11,16 @@ dan **19 (draft 2 ML — rencana, belum runtime)**.
 
 | Komponen | Lokasi | Koneksi DB | Keterangan |
 |---|---|---|---|
-| Backend ✅ | `tanami-backend/app/models/*.py` | PostgreSQL async (SQLAlchemy), migrasi `0001`–`0008` | 20+ tabel: `plants`, `scans`, `disease_episodes`, `crop_profiles`, `diseases`, `harvest_records`, dll. |
+| Backend ✅ | `tanami-backend/app/models/*.py` | PostgreSQL async (SQLAlchemy), migrasi `0001`–`0009` | 20+ tabel: `plants`, `scans`, `disease_episodes`, `crop_profiles`, `diseases`, `harvest_records`, dll. |
 | Vision service ✅ | root `app/` (FastAPI) | **tidak ada** | Baca manifest dari folder `models/`, prediksi via ONNX/stub, tidak menyimpan hasil ke DB. |
-| Manifest model ✅ | `models/*/manifest.json` | file | `disease-mango-v0.1.0`, `disease-citrus-v0.1.0`, `disease-strawberry-v0.1.0`; `commodity_code` = `mango`/`citrus`/`strawberry`, 8/5/5 label (`design.md` 11.5). |
+| Manifest model ✅ | `models/*/manifest.json` | file | `disease-mango-v0.1.0`, `disease-citrus-v0.1.0`, `disease-tomato-v0.1.0`; `commodity_code` = `mango`/`citrus`/`tomato`, 8/5/5 label (`design.md` 11.5). |
 | Backend ↔ vision ✅ | `tanami-backend/app/providers/vision.py` | HTTP + `Bearer` token | `POST /v1/predict` dengan `image`, `type`, `commodity_code`, `client_uuid`, header `Idempotency-Key`; `GET /readyz`; timeout 6s, retry 2× untuk 502/503/504; port 8001. |
 | Desain ML draft 2 ⚠️ | `design.md` bagian 19 | didokumentasikan, **belum diimplementasikan** | Output nama penyakit + status `sehat/sakit/tak_terdeteksi/foto_ditolak`, model per tanaman, tiga lapis tolak, `taxonomy.yaml`, artefak `.joblib` di Drive. Komoditas risetnya berbeda dari runtime (lihat 19.14). |
 
 Masalah yang sudah selesai dan yang masih tertunda:
 
 1. ✅ Komoditas sudah disatukan: backend, runtime vision, dan kontrak memakai
-   **mango / citrus / strawberry** (default `mango`).
+   **mango / citrus / tomato** (default `mango`).
 2. ✅ Sumber kebenaran `status` sudah diputuskan: layanan vision; backend hanya
    menyimpan (lihat §3.3 dan `design.md` 11.2).
 3. ⏳ `diseases.harvest_delay_days` masih `0` dan `crop_profiles.source` kosong;
@@ -71,7 +71,7 @@ Aturan:
 ml_models
 ─────────
 id                  uuid PK
-model_key            text   -- "disease-mango-v0.1.0" / "disease-citrus-v0.1.0" / "disease-strawberry-v0.1.0"
+model_key            text   -- "disease-mango-v0.1.0" / "disease-citrus-v0.1.0" / "disease-tomato-v0.1.0"
 scan_type            text   -- "disease" (satu-satunya jenis scan)
 commodity_code       text   -- FK logis ke crop_profiles.commodity_code
 version              text   -- "v2.0.0"
@@ -89,7 +89,7 @@ ml_labels
 id                   uuid PK
 model_version        text   -- FK logis ke ml_models.version
 model_code           text   -- "late_blight" | "mango_anthracnose" | "healthy" (nama penyakit kanonis)
-backend_disease_code text   -- "mango_anthracnose" | "citrus_canker" | "strawberry_leaf_scorch" | ... (nullable untuk sehat)
+backend_disease_code text   -- "mango_anthracnose" | "citrus_canker" | "tomato_early_blight" | ... (nullable untuk sehat)
 backend_status       text   -- "sehat" | "sakit" | "tak_terdeteksi" | "foto_ditolak" (draft 2)
 display_label        text
 is_trainable         bool   -- true kecuali "kurang yakin"/"ditolak"
@@ -131,7 +131,7 @@ kode runtime `design.md` 11.5 dilakukan lewat `ml_labels`, bukan disamakan.
 | Draft 2 | `model_code` contoh | `backend_disease_code` | Catatan |
 |---|---|---|---|
 | `sehat` | `healthy` | `healthy` | Tidak membuka episode penyakit |
-| `sakit` + penyakit | `late_blight`, `anthracnose`, dll. | `mango_anthracnose`, `citrus_black_spot`, `strawberry_leaf_scorch`, dll. | Nama kanonis dari `taxonomy.yaml` → kode berprefiks komoditas |
+| `sakit` + penyakit | `late_blight`, `anthracnose`, dll. | `mango_anthracnose`, `citrus_black_spot`, `tomato_early_blight`, dll. | Nama kanonis dari `taxonomy.yaml` → kode berprefiks komoditas |
 | `tak_terdeteksi` | `low_confidence`, `far_from_known` | `unknown` + `result.invalid_reason` | Bukan kelas penyakit; jangan dibuka episode |
 | `foto_ditolak` | `background_failed`, `no_leaf` | `invalid_image` | Status tolak, bukan penyakit |
 
@@ -150,8 +150,8 @@ itu di `scans` dan tidak menghitung ulang; frontend juga tidak. Ini mengikuti
 ### 3.4 Penyelarasan komoditas — SELESAI
 
 Runtime vision dan backend memakai tepat tiga komoditas: `mango`, `citrus`,
-`strawberry` (default `mango`). Model primer: `disease-mango-v0.1.0`,
-`disease-citrus-v0.1.0`, `disease-strawberry-v0.1.0`; shadow opsional
+`tomato` (default `mango`). Model primer: `disease-mango-v0.1.0`,
+`disease-citrus-v0.1.0`, `disease-tomato-v0.1.0`; shadow opsional
 `-v0.2.0-rc1` per komoditas.
 
 Dataset training di `design.md` 19.4 (tomat/pepaya/zukini/jeruk) adalah
@@ -169,7 +169,7 @@ backend harus menerjemahkan:
 
 | Draft 2 ML | Runtime sekarang (11.3 / `contracts/API.md`) | Catatan |
 |---|---|---|
-| `crop: "tomat"` | `commodity_code: "mango"` | Nama tanaman bebas vs kode komoditas tetap. Perlu daftar kanonik. |
+| `crop: "tomat"` | `commodity_code: "tomato"` | Nama tanaman bebas vs kode komoditas tetap. Perlu daftar kanonik. |
 | `status: "sehat"` | `status: "confident"` + `result.top.disease_code = "healthy"` | Bukan status yang sama. |
 | `status: "sakit"` | `status: "confident"` + `result.top.disease_code = <kode 11.5>` | `disease` harus dipetakan ke kode berprefiks komoditas. |
 | `status: "tak_terdeteksi"` | `status: "unknown"` | `rejected_reason: low_confidence/far_from_known` bisa masuk `result.invalid_reason` atau `raw`. |

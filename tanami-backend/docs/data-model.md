@@ -24,7 +24,7 @@ Dokumen ini mencatat tabel, kolom, kunci asing, indeks, dan constraint yang bena
 | `CauseCategory` | `healthy`, `fungus`, `bacteria`, `virus`, `pest`, `nutrient_deficiency`, `unknown` |
 | `HealthStatus` | `healthy`, `at_risk`, `sick`, `recovering`, `unknown` |
 | `Placement` | `indoor`, `outdoor` |
-| `PlantingMaterial` | `grafted`, `seed`, `runner`, `other` |
+| `PlantingMaterial` | `grafted`, `seed`, `other` |
 | `IrrigationSchedule` | `daily`, `every_3_5_days`, `weekly`, `never` |
 | `LifecyclePhase` | `juvenile`, `productive` |
 | `TrackingEndReason` | `productive_period_over`, `disease`, `cut_down`, `died_other`, `other`; legacy: `harvested`, `died`, `not_maintained` |
@@ -151,7 +151,7 @@ erDiagram
 | `created_at` | timestamptz | no | now() |  |
 | `updated_at` | timestamptz | no | now() |  |
 
-**Constraints:** `ck_plants_quantity_positive`: `quantity >= 1`; `ck_plants_irrigation_schedule`: `irrigation_schedule IN ('daily', 'every_3_5_days', 'weekly', 'never')`; `ck_plants_outcome`: `outcome IN ('completed', 'ended_early', 'failed')`; `ck_plants_commodity_code`: `commodity_code IN ('mango', 'citrus', 'strawberry')`; `ck_plants_end_reason`: `end_reason IN ('productive_period_over', 'disease', 'cut_down', 'died_other', 'other')`; `ck_plants_disease_end_has_cause`: `end_reason IS DISTINCT FROM 'disease' OR cardinality(coalesce(end_disease_codes, '{}')) > 0 OR btrim(coalesce(end_cause_note, '')) <> ''`; `ck_plants_ended_with_outcome`: `(ended_at IS NULL) = (outcome IS NULL)`; `ck_plants_ended_with_reason`: `(ended_at IS NULL) = (end_reason IS NULL)`; `ck_plants_planting_material`: `planting_material IN ('grafted', 'seed', 'runner', 'other')`; `ck_plants_placement`: `placement IN ('indoor', 'outdoor')`; `ck_plants_health_status`: `health_status IN ('healthy', 'at_risk', 'sick', 'recovering', 'unknown')`; unique `uq_plants_user_code` (`user_id, code`).
+**Constraints:** `ck_plants_quantity_positive`: `quantity >= 1`; `ck_plants_irrigation_schedule`: `irrigation_schedule IN ('daily', 'every_3_5_days', 'weekly', 'never')`; `ck_plants_outcome`: `outcome IN ('completed', 'ended_early', 'failed')`; `ck_plants_commodity_code`: `commodity_code IN ('mango', 'citrus', 'tomato')`; `ck_plants_end_reason`: `end_reason IN ('productive_period_over', 'disease', 'cut_down', 'died_other', 'other')`; `ck_plants_disease_end_has_cause`: `end_reason IS DISTINCT FROM 'disease' OR cardinality(coalesce(end_disease_codes, '{}')) > 0 OR btrim(coalesce(end_cause_note, '')) <> ''`; `ck_plants_ended_with_outcome`: `(ended_at IS NULL) = (outcome IS NULL)`; `ck_plants_ended_with_reason`: `(ended_at IS NULL) = (end_reason IS NULL)`; `ck_plants_planting_material`: `planting_material IN ('grafted', 'seed', 'other')`; `ck_plants_placement`: `placement IN ('indoor', 'outdoor')`; `ck_plants_health_status`: `health_status IN ('healthy', 'at_risk', 'sick', 'recovering', 'unknown')`; unique `uq_plants_user_code` (`user_id, code`).
 
 **Indexes:** `ix_plants_commodity_code` (`commodity_code`); `ix_plants_farm_id` (`farm_id`); `ix_plants_user_ended` (`user_id, ended_at`); `ix_plants_placement` (`placement`); `ix_plants_user_id` (`user_id`); `ix_plants_health_status` (`health_status`); `ix_plants_farm_ended` (`farm_id, ended_at`).
 
@@ -287,7 +287,7 @@ erDiagram
 | `created_at` | timestamptz | no | now() |  |
 | `updated_at` | timestamptz | no | now() |  |
 
-**Constraints:** `ck_crop_profiles_commodity_code`: `commodity_code IN ('mango', 'citrus', 'strawberry')`; `ck_crop_profiles_harvest_cycle_range`: `harvest_cycle_min_days > 0 AND harvest_cycle_min_days <= harvest_cycle_max_days`; `ck_crop_profiles_first_harvest_range`: `first_harvest_min_days > 0 AND first_harvest_min_days <= first_harvest_max_days`; `ck_crop_profiles_planting_material`: `planting_material IN ('grafted', 'seed', 'runner', 'other')`; `ck_crop_profiles_productive_years_positive`: `productive_years > 0`; unique `uq_crop_profiles_material` (`commodity_code, planting_material`).
+**Constraints:** `ck_crop_profiles_commodity_code`: `commodity_code IN ('mango', 'citrus', 'tomato')`; `ck_crop_profiles_harvest_cycle_range`: `harvest_cycle_min_days > 0 AND harvest_cycle_min_days <= harvest_cycle_max_days`; `ck_crop_profiles_first_harvest_range`: `first_harvest_min_days > 0 AND first_harvest_min_days <= first_harvest_max_days`; `ck_crop_profiles_planting_material`: `planting_material IN ('grafted', 'seed', 'other')`; `ck_crop_profiles_productive_years_positive`: `productive_years > 0`; unique `uq_crop_profiles_material` (`commodity_code, planting_material`).
 
 ### `plant_photos`
 

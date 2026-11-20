@@ -1,11 +1,11 @@
 # Tanami Backend
 
-FastAPI service behind the Tanami mobile app. It implements the product requirements R0-R7 (gardens, plant tracking and its history, leaf scan history, forum, profile, reminders) plus BMKG weather, moderation and the disease knowledge base. It is the single owner of persistent state; the `tanami-vision` service (repo root) is stateless and only serves inference for the three fruits (`mango`, `citrus`, `strawberry`).
+FastAPI service behind the Tanami mobile app. It implements the product requirements R0-R7 (gardens, plant tracking and its history, leaf scan history, forum, profile, reminders) plus BMKG weather, moderation and the disease knowledge base. It is the single owner of persistent state; the `tanami-vision` service (repo root) is stateless and only serves inference for the three fruits (`mango`, `citrus`, `tomato`).
 
 Contract: written against `docs/design.md` v2 (sections 8, 10, 11, 12) and `docs/tqa.md`.
 
 > **Status:** this document follows `docs/design.md` **v2** — three commodities
-> (`mango`, `citrus`, `strawberry`), `type=disease` only, no ripeness scans. The
+> (`mango`, `citrus`, `tomato`), `type=disease` only, no ripeness scans. The
 > vision service decides `status`; the backend only stores it (`design.md` 11.2).
 
 The generated OpenAPI lives in `contracts/openapi.json`; the frontend generates its types from it.
@@ -32,7 +32,7 @@ py -3.12 -m venv .venv
 .\.venv\Scripts\activate
 pip install -e ".[dev]"
 copy .env.example .env      # set TANAMI_JWT_SECRET (>= 32 chars)
-alembic upgrade head        # 0001 -> 0008
+alembic upgrade head        # 0001 -> 0009
 uvicorn app.asgi:app --reload --port 8000
 ```
 
@@ -138,7 +138,7 @@ app/
   providers/     vision client, storage, images, push (FCM v1), weather (BMKG)
   jobs/          APScheduler jobs
   data/          seed data (diseases, regions)
-migrations/      Alembic (0001-0008)
+migrations/      Alembic (0001-0009)
 contracts/       openapi.json (generated)
 tests/           unit / integration / contract
 ```

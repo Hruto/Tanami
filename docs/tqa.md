@@ -2,7 +2,7 @@
 
 | | |
 |---|---|
-| Versi | 2.0 (selaras dengan `design.md` v2: mangga, jeruk, stroberi) |
+| Versi | 2.0 (selaras dengan `design.md` v2: mangga, jeruk, tomat) |
 | Tanggal | 9 November 2026 |
 | Berlaku untuk | Seluruh anggota tim Tanami (1 PM, 2 Frontend, 2 Backend/ML) |
 | Dokumen pendamping | `design.md` (kontrak desain, data, dan API) |
@@ -15,7 +15,7 @@ Dokumen ini adalah kesepakatan tim tentang standar kualitas teknis. Semua keputu
 
 **Tujuan:** memastikan frontend, backend, dan ML dibangun dengan standar yang sama sehingga hasilnya konsisten, aman, dan dapat dipercaya petani.
 
-**Ruang lingkup produk** (dokumen *Requirements Aplikasi Deteksi dan Tracking Tanaman*, sebagaimana diubah `design.md` v2). Komoditas: **mangga, jeruk, stroberi**.
+**Ruang lingkup produk** (dokumen *Requirements Aplikasi Deteksi dan Tracking Tanaman*, sebagaimana diubah `design.md` v2). Komoditas: **mangga, jeruk, tomat**.
 
 | Kode | Fitur |
 |---|---|
@@ -34,7 +34,7 @@ R1, R3, dan R4 di atas menyimpang dari dokumen requirement asli dan menunggu per
 
 **Fitur tambahan yang tidak disebut requirement:** reminder cuaca BMKG (hanya kebun outdoor) dan Cek cepat (scan tanpa simpan). Keduanya tidak boleh menghambat rilis R0-R7. Scan kematangan buah **dipensiunkan** di v2.
 
-**Di luar ruang lingkup MVP:** tanaman selain mangga/jeruk/stroberi, scan penyakit buah/bunga, scan kematangan, prediksi jumlah panen, sensor IoT, marketplace saprotan, prediksi harga pasar, peta sebaran penyakit.
+**Di luar ruang lingkup MVP:** tanaman selain mangga/jeruk/tomat, scan penyakit buah/bunga, scan kematangan, prediksi jumlah panen, sensor IoT, marketplace saprotan, prediksi harga pasar, peta sebaran penyakit.
 
 ---
 
@@ -180,7 +180,7 @@ Aturan:
 Bagian ini paling penting, karena kesalahan model langsung memengaruhi keputusan petani.
 
 ### 8.1 Data
-- **Sumber data:** foto lapangan dari kebun nyata adalah data utama. Dataset publik (kandidat di `design.md` 11.5: MangoLeafBD, Citrus Leaves, PlantVillage, Strawberry Disease) hanya untuk pra-latih atau tambahan, dan **lisensinya dicek** sebelum dipakai.
+- **Sumber data:** foto lapangan dari kebun nyata adalah data utama. Dataset publik (kandidat di `design.md` 11.5: MangoLeafBD, Citrus Leaves, PlantVillage, Tomato Disease) hanya untuk pra-latih atau tambahan, dan **lisensinya dicek** sebelum dipakai.
 - **Pergeseran domain:** dataset publik berasal dari luar Indonesia dan sebagian berlatar laboratorium. Waspadai model yang belajar dari latar, bukan daun (periksa dengan Grad-CAM), dan selalu laporkan metrik di set uji lapangan Indonesia terpisah dari set uji publik.
 - **Protokol pengambilan foto:** ditulis dan dibagikan ke pengumpul data (sudut, jarak, pencahayaan, variasi latar, minimal beberapa kondisi cuaca).
 - **Pelabelan:**
@@ -408,4 +408,4 @@ Dengan menandatangani, anggota tim menyatakan telah membaca dan menyepakati doku
 | 0.1 | 2026-10-23 | Draf awal |
 | 0.2 | 2026-11-08 | Ruang lingkup mengikuti requirement R0-R7; fitur ripeness dan cuaca ditandai tambahan; stack aktual (layanan vision terpisah, FCM HTTP v1, APScheduler); struktur repo; strategi tes (PostgreSQL asli, contract test terhadap `design.md` 10, cakupan 80%); E2E alur requirement; privasi profil (email tidak ditampilkan, username publik); pembersihan akun 30 hari; CI backend. |
 | 0.3 | 2026-11-08 | Ruang kerja tim `tanami-admin` untuk moderator, ahli, dan admin; CI dashboard (typecheck + build); server lokal tanpa Docker (`scripts/dev_server.py`). |
-| 2.0 | 2026-11-09 | Selaras dengan `design.md` v2: komoditas mangga/jeruk/stroberi, ruang lingkup R1-R4 baru, tes untuk perkiraan panen dan episode penyakit, metrik ML per jenis tanaman dengan kalibrasi wajib, pergeseran domain dataset publik, scan kematangan dipensiunkan. Nomor versi disamakan dengan `design.md`. |
+| 2.0 | 2026-11-09 | Selaras dengan `design.md` v2: komoditas mangga/jeruk/tomat, ruang lingkup R1-R4 baru, tes untuk perkiraan panen dan episode penyakit, metrik ML per jenis tanaman dengan kalibrasi wajib, pergeseran domain dataset publik, scan kematangan dipensiunkan. Nomor versi disamakan dengan `design.md`. |

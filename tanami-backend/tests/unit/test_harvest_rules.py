@@ -27,7 +27,7 @@ MANGO = CropProfile(
     harvest_cycle_max_days=400,
     productive_years=40,
 )
-STRAWBERRY = CropProfile(60, 90, 3, 7, 2)
+TOMATO = CropProfile(90, 120, 7, 10, 1)
 
 
 def episode(
@@ -209,25 +209,25 @@ def test_overdue_when_today_is_past_the_window() -> None:
 
 
 def test_window_is_clipped_at_the_end_of_the_productive_period() -> None:
-    planted = date(2025, 1, 15)  # strawberry: productive until 2027-01-15
+    planted = date(2025, 1, 15)  # tomato: productive until 2026-01-15
     result = next_harvest(
         planted_at=planted,
-        harvest_dates=[date(2027, 1, 12)],
+        harvest_dates=[date(2026, 1, 8)],
         episodes=[],
-        profile=STRAWBERRY,
-        today=date(2027, 1, 13),
+        profile=TOMATO,
+        today=date(2026, 1, 14),
     )
     assert result is not None
-    assert result.end == date(2027, 1, 15)
+    assert result.end == date(2026, 1, 15)
 
 
 def test_no_estimate_once_the_window_starts_after_the_productive_end() -> None:
     result = next_harvest(
         planted_at=date(2025, 1, 15),
-        harvest_dates=[date(2027, 1, 14)],
+        harvest_dates=[date(2026, 1, 9)],
         episodes=[],
-        profile=STRAWBERRY,
-        today=date(2027, 1, 14),
+        profile=TOMATO,
+        today=date(2026, 1, 14),
     )
     assert result is None
 

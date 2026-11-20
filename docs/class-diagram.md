@@ -317,7 +317,7 @@ classDiagram
 **Detail layanan vision (dari kode, bukan dugaan):**
 
 - `POST /v1/predict` — multipart `type` (hanya `disease`), `image`,
-  `commodity_code` (`mango`/`citrus`/`strawberry`, default `mango`), `client_uuid`;
+  `commodity_code` (`mango`/`citrus`/`tomato`, default `mango`), `client_uuid`;
   header `Idempotency-Key` dan `Authorization: Bearer ...`. Respons envelope
   `{ "data": … }` atau `{ "error": … }`.
 - `GET /healthz`, `/readyz`, `/livez`, `/metrics`, `GET /v1/models`,
@@ -337,9 +337,9 @@ classDiagram
   membuang EXIF lalu resize ke `input_size` manifest.
 
 Manifest yang **aktif** adalah `disease-mango-v0.1.0`,
-`disease-citrus-v0.1.0`, dan `disease-strawberry-v0.1.0` (shadow opsional
+`disease-citrus-v0.1.0`, dan `disease-tomato-v0.1.0` (shadow opsional
 `-v0.2.0-rc1`), dengan label per komoditas sesuai `design.md` 11.5 (mango 8,
-citrus 5, strawberry 5). `StubPredictor` deterministik dan ditolak di
+citrus 5, tomato 5). `StubPredictor` deterministik dan ditolak di
 production; produksi memakai `OnnxPredictor`. Draft 2 ML (`design.md` 19)
 **belum mengubah class diagram ini** — kontrak outputnya masih perlu dipetakan
 atau disepakati (lihat `docs/data-integration.md` §3.5).

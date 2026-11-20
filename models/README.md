@@ -1,10 +1,10 @@
 # Model directory
 
 > **Status:** dokumen ini mengikuti `docs/design.md` **v2** — tepat tiga komoditas
-> (`mango`, `citrus`, `strawberry`), hanya `type=disease`.
+> (`mango`, `citrus`, `tomato`), hanya `type=disease`.
 
 > Folder aktif: `disease-mango-v0.1.0/`, `disease-citrus-v0.1.0/`, dan
-> `disease-strawberry-v0.1.0/`. Shadow opsional memakai versi `-v0.2.0-rc1`
+> `disease-tomato-v0.1.0/`. Shadow opsional memakai versi `-v0.2.0-rc1`
 > per komoditas.
 
 Tiap versi hidup di folder sendiri dan ditemukan hanya lewat `manifest.json`:
@@ -17,7 +17,7 @@ models/
   disease-citrus-v0.1.0/
     manifest.json
     model.onnx
-  disease-strawberry-v0.1.0/
+  disease-tomato-v0.1.0/
     manifest.json
     model.onnx
 ```
@@ -29,7 +29,7 @@ deskripsi model yang dipercaya layanan:
 | ------------------- | -------- | ------------------------------------------------------------ |
 | `model_version`     | str      | harus sama dengan nama folder (TQA 8.4: `<jenis>-<komoditas>-v<semver>`) |
 | `scan_type`         | str      | hanya `disease`                                              |
-| `commodity_code`    | str      | `mango` / `citrus` / `strawberry`; wajib sama dengan yang diminta |
+| `commodity_code`    | str      | `mango` / `citrus` / `tomato`; wajib sama dengan yang diminta |
 | `artifact`          | str      | nama berkas `.onnx` relatif terhadap folder versi             |
 | `labels`            | string[] | urutan output; harus sama persis dengan 11.5 untuk komoditas itu |
 | `input_size`        | int      | sisi kotak yang diharapkan model                             |

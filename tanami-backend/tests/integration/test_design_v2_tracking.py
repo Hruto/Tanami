@@ -119,17 +119,17 @@ def result_for(code: str, cause: str = "fungus", status: str = "confident") -> A
 
 async def test_plant_types_are_the_three_fruits_with_materials(client: AsyncClient) -> None:
     rows = (await client.get("/api/v1/plant-types")).json()["data"]
-    assert [row["code"] for row in rows] == ["mango", "citrus", "strawberry"]
-    strawberry = rows[2]
-    assert {m["code"] for m in strawberry["materials"]} == {"runner", "seed", "other"}
-    assert [m["code"] for m in strawberry["materials"] if m["is_default"]] == ["runner"]
+    assert [row["code"] for row in rows] == ["mango", "citrus", "tomato"]
+    tomato = rows[2]
+    assert {m["code"] for m in tomato["materials"]} == {"seed", "grafted", "other"}
+    assert [m["code"] for m in tomato["materials"] if m["is_default"]] == ["seed"]
     assert rows[0]["detection_supported"] is True
 
 
 async def test_crop_profiles_are_listed(client: AsyncClient) -> None:
     rows = (await client.get("/api/v1/crop-profiles")).json()["data"]
     assert len(rows) == 6
-    assert {row["commodity_code"] for row in rows} == {"mango", "citrus", "strawberry"}
+    assert {row["commodity_code"] for row in rows} == {"mango", "citrus", "tomato"}
 
 
 async def test_plant_codes_count_per_commodity_and_are_never_reused(client: AsyncClient) -> None:
@@ -162,19 +162,19 @@ async def test_new_plant_defaults_and_estimate(client: AsyncClient) -> None:
     assert nxt["is_estimate"] is True and nxt["is_overdue"] is False
 
 
-async def test_strawberry_defaults_to_runner_and_can_be_a_group(client: AsyncClient) -> None:
+async def test_tomato_defaults_to_seed_and_can_be_a_group(client: AsyncClient) -> None:
     headers, farm = await start(client)
     plant = await new_plant(
         client,
         headers,
         farm["id"],
-        variety="Stroberi Frigo",
+        variety="Tomat Cherry",
         nursery_started_at=(TODAY - timedelta(days=30)).isoformat(),
         quantity=200,
         label="Bedengan A",
     )
-    assert plant["planting_material"] == "runner" and plant["quantity"] == 200
-    assert plant["code"] == "STB-001"
+    assert plant["planting_material"] == "seed" and plant["quantity"] == 200
+    assert plant["code"] == "TMT-001"
     assert plant["lifecycle_phase"] == "juvenile"
 
 
@@ -182,7 +182,7 @@ async def test_strawberry_defaults_to_runner_and_can_be_a_group(client: AsyncCli
     "overrides",
     [
         {"variety": "Durian Montong"},  # di luar cakupan
-        {"planting_material": "runner"},  # runner is strawberry-only
+        {"planting_material": "runner"},  # runner is no longer supported
         {"nursery_started_at": (TODAY + timedelta(days=1)).isoformat()},
         {
             "nursery_started_at": (TODAY - timedelta(days=365 * 41)).isoformat()
@@ -202,7 +202,7 @@ async def test_invalid_plants_are_rejected(client: AsyncClient, overrides: dict[
         },
         headers=headers,
     )
-    assert response.status_code == 400, response.text
+    assert response.status_code in (400, 422), response.text
 
 
 # --------------------------------------------------------------------------- #
@@ -590,14 +590,14 @@ async def test_productive_period_ends_tracking_by_itself(
     session_factory: async_sessionmaker[AsyncSession],
 ) -> None:
     headers, farm = await start(client)
-    # Strawberry is productive for two years (design 8.3), so the plant has to be
+    # Tomato is productive for one year (design 8.3), so the plant has to be
     # young enough to register; the job is then driven by moving productive_until.
     plant = await new_plant(
         client,
         headers,
         farm["id"],
-        variety="Stroberi Frigo",
-        nursery_started_at=(TODAY - timedelta(days=400)).isoformat(),
+        variety="Tomat Cherry",
+        nursery_started_at=(TODAY - timedelta(days=120)).isoformat(),
         label="Bedengan A",
     )
     await harvest(client, headers, plant["id"], TODAY - timedelta(days=5))
@@ -608,7 +608,7 @@ async def test_productive_period_ends_tracking_by_itself(
         await db.commit()
     async with session_factory() as db:
         ended = await complete_productive_period(db, settings, today=TODAY)
-    assert [p.code for p in ended] == ["STB-001"]
+    assert [p.code for p in ended] == ["TMT-001"]
 
     data = await get_plant(client, headers, plant["id"])
     assert data["status"] == "ended"

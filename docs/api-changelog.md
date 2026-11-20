@@ -112,7 +112,7 @@ final res = await req.send();
 
 ## 5. Aturan yang wajib dipatuhi klien
 
-1. `variety` bebas, tapi harus menyebut `mangga`, `jeruk`, atau `stroberi`. Selain itu `400`.
+1. `variety` bebas, tapi harus menyebut `mangga`, `jeruk`, atau `tomat`. Selain itu `400`.
    Backend menyimpan komoditas hasil turunan; klien tidak perlu mengirim `commodity_code`.
 2. `nursery_started_at` tidak boleh di masa depan. `planted_at` tidak boleh lebih awal dari
    tanggal pembibitan; kalau kosong, disamakan backend.
@@ -130,7 +130,7 @@ final res = await req.send();
 ## 6. Dampak ke tim ML
 
 Backend mengirim ke model: `commodity_code` (hasil turunan: `mango`/`citrus`/
-`strawberry`) + gambar. Layanan vision menentukan `status` (`decide_status()`);
+`tomato`) + gambar. Layanan vision menentukan `status` (`decide_status()`);
 backend hanya menyimpannya di `scans`. Desain ML Memet **draft 2** memakai
 output nama penyakit langsung + status `sehat/sakit/tak_terdeteksi/foto_ditolak`;
 ini **belum** dipakai runtime. Runtime memakai kode penyakit `design.md` 11.5;
@@ -155,9 +155,9 @@ keputusan tiga komoditas. `contracts/openapi.json` tetap dihasilkan dari kode.
 
 | Area | Sebelum | Sesudah |
 |---|---|---|
-| Komoditas | default `chili`, daftar tidak divalidasi ketat | tepat `mango`, `citrus`, `strawberry`; default `mango`; selain itu 400 |
+| Komoditas | default `chili`, daftar tidak divalidasi ketat | tepat `mango`, `citrus`, `tomato`; default `mango`; selain itu 400 |
 | `type` | `disease` \| `ripeness` | hanya `disease`; `ripeness` dihapus total |
-| Model | `disease-chili-v0.1.0`, `ripeness-chili-v0.1.0` | `disease-mango-v0.1.0`, `disease-citrus-v0.1.0`, `disease-strawberry-v0.1.0`; shadow opsional `-v0.2.0-rc1` |
+| Model | `disease-chili-v0.1.0`, `ripeness-chili-v0.1.0` | `disease-mango-v0.1.0`, `disease-citrus-v0.1.0`, `disease-tomato-v0.1.0`; shadow opsional `-v0.2.0-rc1` |
 | Manifest | 7 label cabai + 4 stage ripeness | 8/5/5 label per komoditas (`design.md` 11.5); `commodity_code` manifest wajib sama dengan yang diminta |
 | Contoh payload | `chili`, `anthracnose`, field `stage` | `mango`, `mango_anthracnose`, tanpa `stage`/`estimated_days_*` |
 | `status` | sumber kebenaran didokumentasikan sebagai backend (`design.md` 11.2 lama) | **layanan vision** (`decide_status()`); backend hanya menyimpan di `scans`, frontend tidak menghitung ulang |
@@ -282,5 +282,26 @@ final res = await http.delete(
 - `UserOut` mendapat field `avatar_url: string | null`.
 - `POST /users/me/avatar` memakai `multipart/form-data`; bukan endpoint JSON.
 - Tidak ada perubahan pada `TokenPair` atau alur login/refresh.
+
+---
+
+## 12. Komoditas ketiga: `strawberry` → `tomato`
+
+Perubahan ini mengganti komoditas ketiga di runtime v2. Biaya integrasi ada di
+klien dan di data referensi, bukan di alur scan.
+
+| Area | Sebelum | Sesudah |
+|---|---|---|
+| `commodity_code` | `mango`, `citrus`, `strawberry` | `mango`, `citrus`, `tomato` (default tetap `mango`) |
+| Model | `disease-strawberry-v0.1.0` | `disease-tomato-v0.1.0` |
+| Label | 5 label stroberi | `healthy`, `tomato_bacterial_spot`, `tomato_early_blight`, `tomato_late_blight`, `tomato_septoria_leaf_spot` |
+| `planting_material` | `runner` untuk stroberi | `seed` (default tomat) / `grafted` / `other`; `runner` dihapus |
+| Kode tanaman | `STB-001` | `TMT-001` |
+| Migrasi DB | — | Alembic `0009` memperbarui CHECK, `crop_profiles`, dan baris lama |
+
+Klien harus mengganti string `strawberry` menjadi `tomato` pada `commodity_code`
+dan `disease-strawberry-v0.1.0` menjadi `disease-tomato-v0.1.0`. Kode tanaman lama
+yang sudah terlanjur `STB-*` tidak diubah oleh migrasi (kode tidak pernah dipakai
+ulang); tanaman baru memakai `TMT-*`.
 
 

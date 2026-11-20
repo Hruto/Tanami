@@ -16,8 +16,8 @@ from app.schemas.farm import PlantCreate
         ("Mangga Arumanis", "mango"),
         ("mangga harum manis", "mango"),
         ("Jeruk Siam", "citrus"),
-        ("Stroberi Frigo", "strawberry"),
-        ("  Stroberi Frigo  ", "strawberry"),
+        ("Tomat Cherry", "tomato"),
+        ("  Tomat Cherry  ", "tomato"),
     ],
 )
 def test_commodity_diturunkan_dari_nama_varietas(variety: str, expected: str) -> None:

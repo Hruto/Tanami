@@ -4639,7 +4639,6 @@
         "enum": [
           "grafted",
           "seed",
-          "runner",
           "other"
         ],
         "title": "PlantingMaterial",
@@ -8623,7 +8622,7 @@
     },
     "/api/v1/plant-types": {
       "get": {
-        "description": "Dropdown of plant types (mango, citrus, strawberry) with the planting materials allowed.",
+        "description": "Dropdown of plant types (mango, citrus, tomato) with the planting materials allowed.",
         "operationId": "plant_types_api_v1_plant_types_get",
         "responses": {
           "200": {

@@ -19,7 +19,7 @@ from app.domain import DISEASE_LABELS_BY_COMMODITY, ScanType, known_labels
 DEFAULT_VERSIONS: dict[str, str] = {
     "mango": "disease-mango-v0.1.0",
     "citrus": "disease-citrus-v0.1.0",
-    "strawberry": "disease-strawberry-v0.1.0",
+    "tomato": "disease-tomato-v0.1.0",
 }
 
 SHADOW_VERSIONS: dict[str, str] = {

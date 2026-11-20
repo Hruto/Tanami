@@ -39,7 +39,7 @@ _ERRORS: dict[int | str, dict[str, object]] = {
     summary="Klasifikasi satu gambar",
     description=(
         "Menerima satu foto daun buah dengan type=disease untuk komoditas "
-        "mangga, jeruk, atau stroberi, lalu mengembalikan `result` sesuai "
+        "mangga, jeruk, atau tomat, lalu mengembalikan `result` sesuai "
         "design.md 11.3 beserta `status` dari ambang keyakinan design.md 11.2.\\n\\n"
         "Layanan ini **stateless**: tidak menyimpan gambar, tidak menulis "
         "database, tidak mengirim notifikasi. Penyimpanan dan pemberian "
@@ -54,7 +54,7 @@ async def predict(
     image: Annotated[UploadFile, File(description="JPEG/PNG, maks 2 MB dari backend")],
     client_uuid: Annotated[str | None, Form(description="UUID dari klien")] = None,
     commodity_code: Annotated[
-        str | None, Form(description="mango, citrus, atau strawberry (default: mango)")
+        str | None, Form(description="mango, citrus, atau tomato (default: mango)")
     ] = None,
     idempotency_key: IdempotencyKey = None,
 ) -> PredictionResponse:

@@ -83,8 +83,8 @@ async def test_irigasi_bisa_diubah_dan_riwayatnya_tersimpan(client: AsyncClient)
         await client.post(
             f"/api/v1/farms/{farm['id']}/plants",
             json={
-                "label": "Stroberi 1",
-                "variety": "Stroberi Frigo",
+                "label": "Tomat 1",
+                "variety": "Tomat Cherry",
                 "nursery_started_at": (TODAY - timedelta(days=20)).isoformat(),
             },
             headers=headers,

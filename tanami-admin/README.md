@@ -1,6 +1,6 @@
 # tanami-admin
 
-> **Status:** dokumen ini menjelaskan kode yang berjalan sekarang, mengikuti `docs/design.md` **v2** (mangga, jeruk, stroberi) untuk deteksi penyakit.
+> **Status:** dokumen ini menjelaskan kode yang berjalan sekarang, mengikuti `docs/design.md` **v2** (mangga, jeruk, tomat) untuk deteksi penyakit.
 
 Ruang kerja tim Tanami: web untuk **ahli**, **moderator**, dan **admin**. Akun petani ditolak saat masuk.
 

@@ -24,19 +24,20 @@ async def test_indoor_plant_and_plant_type_dropdown(client: AsyncClient) -> None
     )
     assert indoor["placement"] == "indoor" and farm["village"] == "Gambir"
     types = (await client.get("/api/v1/plant-types")).json()["data"]
-    # design 8.2: only mango, citrus and strawberry are offered in v2.
-    assert [row["code"] for row in types] == ["mango", "citrus", "strawberry"]
+    # design 8.2: only mango, citrus and tomato are offered in v2.
+    assert [row["code"] for row in types] == ["mango", "citrus", "tomato"]
     by_code = {row["code"]: row for row in types}
     assert by_code["mango"]["label"] == "Mangga" and by_code["mango"]["detection_supported"] is True
     assert by_code["citrus"]["detection_supported"] is True
-    assert by_code["strawberry"]["label"] == "Stroberi"
+    assert by_code["tomato"]["label"] == "Tomat"
     # design 8.3: material choices per commodity, with its default (8.2 note).
     assert {item["code"] for item in by_code["mango"]["materials"]} == {"grafted", "seed", "other"}
+    assert {item["code"] for item in by_code["tomato"]["materials"]} == {"seed", "grafted", "other"}
     defaults = {
         code: [item["code"] for item in row["materials"] if item["is_default"]]
         for code, row in by_code.items()
     }
-    assert defaults == {"mango": ["grafted"], "citrus": ["grafted"], "strawberry": ["runner"]}
+    assert defaults == {"mango": ["grafted"], "citrus": ["grafted"], "tomato": ["seed"]}
     bad = await client.post(
         f"/api/v1/farms/{farm['id']}/plants",
         json={

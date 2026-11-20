@@ -15,7 +15,7 @@ ModelBackend = Literal["stub", "onnx"]
 DEFAULT_DISEASE_MODEL_VERSIONS: dict[str, str] = {
     "mango": "disease-mango-v0.1.0",
     "citrus": "disease-citrus-v0.1.0",
-    "strawberry": "disease-strawberry-v0.1.0",
+    "tomato": "disease-tomato-v0.1.0",
 }
 
 

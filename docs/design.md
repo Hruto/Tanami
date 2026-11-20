@@ -25,15 +25,15 @@ v2 mengubah **cara kerja tracking, scan, dan history**. Bagian lain (design syst
 
 | # | Perubahan | Alasan |
 |---|---|---|
-| 1 | **Fokus 3 tanaman buah:** mangga (`mango`), jeruk (`citrus`), stroberi (`strawberry`). Jenis lain dihapus dari dropdown. | Fokus tim; dataset penyakit daun tersedia untuk ketiganya (11.5). |
+| 1 | **Fokus 3 tanaman buah:** mangga (`mango`), jeruk (`citrus`), tomat (`tomato`). Jenis lain dihapus dari dropdown. | Fokus tim; dataset penyakit daun tersedia untuk ketiganya (11.5). |
 | 2 | **Tracking berbasis aturan, bukan ML.** Timeline (umur mulai berbuah, siklus panen, akhir masa produktif) dihitung dari **profil tanaman** (8.3) yang diisi dari literatur agronomi. | Tidak ada dataset "dari bibit sampai panen" untuk melatih model. |
 | 3 | **Panen dicatat bertahap:** panen ke-1, ke-2, dst. Perkiraan panen berikutnya selalu berupa **rentang tanggal**. | Pohon buah dipanen berkali-kali, tidak ditebang saat panen. |
 | 4 | **Scan wajib memilih tanaman yang terdaftar.** Daftar Tanaman Deteksi (`detection_plants`) **dihapus**; setiap scan tersimpan menempel ke satu tanaman. Ada "Cek cepat" tanpa tanaman yang **tidak disimpan**. | Menghilangkan redundansi dua daftar tanaman; riwayat penyakit otomatis terkelompok per tanaman. |
 | 5 | **Penyakit dapat memundurkan perkiraan panen** lewat **episode penyakit** (8.5): hanya dari hasil `confident` yang **dikonfirmasi pengguna**, dihitung **sekali per episode per siklus**, dengan batas maksimum. | Scan daun yang sama berkali-kali tidak boleh menumpuk keterlambatan. |
 | 6 | **Akhiri tracking** hanya bisa dilakukan **sebelum masa produktif habis**. Setelah lewat, tracking selesai otomatis. Alasan baru: penyakit (pilih dari riwayat scan tanaman itu), ditebang/dibongkar, mati bukan karena penyakit, lainnya. | Permintaan tim; "ditebang vs sakit" di versi sebelumnya tumpang tindih (tanaman bisa ditebang *karena* sakit). |
 | 7 | **Dua history:** **Riwayat Tanaman** (status akhir, jumlah panen, alasan, penyakit) dan **Riwayat Scan** (penyakit, keyakinan %, pencegahan; filter penyakit dan tanaman). "Gagal panen" hanya untuk tanaman yang dihentikan **sebelum panen pertama**. | Pohon yang sudah panen 10 kali lalu ditebang bukan gagal panen. |
-| 8 | **Satu tanaman = satu pohon atau satu kelompok** (kolom `quantity`). Stroberi umumnya dicatat per kelompok/bedengan. | Mencatat ratusan tanaman stroberi satu per satu tidak realistis. |
-| 9 | **Jenis bibit** (`planting_material`) wajib: okulasi/sambung, biji, anakan (runner), lainnya. | Petani jarang menanam dari biji; umur mulai berbuah sangat berbeda per jenis bibit. |
+| 8 | **Satu tanaman = satu pohon atau satu kelompok** (kolom `quantity`). Tomat umumnya dicatat per kelompok/bedengan. | Mencatat ratusan tanaman tomat satu per satu tidak realistis. |
+| 9 | **Jenis bibit** (`planting_material`) wajib: okulasi/sambung, biji, lainnya. | Petani jarang menanam dari biji; umur mulai berbuah sangat berbeda per jenis bibit. |
 | 10 | Scan kematangan buah (`ripeness`) dan hasil akhir persentase (`final_result`, `yield_percent`) **dipensiunkan**. | Tidak ada data kematangan untuk 3 komoditas ini; hasil akhir diganti status akhir (8.6). |
 
 **Penyimpangan dari dokumen requirement** (perlu persetujuan pemilik requirement, lihat pertanyaan terbuka #11):
@@ -48,7 +48,7 @@ v2 mengubah **cara kerja tracking, scan, dan history**. Bagian lain (design syst
 
 ## 1. Ringkasan Produk dan Prinsip Desain
 
-**Tanami** adalah aplikasi pendamping petani dan penghobi **tanaman buah (mangga, jeruk, stroberi)**. Pengguna mendaftarkan kebun dan tanamannya, melihat perkiraan kapan tanaman mulai berbuah dan kapan panen berikutnya, mencatat setiap panen, memeriksa penyakit daun dari foto, menerima pengingat, dan berdiskusi di forum.
+**Tanami** adalah aplikasi pendamping petani dan penghobi **tanaman buah (mangga, jeruk, tomat)**. Pengguna mendaftarkan kebun dan tanamannya, melihat perkiraan kapan tanaman mulai berbuah dan kapan panen berikutnya, mencatat setiap panen, memeriksa penyakit daun dari foto, menerima pengingat, dan berdiskusi di forum.
 
 **Prinsip desain (jadi pegangan saat ragu):**
 1. **Satu tangan, di bawah matahari.** Layar dipakai di kebun: tombol besar, kontras tinggi, sedikit langkah.
@@ -67,8 +67,8 @@ v2 mengubah **cara kerja tracking, scan, dan history**. Bagian lain (design syst
 | Persona | Deskripsi | Kebutuhan utama | Catatan desain |
 |---|---|---|---|
 | **Pak Budi, petani mangga/jeruk** | 45-60 tahun, HP Android kelas menengah ke bawah, sinyal tidak stabil, kebun outdoor 0,2-2 ha, puluhan pohon | Tahu daun kenapa, kapan kira-kira panen, catatan panen tiap musim | Teks besar, ikon jelas, sedikit mengetik, offline |
-| **Rina, penghobi tanaman buah** | 20-35 tahun, mangga/jeruk dalam pot, stroberi di polybag | Kapan berbuah, pengingat siram, foto perkembangan | Kebun indoor/outdoor, riwayat foto |
-| **Bu Sari, petani stroberi** | 35-50 tahun, beberapa bedengan stroberi | Mencatat panen per bedengan, cek penyakit daun | Tanaman dicatat per kelompok (`quantity`) |
+| **Rina, penghobi tanaman buah** | 20-35 tahun, mangga/jeruk dalam pot, tomat di polybag | Kapan berbuah, pengingat siram, foto perkembangan | Kebun indoor/outdoor, riwayat foto |
+| **Bu Sari, petani tomat** | 35-50 tahun, beberapa bedengan tomat | Mencatat panen per bedengan, cek penyakit daun | Tanaman dicatat per kelompok (`quantity`) |
 | **Penyuluh/ahli** | Penyuluh pertanian, dosen | Menjawab di forum, meninjau hasil deteksi yang salah, mengisi profil tanaman dan basis penyakit | Peran `expert` terverifikasi |
 
 ---
@@ -78,7 +78,7 @@ v2 mengubah **cara kerja tracking, scan, dan history**. Bagian lain (design syst
 | Prioritas | Fitur (requirement) | Isi |
 |---|---|---|
 | P0 | **Tambah Kebun (R0)** | Nama kebun, lokasi kelurahan (kode adm4), penempatan `indoor`/`outdoor` |
-| P0 | **Tracking Tanaman (R1)** | Jenis (mangga/jeruk/stroberi), jenis bibit, tanggal tanam, jumlah, jadwal irigasi, foto, catat perawatan; **timeline otomatis** (fase, perkiraan panen pertama/berikutnya, akhir masa produktif); **catat panen ke-n**; akhiri tracking sebelum masa produktif habis |
+| P0 | **Tracking Tanaman (R1)** | Jenis (mangga/jeruk/tomat), jenis bibit, tanggal tanam, jumlah, jadwal irigasi, foto, catat perawatan; **timeline otomatis** (fase, perkiraan panen pertama/berikutnya, akhir masa produktif); **catat panen ke-n**; akhiri tracking sebelum masa produktif habis |
 | P0 | **Scan Penyakit Daun (R3, diubah)** | Pilih tanaman terdaftar -> foto daun -> nama penyakit, keyakinan %, gejala, pencegahan, penanganan; konfirmasi penyakit -> perkiraan panen bisa mundur |
 | P0 | **Riwayat Tanaman (R2)** dan **Riwayat Scan (R4, diubah)** | Riwayat Tanaman: tanaman yang selesai/dihentikan, status akhir, jumlah panen, alasan, penyakit. Riwayat Scan: semua hasil scan dengan filter penyakit, jenis tanaman, dan tanaman |
 | P1 | **Notifikasi dan Pengingat (R7)** | Siram, foto, pemantauan, tindak lanjut penyakit, **panen sudah dekat**, **cek catatan panen**, masa produktif hampir habis |
@@ -87,7 +87,7 @@ v2 mengubah **cara kerja tracking, scan, dan history**. Bagian lain (design syst
 | P2 | **Cek cepat** | Scan tanpa memilih tanaman (pilih jenis saja); hasil ditampilkan, **tidak disimpan** |
 | Tambahan | Reminder cuaca BMKG | Hanya untuk kebun `outdoor`; memakai perkiraan panen dari 8.4 |
 
-**Di luar cakupan:** tanaman selain mangga/jeruk/stroberi, scan kematangan buah, scan penyakit pada buah/bunga (hanya daun), prediksi jumlah panen (kg), konsultasi video, peta sebaran penyakit, marketplace, sensor IoT, perpanjangan masa produktif (mis. peremajaan, sambung ulang, injeksi).
+**Di luar cakupan:** tanaman selain mangga/jeruk/tomat, scan kematangan buah, scan penyakit pada buah/bunga (hanya daun), prediksi jumlah panen (kg), konsultasi video, peta sebaran penyakit, marketplace, sensor IoT, perpanjangan masa produktif (mis. peremajaan, sambung ulang, injeksi).
 
 ---
 
@@ -133,8 +133,8 @@ Forum   -> Daftar Posting -> Detail Posting (komentar, suka, laporkan) | Buat Po
 5. Selesai -> Beranda dengan kartu "Perkiraan panen pertama: ..." dan ajakan "Periksa daun pertama Anda".
 
 ### 5.2 Mendaftarkan tanaman (R1)
-1. Pilih **jenis**: Mangga, Jeruk, Stroberi.
-2. Pilih **jenis bibit**: Okulasi/sambung, Biji, Anakan (khusus stroberi), Lainnya. Default per jenis: mangga/jeruk = okulasi, stroberi = anakan.
+1. Pilih **jenis**: Mangga, Jeruk, Tomat.
+2. Pilih **jenis bibit**: Okulasi/sambung, Biji, Lainnya. Default per jenis: mangga/jeruk = okulasi, tomat = biji.
 3. Isi **nama/label** (mis. "Mangga Depan Rumah"), **varietas** (opsional, mis. "Harum Manis"), **tanggal tanam** (boleh perkiraan; tidak boleh di masa depan), **jumlah** (default 1; isi >1 untuk kelompok/bedengan), **jadwal irigasi**.
 4. Opsional: foto awal.
 5. Backend memberi **kode tanaman** (mis. `MGA-001`) dan langsung menghitung timeline: fase, perkiraan panen pertama, tanggal akhir masa produktif (8.3-8.4).
@@ -340,8 +340,8 @@ Daftar posting -> detail -> komentar / suka / laporkan. Buat posting: judul, isi
 | Enum | Nilai |
 |---|---|
 | `placement` (R0) | `indoor`, `outdoor` |
-| `commodity_code` (R1) | `mango` (Mangga), `citrus` (Jeruk), `strawberry` (Stroberi). Label dari `GET /plant-types`. |
-| `planting_material` (R1) | `grafted` (okulasi/sambung), `seed` (biji), `runner` (anakan/stolon, hanya stroberi), `other` (dihitung seperti bibit default jenisnya) |
+| `commodity_code` (R1) | `mango` (Mangga), `citrus` (Jeruk), `tomato` (Tomat). Label dari `GET /plant-types`. |
+| `planting_material` (R1) | `grafted` (okulasi/sambung), `seed` (biji), `other` (dihitung seperti bibit default jenisnya) |
 | `irrigation_schedule` (R1) | `daily` (setiap hari), `every_3_5_days` (setiap 3-5 hari), `weekly` (setiap minggu), `never` (tidak pernah) |
 | `lifecycle_phase` | `juvenile` (Belum berbuah), `productive` (Masa berbuah) |
 | `tracking_end_reason` (R1) | `productive_period_over` (otomatis oleh sistem), `disease` (mati/dibongkar karena penyakit), `cut_down` (ditebang/dibongkar karena alasan lain), `died_other` (mati bukan karena penyakit), `other` |
@@ -364,7 +364,7 @@ Daftar posting -> detail -> komentar / suka / laporkan. Buat posting: judul, isi
 
 **Dihapus dari v0.3:** `growth_stage`, `harvest_outcome`/`final_result`, `ripeness_stage`, nilai `tracking_end_reason` lama (`harvested`, `died`, `not_maintained`), `reminder_type` `harvest_soon`, komoditas selain tiga di atas.
 
-**Kode tanaman** = prefiks jenis + nomor urut per pengguna, minimal 3 digit: `MGA-001` (mangga), `JRK-001` (jeruk), `STB-001` (stroberi). Diberikan backend, tidak pernah dipakai ulang, tidak bisa diubah.
+**Kode tanaman** = prefiks jenis + nomor urut per pengguna, minimal 3 digit: `MGA-001` (mangga), `JRK-001` (jeruk), `TMT-001` (tomat). Diberikan backend, tidak pernah dipakai ulang, tidak bisa diubah.
 
 **Umur tanaman** (`age_days`) = selisih hari antara `planted_at` dan hari ini (zona `Asia/Jakarta`), atau tanggal pengakhiran bila tracking sudah diakhiri.
 
@@ -378,12 +378,12 @@ Profil adalah **data**, bukan kode: disimpan di tabel `crop_profiles`, diisi see
 | `mango` | `seed` | 1825-2920 (5-8 th) | 330-400 | 40 th | Musiman, sekali setahun |
 | `citrus` | `grafted` | 730-1095 (2-3 th) | 150-210 | 20 th | 1-2 kali setahun (musim raya + selingan) |
 | `citrus` | `seed` | 1825-2555 (5-7 th) | 150-210 | 20 th | 1-2 kali setahun |
-| `strawberry` | `runner` | 60-90 | 3-7 | 2 th | Terus-menerus selama berbuah (petik tiap beberapa hari) |
-| `strawberry` | `seed` | 120-180 | 3-7 | 2 th | Terus-menerus |
+| `tomato` | `seed` | 90-120 | 7-10 | 1 th | Terus-menerus selama berbuah (petik tiap beberapa hari) |
+| `tomato` | `grafted` | 80-110 | 7-10 | 1 th | Terus-menerus |
 
 Catatan:
-- `other` memakai baris bibit default jenisnya: `grafted` untuk mangga/jeruk, `runner` untuk stroberi. `runner` hanya sah untuk stroberi.
-- Stroberi dipetik sangat sering. Aplikasi **menyarankan** mencatat panen stroberi **per minggu** (satu catatan untuk semua petikan minggu itu); siklus 3-7 hari tetap dipakai untuk perkiraan.
+- `other` memakai baris bibit default jenisnya: `grafted` untuk mangga/jeruk, `seed` untuk tomat. Tomat tidak memakai `runner`.
+- Tomat dipetik sangat sering. Aplikasi **menyarankan** mencatat panen tomat **per minggu** (satu catatan untuk semua petikan minggu itu); siklus 7-10 hari tetap dipakai untuk perkiraan.
 - Musim mangga di Indonesia terikat musim kemarau. MVP **tidak** mencocokkan perkiraan ke bulan musim per daerah; ini perbaikan pasca-MVP (pertanyaan terbuka #13).
 
 ### 8.4 Fase dan perkiraan panen
@@ -756,7 +756,7 @@ Frontend **wajib menampilkan** teks `attribution` ("Sumber data: BMKG") di panel
 
 | Metode | Path | Keterangan |
 |---|---|---|
-| GET | `/forum/categories` | Kategori = Mangga, Jeruk, Stroberi + "Umum" |
+| GET | `/forum/categories` | Kategori = Mangga, Jeruk, Tomat + "Umum" |
 | GET | `/forum/posts?commodity_code=&cursor=&q=` | Daftar posting (publik; `liked_by_me` bila login) |
 | POST | `/forum/posts` | `{ "commodity_code", "title", "body", "scan_id"?, "image_keys"? }` |
 | GET/DELETE | `/forum/posts/{id}` | Detail + komentar / hapus milik sendiri |
@@ -917,23 +917,23 @@ Kode penyakit **unik global** dengan prefiks jenis; kelas sehat memakai kode ber
 | `citrus_black_spot` | Bercak hitam | `fungus` | Black spot | 7 |
 | `citrus_melanose` | Melanosa | `fungus` | Melanose | 7 |
 
-**Stroberi (`strawberry`)** - hanya penyakit daun
+**Tomat (`tomato`)** - hanya penyakit daun
 
 | `disease_code` | Nama | `cause_category` | Label dataset | Hari mundur |
 |---|---|---|---|---|
 | `healthy` | Sehat | `healthy` | healthy (PlantVillage) | 0 |
-| `strawberry_leaf_scorch` | Hangus daun | `fungus` | Leaf_scorch (PlantVillage) | 7 |
-| `strawberry_leaf_spot` | Bercak daun | `fungus` | Leaf Spot | 7 |
-| `strawberry_angular_leaf_spot` | Bercak daun bersudut | `bacteria` | Angular Leafspot | 7 |
-| `strawberry_powdery_mildew` | Embun tepung | `fungus` | Powdery Mildew Leaf | 7 |
+| `tomato_bacterial_spot` | Bercak bakteri | `bacteria` | Bacterial spot (PlantVillage) | 7 |
+| `tomato_early_blight` | Bercak daun awal | `fungus` | Early blight (PlantVillage) | 7 |
+| `tomato_late_blight` | Busuk daun | `fungus` | Late blight (PlantVillage) | 7 |
+| `tomato_septoria_leaf_spot` | Bercak daun septoria | `fungus` | Septoria leaf spot (PlantVillage) | 7 |
 
 **Dataset kandidat** (lisensi, jumlah gambar, dan isi kelas **wajib dicek ulang** oleh tim ML di sumber aslinya sebelum dipakai; catat di `tanami-ml/reports/datasets.md`):
 
 | Jenis | Dataset | Catatan risiko |
 |---|---|---|
 | Mangga | **MangoLeafBD** (Mendeley Data, Bangladesh) | Periksa apakah sebagian gambar hasil augmentasi; bila ya, bagi train/val/test berdasarkan gambar asli agar tidak bocor |
-| Jeruk | **Citrus Leaves Dataset**, Rauf dkk. 2019 (Data in Brief / Mendeley, Pakistan) | Kecil dan tidak seimbang; beberapa kelas sangat sedikit -> perlu augmentasi, class weight, dan laporan per kelas. Kelas greening dapat ditambah dari PlantVillage (Orange Haunglongbing) dengan risiko latar seperti di baris stroberi |
-| Stroberi | **PlantVillage** (Leaf scorch, healthy) + **Strawberry Disease Detection Dataset**, Afzaal dkk. 2021 (Kaggle) | **Risiko jalan pintas latar:** PlantVillage berlatar polos laboratorium, Afzaal berlatar lapangan. Model bisa belajar "latar polos = sehat/leaf scorch". Mitigasi: potong/segmentasi daun, tambah foto sehat lapangan, cek dengan Grad-CAM |
+| Jeruk | **Citrus Leaves Dataset**, Rauf dkk. 2019 (Data in Brief / Mendeley, Pakistan) | Kecil dan tidak seimbang; beberapa kelas sangat sedikit -> perlu augmentasi, class weight, dan laporan per kelas. Kelas greening dapat ditambah dari PlantVillage (Orange Haunglongbing) dengan risiko latar seperti di baris tomat |
+| Tomat | **PlantVillage** (Bacterial spot, Early blight, Late blight, Septoria leaf spot, healthy) + **Tomato Leaf Disease Dataset** (Kaggle) | **Risiko jalan pintas latar:** PlantVillage berlatar polos laboratorium, dataset lapangan berlatar kompleks. Model bisa belajar "latar polos = sehat". Mitigasi: potong/segmentasi daun, tambah foto sehat lapangan, cek dengan Grad-CAM |
 
 **Pergeseran domain:** semua dataset berasal dari luar Indonesia dan sebagian difoto di lab. Tim ML **wajib** menyiapkan **set uji foto lapangan Indonesia** (target [USULAN] >= 30 foto per kelas, diberi label oleh ahli) dan melaporkan metrik di set itu terpisah dari set uji dataset publik.
 
@@ -963,8 +963,8 @@ Dihitung harian (06:30 WIB) untuk setiap tanaman **aktif** milik akun aktif. Tan
 | `scan_followup` | Ada episode `open` dan tanaman belum discan 7 hari [USULAN] | `normal` | "Antraknosa pada MGA-001 belum dicek lagi. Yuk foto daunnya." |
 | `harvest_due` | `next_harvest.start` <= 3 hari lagi [USULAN] (sekali per siklus) | `normal` | "Perkiraan panen MGA-001 mulai 19 Nov. Sudah panen? Catat di aplikasi." |
 | `harvest_check` | Hari ini > `next_harvest.end` dan belum ada catatan panen di siklus ini (sekali per siklus) | `low` | "Belum ada catatan panen untuk MGA-001. Sudah panen atau belum berbuah?" |
-| `productive_ending` | 30 hari sebelum `productive_until` | `low` | "Masa produktif STB-002 berakhir 9 Des. Setelah itu tracking selesai otomatis." |
-| `tracking_completed` | Job mengakhiri tracking dengan `productive_period_over` | `normal` | "Tracking STB-002 selesai. Lihat ringkasannya di Riwayat." |
+| `productive_ending` | 30 hari sebelum `productive_until` | `low` | "Masa produktif TMT-002 berakhir 9 Des. Setelah itu tracking selesai otomatis." |
+| `tracking_completed` | Job mengakhiri tracking dengan `productive_period_over` | `normal` | "Tracking TMT-002 selesai. Lihat ringkasannya di Riwayat." |
 
 **Scan ulang** bersifat **manual**: pengguna menekan "Scan daun tanaman ini"; tidak ada pemeriksaan otomatis.
 
@@ -997,7 +997,7 @@ Rule engine (pengingat, perkiraan panen, keterlambatan) adalah **kode aturan ter
 
 ## 13. Forum (R5)
 
-- **Kategori:** Mangga, Jeruk, Stroberi, ditambah "Umum".
+- **Kategori:** Mangga, Jeruk, Tomat, ditambah "Umum".
 - **Posting:** judul, isi, hingga 3 foto, atau lampirkan hasil scan (yang dibagikan hanya foto dan ringkasan hasil, bukan data kebun/tanaman).
 - **Komentar:** datar (tanpa balasan bersarang).
 - **Suka (interaksi pengguna):** satu suka per pengguna per posting; jumlah suka tampil di kartu posting.
@@ -1070,7 +1070,7 @@ app/
                      # admin, maintenance
   providers/         # vision client, storage, images, push (FCM v1), weather (BMKG)
   jobs/              # scheduler (bagian 12.3)
-migrations/          # Alembic 0001-0008 (0001-0004 v0.3, 0005 v2, 0006 pasca-rapat, 0007 default scan, 0008 avatar)
+migrations/          # Alembic 0001-0009 (0001-0004 v0.3, 0005 v2, 0006 pasca-rapat, 0007 default scan, 0008 avatar, 0009 tomat)
 contracts/           # openapi.json (dibuat otomatis)
 tests/
   unit/ integration/ contract/
@@ -1104,7 +1104,7 @@ data/  notebooks/  src/  configs/  reports/   # reports/datasets.md wajib (sumbe
 
 | # | Pertanyaan | Status |
 |---|---|---|
-| 1 | Komoditas | **Diputuskan (v2): mangga, jeruk, stroberi.** |
+| 1 | Komoditas | **Diputuskan (v2): mangga, jeruk, tomat.** |
 | 2 | Aplikasi mobile (React Native) atau PWA? | Terbuka (PM + Frontend). |
 | 3 | Ahli/penyuluh mitra untuk validasi label, konten solusi, profil tanaman, dan hari keterlambatan? | Terbuka (PM). **Menjadi penghambat rilis** karena 8.3 dan 11.5 bergantung padanya. |
 | 4 | Metode login? | **Diputuskan (requirement 6): email atau username + kata sandi.** |
@@ -1118,14 +1118,14 @@ data/  notebooks/  src/  configs/  reports/   # reports/datasets.md wajib (sumbe
 | 12 | Bolehkah pengguna membatalkan "Akhiri tracking" yang salah tekan (mis. dalam 24 jam)? | Terbuka (PM + Frontend). v2: tidak bisa dibatalkan. |
 | 13 | Mencocokkan perkiraan panen mangga/jeruk ke bulan musim per daerah? | Pasca-MVP. |
 | 14 | Apakah tanaman yang lewat masa produktif benar-benar diakhiri otomatis, atau cukup ditandai "lewat masa produktif" dan pengguna yang mengakhiri? | v2: otomatis (permintaan tim). Dapat ditinjau ulang setelah uji pengguna. |
-| 15 | Perlukah scan penyakit buah/bunga (mis. antraknosa buah mangga, busuk abu-abu stroberi)? | Pasca-MVP; dataset daun lebih tersedia. |
+| 15 | Perlukah scan penyakit buah/bunga (mis. antraknosa buah mangga, busuk abu-abu tomat)? | Pasca-MVP; dataset daun lebih tersedia. |
 | 16 | Mode ketat atau longgar untuk aturan masuk tanaman (draft 1)? | **Digantikan draft 2 (19.4).** Sekarang: >=100 gambar asli per penyakit, >=4 kelas penyakit per tanaman, penyakit di bawah ambang masuk hard-negative. |
 | 17 | Bolehkah `rembg` + EfficientNet-B0 dipakai sebagai **ekstraksi fitur** (bukan fine-tuning)? | **Terbuka (Dosen + ML).** Fallback: segmentasi HSV/Otsu/GrabCut + fitur handmade saja. |
-| 18 | Komoditas ML draft 2 (tomat/padi/jagung/apel) vs runtime (mangga/jeruk/stroberi) tidak sejalan. | **Terbuka (PM + Backend + ML).** Lihat 19.14 dan `docs/data-integration.md` §3.4. |
+| 18 | Komoditas ML draft 2 (tomat/padi/jagung/apel) vs runtime (mangga/jeruk/tomat) bersinggungan di tomat, tetapi cakupan keseluruhan tetap berbeda. | **Terbuka (PM + Backend + ML).** Lihat 19.14 dan `docs/data-integration.md` §3.4. |
 | 19 | Daftar gelombang 1 (tomat, padi, jagung, apel) sudah final? | **Terbuka (ML).** Menunggu `00_audit`. |
 | 20 | Ambang >=100 gambar/penyakit dan >=4 penyakit/tanaman sudah final? | **Terbuka (ML + Ahli).** Bisa diubah di `00_audit`. |
 | 21 | Kontrak output draft 2 (`crop/status/disease/top_k/rejected_reason`) vs kontrak runtime 11.3 (`commodity_code/result.top/status`): diterjemahkan di backend atau kontrak 11.3 diubah? | **Terbuka (Backend + ML).** Lihat 19.10 dan `docs/data-integration.md` §3.5. |
-| 22 | Stroberi tetap dapat model deteksi di aplikasi meski draft 2 menggolongkannya sebagai tanaman dengan penyakit terlalu sedikit? | **Terbuka (PM + ML).** |
+| 22 | Model tomat di runtime memakai label `design.md` 11.5 atau label draft 2? | **Terbuka (PM + ML).** |
 
 ---
 
@@ -1136,11 +1136,12 @@ data/  notebooks/  src/  configs/  reports/   # reports/datasets.md wajib (sumbe
 | 0.1 | 2026-10-23 | Draf awal | Tim |
 | 0.2 | 2026-11-08 | Diselaraskan dengan dokumen requirement (R0-R7). | Tim |
 | 0.3 | 2026-11-08 | Ruang kerja tim `tanami-admin` (10.11) dan endpoint staf. | Tim |
-| 2.0 | 2026-11-09 | Fokus mangga/jeruk/stroberi. Tracking berbasis profil tanaman (8.3-8.4) dengan panen bertahap dan perkiraan panen berupa rentang. Episode penyakit dan keterlambatan panen (8.5). Akhiri tracking dengan alasan baru dan status akhir (8.6), selesai otomatis saat masa produktif habis. Scan wajib memilih tanaman; `detection_plants` dihapus; Cek cepat tanpa simpan. Riwayat Tanaman + Riwayat Scan dengan filter. Kontrak ML per jenis tanaman, kelas dan dataset baru, kalibrasi wajib (11). Scan kematangan dan `final_result` dipensiunkan. | Tim |
+| 2.0 | 2026-11-09 | Fokus mangga/jeruk/tomat. Tracking berbasis profil tanaman (8.3-8.4) dengan panen bertahap dan perkiraan panen berupa rentang. Episode penyakit dan keterlambatan panen (8.5). Akhiri tracking dengan alasan baru dan status akhir (8.6), selesai otomatis saat masa produktif habis. Scan wajib memilih tanaman; `detection_plants` dihapus; Cek cepat tanpa simpan. Riwayat Tanaman + Riwayat Scan dengan filter. Kontrak ML per jenis tanaman, kelas dan dataset baru, kalibrasi wajib (11). Scan kematangan dan `final_result` dipensiunkan. | Tim |
 | 2.1 | 2026-11-17 | Pasca-rapat: varietas teks bebas sebagai input, umur dari tanggal mulai pembibitan, `placement` per tanaman, arsip dihapus, progress panen + kualitas hasil, irigasi bisa diubah, thumbnail sekali kirim. Desain ML v2 Memet ditambahkan sebagai bagian 19; pemetaan database aplikasi ↔ ML di `docs/data-integration.md`. | Tim |
 | 2.2 | 2026-11-17 | Bagian 19 diperbarui ke **draft 2** ML: 4/5 kategori dibuang, output nama penyakit langsung, mekanisme tolak tiga lapis, gelombang 1 tomat/padi/jagung/apel, `taxonomy.yaml`, kontrak output baru. Konflik dengan runtime dicatat di 19.14 dan keputusan terbuka 19-22. |
 | 2.3 | 2026-11-19 | `PATCH /users/me` menyatukan edit profil + password (`current_password`/`new_password`, respons `data.tokens`); `POST /users/me/password` dihapus. `data-model.md` diregenerasi dari `Base.metadata`; migrasi `0001`–`0007`; `mobile/` (Flutter) jadi satu-satunya klien mobile di repo. | Tim |
 | 2.4 | 2026-11-19 | Profil pengguna mendapat foto/avatar: kolom `users.avatar_key` + migrasi `0008`, endpoint `POST`/`DELETE /users/me/avatar` (multipart, divalidasi dari isi), `avatar_url` di `UserOut`. `PATCH /users/me` tetap untuk username/email/nama/password; foto tidak dikirim sebagai JSON. | Tim |
+| 2.5 | 2026-11-20 | Komoditas ketiga diganti `strawberry` → `tomato`; label tomat 5 kelas (11.5), `runner` dihapus dari `planting_material`, kode tanaman `TMT-*`, migrasi `0009`. | Tim |
 
 ---
 
@@ -1152,7 +1153,7 @@ skema 4 kategori dibuang, output langsung **nama penyakit**, dan tanaman
 dipilih berdasarkan **jumlah penyakit yang tersedia di dataset**.
 
 > ⚠️ Ini adalah **rencana riset ML**, bukan kontrak runtime saat ini. Layanan
-> vision yang berjalan masih memakai tiga komoditas `mango`/`citrus`/`strawberry`
+> vision yang berjalan masih memakai tiga komoditas `mango`/`citrus`/`tomato`
 > dan label berprefiks komoditas dari 11.5. Belum ada kode yang mengimplementasikan
 > draft 2. Lihat 19.14 dan `docs/data-integration.md` untuk pemetaan yang harus
 > disepakati sebelum diimplementasikan.
@@ -1242,12 +1243,12 @@ filenya). Angka final keluar dari notebook `00_audit`.
 > tetap: model cabai dihapus total dari runtime.
 
 **Tidak dipakai sebagai model sendiri:** tanaman dengan 1-3 penyakit saja
-(stroberi, persik, ceri, anggur, dll. di PlantVillage), karena
+(tomat, persik, ceri, anggur, dll. di PlantVillage), karena
 `tak_terdeteksi` akan terlalu sering. Gambarnya tetap berguna sebagai
 hard-negative dan test.
 
 > ⚠️ Ini berbenturan dengan keputusan runtime yang memasang model
-> `disease-strawberry-v0.1.0`. Belum disepakati apakah stroberi tetap
+> `disease-tomato-v0.1.0`. Belum disepakati apakah tomat tetap
 > mendapat model deteksi (dengan keterbatasan) atau hanya tracking.
 
 **Aturan kelas penyakit:**
@@ -1378,8 +1379,7 @@ Lihat `docs/data-integration.md` §3.5.
 2. Ambang minimum gambar per penyakit (awal 100) dan minimum penyakit per
    tanaman (awal 4).
 3. Konfirmasi dosen soal pretrained untuk ekstraksi.
-4. Apakah stroberi tetap dapat model deteksi di aplikasi, meski draft 2
-   menggolongkannya sebagai tanaman dengan penyakit terlalu sedikit?
+4. Model tomat di runtime memakai label `design.md` 11.5 atau label draft 2?
 5. Kontrak output draft 2 vs kontrak runtime 11.3: terjemahkan di backend atau
    ubah kontrak 11.3?
 
@@ -1398,7 +1398,7 @@ Lihat `docs/data-integration.md` §3.5.
 
 | Aspek | Runtime sekarang (kode) | Draft 2 ML | Status |
 |---|---|---|---|
-| Komoditas | `mango`, `citrus`, `strawberry` | tomat, padi, jagung, apel (+ gelombang 2) | ⚠️ beda |
+| Komoditas | `mango`, `citrus`, `tomato` | tomat, padi, jagung, apel (+ gelombang 2) | ⚠️ sebagian bersinggungan |
 | Label | 8/5/5 kode berprefiks komoditas (11.5) | nama penyakit kanonis bebas, `taxonomy.yaml` | ⚠️ perlu pemetaan |
 | Status | `confident/uncertain/unknown/invalid_image` | `sehat/sakit/tak_terdeteksi/foto_ditolak` | ⚠️ perlu terjemahan |
 | Model | ONNX/stub di `models/`, stateless | `.joblib` + `config.json` di Drive | ⚠️ belum diimplementasikan |
@@ -1417,8 +1417,8 @@ Kode sudah selaras dengan design v2 (tiga komoditas). Rincian pekerjaan per tim:
 
 | Tim | Pekerjaan |
 |---|---|
-| **Backend** | Migrasi `0001`–`0008`: `0005` (crop_profiles, disease_episodes, plants v2, hapus detection_plants), `0006` (nursery_started_at, placement per tanaman, irrigation_changes, quality/success_pct), `0007` (default `scans.commodity_code` → `mango`), `0008` (`users.avatar_key`). Endpoint 10.5/10.6/10.8/10.10; hapus `/detection-plants*`; `PATCH /users/me` menangani profil + password; `POST`/`DELETE /users/me/avatar` menangani foto. Perbarui `contracts/openapi.json` dan tes kontrak. |
+| **Backend** | Migrasi `0001`–`0009`: `0005` (crop_profiles, disease_episodes, plants v2, hapus detection_plants), `0006` (nursery_started_at, placement per tanaman, irrigation_changes, quality/success_pct), `0007` (default `scans.commodity_code` → `mango`), `0008` (`users.avatar_key`), `0009` (komoditas ketiga `strawberry` → `tomato`, `runner` dihapus). Endpoint 10.5/10.6/10.8/10.10; hapus `/detection-plants*`; `PATCH /users/me` menangani profil + password; `POST`/`DELETE /users/me/avatar` menangani foto. Perbarui `contracts/openapi.json` dan tes kontrak. |
 | **Vision/ML** | `POST /v1/predict` menerima `commodity_code` (default `mango`); manifest model per jenis; kelas 11.5; `invalid_reason`. Service berjalan di port 8001, stateless tanpa database; model aktif + shadow dimuat lewat `ModelRegistry`, reload via `POST /v1/models/reload`. Model cabai dan ripeness dipensiunkan: **SELESAI**. Rencana berikutnya mengikuti draft 2 (bagian 19): `00_audit` untuk tomat/padi/jagung/apel, `taxonomy.yaml`, tiga lapis tolak, kontrak output baru—**belum diimplementasikan**, menunggu keputusan terbuka 19-22. |
 | **Frontend (`mobile/`, Flutter)** | Navigasi 5 tab baru (bagian 4); layar S06, S07, S10-S18; Kartu Perkiraan Panen, Timeline Fase, Kartu Konfirmasi Penyakit, Lencana Status Akhir, filter Riwayat Scan; hapus layar Daftar/History Deteksi; antrean offline untuk catatan panen. Saat ini baru auth (welcome/login/register). |
 | **Admin (`tanami-admin`)** | Ringkasan dengan status akhir dan statistik per jenis; Basis penyakit dengan filter jenis dan `harvest_delay_days`; layar Profil tanaman; `allowed_labels` per jenis di Tinjauan deteksi. |
-| **Dokumen** | `tqa.md`, `architecture.md`, `tanami-backend/README.md`, dan `tanami-backend/docs/data-model.md` diselaraskan dengan kode terbaru (tiga komoditas; `PATCH /users/me` untuk profil+password; foto profil `POST`/`DELETE /users/me/avatar`; migrasi `0001`–`0008`; tanpa `detection_plants`/arsip). Nomor bagian 1-18 dipertahankan agar referensi "design 10.6"/"12.4" tetap valid. Dokumen pendukung: `api-changelog.md`, `class-diagram.md`, `data-integration.md`, `panduan-dokumentasi.md`, `ml-router-architecture.md` (trial). |
+| **Dokumen** | `tqa.md`, `architecture.md`, `tanami-backend/README.md`, dan `tanami-backend/docs/data-model.md` diselaraskan dengan kode terbaru (tiga komoditas; `PATCH /users/me` untuk profil+password; foto profil `POST`/`DELETE /users/me/avatar`; migrasi `0001`–`0009`; tanpa `detection_plants`/arsip). Nomor bagian 1-18 dipertahankan agar referensi "design 10.6"/"12.4" tetap valid. Dokumen pendukung: `api-changelog.md`, `class-diagram.md`, `data-integration.md`, `panduan-dokumentasi.md`, `ml-router-architecture.md` (trial). |

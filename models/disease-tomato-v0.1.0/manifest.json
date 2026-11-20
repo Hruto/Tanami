@@ -1,14 +1,14 @@
 {
-  "model_version": "disease-strawberry-v0.1.0",
+  "model_version": "disease-tomato-v0.1.0",
   "scan_type": "disease",
-  "commodity_code": "strawberry",
+  "commodity_code": "tomato",
   "artifact": "model.onnx",
   "labels": [
     "healthy",
-    "strawberry_leaf_scorch",
-    "strawberry_leaf_spot",
-    "strawberry_angular_leaf_spot",
-    "strawberry_powdery_mildew"
+    "tomato_bacterial_spot",
+    "tomato_early_blight",
+    "tomato_late_blight",
+    "tomato_septoria_leaf_spot"
   ],
   "input_size": 224,
   "input_name": "input",

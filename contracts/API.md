@@ -1,7 +1,7 @@
 # Kontrak API — `tanami-vision`
 
 > **Status:** dokumen ini mengikuti `docs/design.md` **v2** — tiga komoditas
-> (`mango`, `citrus`, `strawberry`), hanya `type=disease`, tanpa scan kematangan.
+> (`mango`, `citrus`, `tomato`), hanya `type=disease`, tanpa scan kematangan.
 > `commodity_code` wajib dikirim (default `mango`); nilai di luar tiga kode itu
 > ditolak 400.
 
@@ -78,7 +78,7 @@ internal.
 |---|---|---|---|
 | `type` | ya | `disease` | Jenis scan; hanya penyakit daun (design.md 8.2) |
 | `image` | ya | file | JPEG/PNG. Batas keras layanan: `VISION_MAX_UPLOAD_BYTES` (default 8 MB) dan sisi ≤ `VISION_MAX_IMAGE_SIDE` |
-| `commodity_code` | ya | string | `mango`, `citrus`, atau `strawberry` (default `mango`). Nilai di luar `VISION_SUPPORTED_COMMODITIES` → 400 |
+| `commodity_code` | ya | string | `mango`, `citrus`, atau `tomato` (default `mango`). Nilai di luar `VISION_SUPPORTED_COMMODITIES` → 400 |
 | `client_uuid` | tidak | UUID | UUID dari aplikasi; dicatat di log untuk korelasi |
 | `Idempotency-Key` (header) | tidak | string | Dipakai sebagai `client_uuid` bila bidang form kosong |
 
@@ -241,7 +241,7 @@ kontrak (TQA bagian 6):
 
 | Variabel | Default | Efek |
 |---|---|---|
-| `VISION_SUPPORTED_COMMODITIES` | `mango,citrus,strawberry` | Komoditas yang diterima; di luar itu 400 |
+| `VISION_SUPPORTED_COMMODITIES` | `mango,citrus,tomato` | Komoditas yang diterima; di luar itu 400 |
 | `VISION_CONFIDENT_THRESHOLD` | 0.75 | Batas `confident` (sumber kebenaran: layanan vision) |
 | `VISION_UNCERTAIN_THRESHOLD` | 0.50 | Batas `uncertain`; wajib < confident |
 | `VISION_BLUR_MIN_VARIANCE` | 45.0 | Ambang blur (varians Laplacian pada maks 512 px) |

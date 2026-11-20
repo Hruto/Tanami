@@ -106,7 +106,7 @@ def test_predict_accepts_each_commodity(client: TestClient, commodity: str) -> N
 
 
 def test_predict_rejects_unknown_commodity(client: TestClient) -> None:
-    response = predict(client, data={"type": "disease", "commodity_code": "tomato"})
+    response = predict(client, data={"type": "disease", "commodity_code": "strawberry"})
     assert response.status_code == 400
     error = response.json()["error"]
     assert error["code"] == "validation_error"

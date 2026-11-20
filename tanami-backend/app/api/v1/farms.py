@@ -195,14 +195,13 @@ async def update_plant(
 _MATERIAL_LABELS = {
     "grafted": "Okulasi/sambung",
     "seed": "Biji",
-    "runner": "Anakan (stolon)",
     "other": "Lainnya",
 }
 
 
 @router.get("/plant-types")
 async def plant_types(session: SessionDep) -> ListEnvelope[PlantTypeOut]:
-    """Dropdown of plant types (mango, citrus, strawberry) with the planting materials allowed."""
+    """Dropdown of plant types (mango, citrus, tomato) with the planting materials allowed."""
     profiles = {
         (row.commodity_code, row.planting_material): row
         for row in (await session.execute(select(CropProfile))).scalars()

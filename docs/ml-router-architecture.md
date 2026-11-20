@@ -25,7 +25,7 @@ Prinsip yang membedakan arsitektur ini:
 1. **Deep learning hanya untuk ekstraksi fitur.** `rembg` dan EfficientNet-B0 beku, tidak pernah dilatih.
 2. **Semua yang dilatih adalah machine learning klasik.** Router, classifier penyakit, dan modul tolak semuanya ML/statistik.
 3. **Satu embedding dipakai dua kali.** Router tanaman dan classifier penyakit memakan fitur yang sama, sehingga biaya ekstraksi tetap satu kali per foto.
-4. **Tiga model penyakit, bukan satu model universal.** Satu classifier per komoditas: `mango`, `citrus`, `strawberry`.
+4. **Tiga model penyakit, bukan satu model universal.** Satu classifier per komoditas: `mango`, `citrus`, `tomato`.
 5. **Jika router ragu, sistem bertanya ke user**, bukan memaksakan classifier.
 
 ---
@@ -58,7 +58,7 @@ flowchart TD
     C --> D[M1 Router Species]
     D -->|mango| E1[Classifier mango]
     D -->|citrus| E2[Classifier citrus]
-    D -->|strawberry| E3[Classifier strawberry]
+    D -->|tomato| E3[Classifier tomato]
     D -->|other / ragu| Z2[unknown + need_commodity]
 
     E1 --> F[M4 Kalibrasi + Tolak]
@@ -81,7 +81,7 @@ Versi teks: `foto → M0 → M2 → M1 → (E1|E2|E3) → M4 → {confident|unce
 | Tahap | Nama | Input | Output | Implementasi |
 |---|---|---|---|---|
 | M0 | Quality gate | file gambar | `ok` / `invalid_image` | ✅ memakai `QualityStatus` yang sudah ada; 🆕 tambah cek `rembg` mask |
-| M1 | Router species | embedding | `mango` / `citrus` / `strawberry` / `other` | 🆕 ML klasik |
+| M1 | Router species | embedding | `mango` / `citrus` / `tomato` / `other` | 🆕 ML klasik |
 | M2 | Feature extractor | gambar | embedding 1280-d + fitur handmade | 🆕 DL beku + fitur klasik |
 | M3 | Classifier penyakit | embedding + komoditas | probabilitas label 11.5 | 🆕 3 model ML klasik |
 | M4 | Kalibrasi + tolak | probabilitas + embedding | terima/tolak + alasan | 🆕 MSP + anomali + temperature |
@@ -103,7 +103,7 @@ Output gagal dipetakan ke `invalid_image` dengan `details.reason` salah satu: `t
 Router **hanya dipakai di Jalur 2**. Di Jalur 1, `commodity_code` sudah dikirim klien, sehingga router berubah menjadi verifikasi (`wrong_commodity`), bukan prediksi.
 
 - Input: embedding dari M2.
-- Kelas: `mango`, `citrus`, `strawberry`, `other`.
+- Kelas: `mango`, `citrus`, `tomato`, `other`.
 - Model: Logistic Regression atau SVM-RBF.
 - Threshold `τ_route` dituning dari validasi.
 - Kalau `max(prob) < τ_route` atau kelas terpilih `other` → `unknown + need_commodity`.
@@ -131,7 +131,7 @@ Vektor akhir ini dipakai oleh M1 **dan** M3. Tidak ada inferensi DL kedua.
 |---|---|---|
 | `mango` | 8 | `design.md` 11.5 |
 | `citrus` | 5 | `design.md` 11.5 |
-| `strawberry` | 5 | `design.md` 11.5 |
+| `tomato` | 5 | `design.md` 11.5 |
 
 Kandidat model yang dibandingkan per komoditas: Random Forest, SVM-RBF, LightGBM, Logistic Regression. Pemilihan berdasarkan **macro-F1 per komoditas**, bukan akurasi agregat.
 
@@ -167,7 +167,7 @@ Ini bagian yang tidak boleh dilanggar saat implementasi.
 | Router species | ML klasik | Ya | LogReg / SVM-RBF |
 | Classifier `mango` | ML klasik | Ya | `mango.joblib` |
 | Classifier `citrus` | ML klasik | Ya | `citrus.joblib` |
-| Classifier `strawberry` | ML klasik | Ya | `strawberry.joblib` |
+| Classifier `tomato` | ML klasik | Ya | `tomato.joblib` |
 | Anomali + kalibrasi | ML/statistik | Ya/difit | Mahalanobis atau OCSVM + temperature |
 
 Ringkasnya: **DL hanya mata, ML klasik yang berpikir.** Tidak ada file `*.pt` yang dilatih; artefak terlatih berbentuk `*.joblib` dan `config.json`.
@@ -205,7 +205,7 @@ models/disease-router-v0.1.0-ml/
 └── classifiers/
     ├── mango.joblib
     ├── citrus.joblib
-    └── strawberry.joblib
+    └── tomato.joblib
 ```
 
 Manifest mengikuti pola aktif/shadow yang sudah ada: `disease-<komoditas>-v0.1.0` untuk runtime saat ini, `...-v0.2.0-ml` untuk kandidat baru.

@@ -195,7 +195,6 @@ class LifecyclePhase(StrEnum):
 class PlantingMaterial(StrEnum):
     GRAFTED = "grafted"
     SEED = "seed"
-    RUNNER = "runner"  # strawberry only
     OTHER = "other"
 
 
@@ -258,33 +257,33 @@ class PushState(StrEnum):
 
 
 # Commodities the vision service has a model for (design 11.5).
-DETECTION_COMMODITIES: tuple[str, ...] = ("mango", "citrus", "strawberry")
+DETECTION_COMMODITIES: tuple[str, ...] = ("mango", "citrus", "tomato")
 # design 13: one forum category per commodity plus "Umum".
 FORUM_GENERAL_CATEGORY = "general"
 
-# --- design v2 (mango, citrus, strawberry) ------------------------------------
+# --- design v2 (mango, citrus, tomato) ------------------------------------
 # The stored-value constraints below use these, not the legacy enums above, so the
 # database already speaks v2 while services are being moved over.
-COMMODITIES_V2: tuple[str, ...] = ("mango", "citrus", "strawberry")
+COMMODITIES_V2: tuple[str, ...] = ("mango", "citrus", "tomato")
 COMMODITY_LABELS_V2: dict[str, str] = {
     "mango": "Mangga",
     "citrus": "Jeruk",
-    "strawberry": "Stroberi",
+    "tomato": "Tomat",
 }
 
 # design 13 v2: forum categories follow the commodities of this release, plus "Umum".
 FORUM_CATEGORIES: tuple[str, ...] = (*COMMODITIES_V2, FORUM_GENERAL_CATEGORY)
 # Prefix of the display code of a plant, e.g. ``MGA-001`` (design 8.2).
-PLANT_CODE_PREFIX: dict[str, str] = {"mango": "MGA", "citrus": "JRK", "strawberry": "STB"}
+PLANT_CODE_PREFIX: dict[str, str] = {"mango": "MGA", "citrus": "JRK", "tomato": "TMT"}
 
 # Planting materials each commodity may use; ``other`` is counted as the default
 # one when the profile is looked up (design 8.3).
 MATERIALS_BY_COMMODITY: dict[str, tuple[str, ...]] = {
     "mango": ("grafted", "seed", "other"),
     "citrus": ("grafted", "seed", "other"),
-    "strawberry": ("runner", "seed", "other"),
+    "tomato": ("seed", "grafted", "other"),
 }
-DEFAULT_MATERIAL: dict[str, str] = {"mango": "grafted", "citrus": "grafted", "strawberry": "runner"}
+DEFAULT_MATERIAL: dict[str, str] = {"mango": "grafted", "citrus": "grafted", "tomato": "seed"}
 
 
 def profile_material(commodity_code: str, planting_material: str) -> str:
@@ -335,8 +334,8 @@ CAUSE_LABELS: dict[CauseCategory, str] = {
 VARIETY_COMMODITY_KEYWORDS: tuple[tuple[str, str], ...] = (
     ("mangga", "mango"),
     ("jeruk", "citrus"),
-    ("stroberi", "strawberry"),
-    ("strawberry", "strawberry"),
+    ("tomat", "tomato"),
+    ("tomato", "tomato"),
 )
 
 
@@ -347,7 +346,7 @@ def commodity_from_variety(variety: str) -> str:
         if keyword in lowered:
             return commodity
     raise ValidationError(
-        "Jenis tanaman harus menyebut mangga, jeruk, atau stroberi.",
+        "Jenis tanaman harus menyebut mangga, jeruk, atau tomat.",
         details={"field": "variety", "supported": list(COMMODITIES_V2)},
     )
 
@@ -374,7 +373,7 @@ HARVEST_QUALITY_LABELS: dict[HarvestQuality, str] = {
 EXPECTED_YIELD_KG: dict[str, float] = {
     "mango": 40.0,
     "citrus": 25.0,
-    "strawberry": 3.0,
+    "tomato": 8.0,
 }
 
 

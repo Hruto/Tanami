@@ -139,12 +139,12 @@ def test_label_from_another_commodity_is_rejected() -> None:
         ("citrus", "citrus_canker", "Kanker jeruk", CauseCategory.BACTERIA),
         ("citrus", "citrus_greening", "CVPD (Greening/HLB)", CauseCategory.BACTERIA),
         (
-            "strawberry",
-            "strawberry_angular_leaf_spot",
-            "Bercak daun bersudut",
+            "tomato",
+            "tomato_bacterial_spot",
+            "Bercak bakteri",
             CauseCategory.BACTERIA,
         ),
-        ("strawberry", "strawberry_leaf_scorch", "Hangus daun", CauseCategory.FUNGUS),
+        ("tomato", "tomato_early_blight", "Bercak daun awal", CauseCategory.FUNGUS),
         ("mango", "mango_gall_midge", "Puru daun (lalat puru)", CauseCategory.PEST),
     ],
 )

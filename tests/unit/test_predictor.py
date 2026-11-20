@@ -54,14 +54,14 @@ def test_stub_is_sensitive_to_pixels(tmp_path: Path) -> None:
 def test_stub_labels_follow_the_commodity(tmp_path: Path) -> None:
     write_manifest(
         tmp_path,
-        commodity_code="strawberry",
-        version="disease-strawberry-v0.1.0",
-        labels=LABELS_BY_COMMODITY["strawberry"],
+        commodity_code="tomato",
+        version="disease-tomato-v0.1.0",
+        labels=LABELS_BY_COMMODITY["tomato"],
     )
-    manifest = load_manifest(tmp_path, "disease-strawberry-v0.1.0", "strawberry")
+    manifest = load_manifest(tmp_path, "disease-tomato-v0.1.0", "tomato")
     predictor = StubPredictor(manifest)
     image = np.zeros((224, 224, 3), dtype=np.float32)
-    assert set(predictor.predict(image).probabilities) == set(LABELS_BY_COMMODITY["strawberry"])
+    assert set(predictor.predict(image).probabilities) == set(LABELS_BY_COMMODITY["tomato"])
 
 
 def test_build_predictor_respects_backend(tmp_path: Path) -> None:

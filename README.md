@@ -2,9 +2,9 @@
 
 **Pendamping petani buah: tahu kapan panen, tahu daun kenapa.**
 
-Tanami membantu petani dan penghobi **mangga, jeruk, dan stroberi** mencatat tanamannya, melihat perkiraan kapan panen berikutnya, mencatat setiap panen, dan memeriksa penyakit daun cukup dari foto.
+Tanami membantu petani dan penghobi **mangga, jeruk, dan tomat** mencatat tanamannya, melihat perkiraan kapan panen berikutnya, mencatat setiap panen, dan memeriksa penyakit daun cukup dari foto.
 
-> **Status: pra-MVP.** Rancangan produk dan kontrak sudah di [`docs/design.md`](docs/design.md) **v2**: tiga komoditas (`mango`, `citrus`, `strawberry`), hanya scan penyakit daun, tanpa ripeness/cabai. `status` ditentukan layanan vision; backend hanya menyimpan. Rincian di lampiran design.md, bagian "Dampak ke Implementasi".
+> **Status: pra-MVP.** Rancangan produk dan kontrak sudah di [`docs/design.md`](docs/design.md) **v2**: tiga komoditas (`mango`, `citrus`, `tomato`), hanya scan penyakit daun, tanpa ripeness/cabai. `status` ditentukan layanan vision; backend hanya menyimpan. Rincian di lampiran design.md, bagian "Dampak ke Implementasi".
 
 ## Daftar isi
 
@@ -166,7 +166,7 @@ Aturan emas: jika kode berbeda dengan `design.md` pada bagian enum, API, atau ko
 | `tanami-admin`: ruang kerja tim | ✅ Ada, selaras design v2 |
 | `tanami-vision`: kontrak, stub, jalur ONNX, model bayangan, CI, Docker | ✅ Ada, tiga model primer per komoditas |
 | Penyesuaian ke design v2 (tracking 3 tanaman buah, episode penyakit, riwayat baru) | ✅ Selesai |
-| Model runtime mangga, jeruk, stroberi (`disease-<komoditas>-v0.1.0`) | ✅ Ada; set uji foto lapangan ⏳ |
+| Model runtime mangga, jeruk, tomat (`disease-<komoditas>-v0.1.0`) | ✅ Ada; set uji foto lapangan ⏳ |
 | Aplikasi mobile `tanami-app` | ⏳ Belum di repo ini |
 | Profil tanaman dan hari keterlambatan per penyakit yang bersumber dan ditinjau ahli | ⏳ Belum |
 
@@ -185,7 +185,7 @@ Ringkasan aturan tim (detail di `tqa.md` bagian 4):
 
 - **Bukan pengganti ahli.** Hasil scan dan perkiraan panen adalah perkiraan. Setiap layar hasil memuat: *"Hasil ini perkiraan dan tidak menggantikan ahli."*
 - **BMKG** (Prakiraan Cuaca Terbuka): wajib mencantumkan BMKG sebagai sumber. Hanya backend yang memanggil BMKG, dengan cache.
-- **Dataset publik** (MangoLeafBD, Citrus Leaves, PlantVillage, Strawberry Disease) baru kandidat; lisensinya dicek dan dicatat sebelum dipakai (`tqa.md` bagian 13).
+- **Dataset publik** (MangoLeafBD, Citrus Leaves, PlantVillage, Tomato Disease) baru kandidat; lisensinya dicek dan dicatat sebelum dipakai (`tqa.md` bagian 13).
 - **Privasi:** metadata EXIF/GPS dibuang dari foto, lokasi kebun disimpan setingkat kelurahan, dan foto hanya dipakai melatih model bila pengguna memberi **persetujuan terpisah**. Kewajiban rinci menurut UU No. 27 Tahun 2022 tentang Pelindungan Data Pribadi perlu dikonfirmasi sebelum rilis publik.
 
 ## Tim

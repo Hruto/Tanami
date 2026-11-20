@@ -94,7 +94,7 @@ async def test_scan_history_replaces_detection_plants_and_ending_is_final(
     # the three v2 commodities (design 8.2, 10.6).
     unsupported = await client.post(
         "/api/v1/scans",
-        data={"commodity_code": "tomato"},
+        data={"commodity_code": "strawberry"},
         files={"image": ("d.jpg", image_bytes(), "image/jpeg")},
         headers=headers,
     )

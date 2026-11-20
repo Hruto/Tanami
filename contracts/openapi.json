@@ -24,7 +24,7 @@
                 "type": "null"
               }
             ],
-            "description": "mango, citrus, atau strawberry (default: mango)",
+            "description": "mango, citrus, atau tomato (default: mango)",
             "title": "Commodity Code"
           },
           "image": {
@@ -706,7 +706,7 @@
     },
     "/v1/predict": {
       "post": {
-        "description": "Menerima satu foto daun buah dengan type=disease untuk komoditas mangga, jeruk, atau stroberi, lalu mengembalikan `result` sesuai design.md 11.3 beserta `status` dari ambang keyakinan design.md 11.2.\\n\\nLayanan ini **stateless**: tidak menyimpan gambar, tidak menulis database, tidak mengirim notifikasi. Penyimpanan dan pemberian rekomendasi tetap di backend.",
+        "description": "Menerima satu foto daun buah dengan type=disease untuk komoditas mangga, jeruk, atau tomat, lalu mengembalikan `result` sesuai design.md 11.3 beserta `status` dari ambang keyakinan design.md 11.2.\\n\\nLayanan ini **stateless**: tidak menyimpan gambar, tidak menulis database, tidak mengirim notifikasi. Penyimpanan dan pemberian rekomendasi tetap di backend.",
         "operationId": "predict_v1_predict_post",
         "parameters": [
           {

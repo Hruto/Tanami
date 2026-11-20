@@ -136,7 +136,7 @@ class PlantCreate(ApiModel):
     # Tanggal pindah ke lahan; bila kosong, disamakan dengan nursery_started_at.
     planted_at: date | None = None
     placement: Placement = Placement.OUTDOOR
-    # Omitted: the default material of the commodity (grafted, or runner for strawberry).
+    # Omitted: the default material of the commodity (grafted, or seed for tomato).
     planting_material: PlantingMaterial | None = None
     quantity: int = Field(default=1, ge=1, le=100_000)
     irrigation_schedule: IrrigationSchedule = IrrigationSchedule.EVERY_3_5_DAYS

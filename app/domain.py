@@ -95,19 +95,19 @@ DISEASE_LABELS_BY_COMMODITY: dict[str, dict[str, DiseaseLabel]] = {
         ),
         "citrus_melanose": DiseaseLabel("citrus_melanose", "Melanosa", CauseCategory.FUNGUS),
     },
-    "strawberry": {
+    "tomato": {
         "healthy": DiseaseLabel("healthy", "Sehat", CauseCategory.HEALTHY),
-        "strawberry_leaf_scorch": DiseaseLabel(
-            "strawberry_leaf_scorch", "Hangus daun", CauseCategory.FUNGUS
+        "tomato_bacterial_spot": DiseaseLabel(
+            "tomato_bacterial_spot", "Bercak bakteri", CauseCategory.BACTERIA
         ),
-        "strawberry_leaf_spot": DiseaseLabel(
-            "strawberry_leaf_spot", "Bercak daun", CauseCategory.FUNGUS
+        "tomato_early_blight": DiseaseLabel(
+            "tomato_early_blight", "Bercak daun awal", CauseCategory.FUNGUS
         ),
-        "strawberry_angular_leaf_spot": DiseaseLabel(
-            "strawberry_angular_leaf_spot", "Bercak daun bersudut", CauseCategory.BACTERIA
+        "tomato_late_blight": DiseaseLabel(
+            "tomato_late_blight", "Busuk daun", CauseCategory.FUNGUS
         ),
-        "strawberry_powdery_mildew": DiseaseLabel(
-            "strawberry_powdery_mildew", "Embun tepung", CauseCategory.FUNGUS
+        "tomato_septoria_leaf_spot": DiseaseLabel(
+            "tomato_septoria_leaf_spot", "Bercak daun septoria", CauseCategory.FUNGUS
         ),
     },
 }

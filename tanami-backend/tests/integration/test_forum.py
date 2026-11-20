@@ -65,10 +65,10 @@ async def test_post_with_photo_scan_and_public_listing(client: AsyncClient) -> N
     assert [row["id"] for row in listed["data"]] == [post["id"]]
     assert (await client.get("/api/v1/forum/posts?q=100%25")).json()["data"] == []
     cats = (await client.get("/api/v1/forum/categories")).json()["data"]
-    # design 10.9 v2: Mangga, Jeruk, Stroberi plus "Umum" - nothing else.
-    assert [c["commodity_code"] for c in cats] == ["mango", "citrus", "strawberry", "general"]
+    # design 10.9 v2: Mangga, Jeruk, Tomat plus "Umum" - nothing else.
+    assert [c["commodity_code"] for c in cats] == ["mango", "citrus", "tomato", "general"]
     counts = {c["commodity_code"]: c["post_count"] for c in cats}
-    assert counts == {"mango": 1, "citrus": 0, "strawberry": 0, "general": 0}
+    assert counts == {"mango": 1, "citrus": 0, "tomato": 0, "general": 0}
 
 
 async def test_cannot_attach_someone_elses_photo_or_scan(client: AsyncClient) -> None:
