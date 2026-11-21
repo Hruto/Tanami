@@ -1,7 +1,6 @@
 # Perubahan API pasca-rapat (2026-11-17)
 
-Semua perubahan ini sudah diterapkan di `feat/backend-design-v2`, diverifikasi
-dengan 295 test, `ruff`, dan `mypy`. Kontrak terbit di `contracts/openapi.json`.
+Semua perubahan ini sudah diterapkan langsung di `main`, diverifikasi dengan 309 test backend, `ruff`, dan `mypy`. Kontrak terbit di `contracts/openapi.json`. Branch backend terpisah sudah dihapus; `main` satu-satunya sumber update.
 
 ## Ringkasan
 
