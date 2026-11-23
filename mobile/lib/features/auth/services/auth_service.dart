@@ -17,6 +17,7 @@ class AuthService {
     final response = await _apiClient.post(
       ApiConfig.register,
       request.toJson(),
+      requiresAuth: false,
     );
 
     final authResponse = AuthResponse.fromJson(
@@ -38,6 +39,7 @@ class AuthService {
     final response = await _apiClient.post(
       ApiConfig.login,
       request.toJson(),
+      requiresAuth: false,
     );
 
     final authResponse = AuthResponse.fromJson(
