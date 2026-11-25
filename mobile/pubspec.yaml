@@ -16,6 +16,9 @@ dependencies:
   http: ^1.6.0
   flutter_secure_storage: ^11.2.0
   internet_connection_checker_plus: ^3.1.2
+  shared_preferences: ^2.5.6
+  image_picker: ^1.2.4
+  camera: ^0.12.2
 
 dev_dependencies:
   flutter_test:

@@ -54,7 +54,7 @@ from PIL import Image, ImageDraw  # noqa: E402
 from sqlalchemy import text, update  # noqa: E402
 
 DEMO_PASSWORD = "tanami-demo-123"  # noqa: S105 - local demo only
-DEV_ORIGINS = "http://localhost:5173,http://127.0.0.1:5173"
+DEV_ORIGINS = "http://localhost:5173,http://127.0.0.1:5173,http://localhost:5127,http://127.0.0.1:5127"
 
 STAFF = (
     ("admin", "Rina Wulandari", "admin"),
@@ -288,7 +288,6 @@ async def populate(state: AppState) -> None:
                     json={
                         "name": rng.choice(["Kebun Belakang", "Lahan Sawah Timur", "Pekarangan"]),
                         "adm4_code": rng.choice(REGIONS),
-                        "placement": "outdoor" if index % 4 else "indoor",
                     },
                     headers=headers,
                 )
@@ -301,7 +300,10 @@ async def populate(state: AppState) -> None:
                         f"/api/v1/farms/{farm['id']}/plants",
                         json={
                             "label": f"{COMMODITY_LABELS_V2[commodity]} {number + 1}",
-                            "commodity_code": commodity,
+                            "variety": COMMODITY_LABELS_V2[commodity],
+                            "nursery_started_at": (
+                                planted - timedelta(days=30)
+                            ).isoformat(),
                             "planted_at": planted.isoformat(),
                         },
                         headers=headers,

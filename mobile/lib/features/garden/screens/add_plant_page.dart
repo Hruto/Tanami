@@ -1,49 +1,52 @@
-
+import 'dart:typed_data';
 import 'package:flutter/material.dart';
 import 'package:flutter_svg/flutter_svg.dart';
-
+import 'package:image_picker/image_picker.dart';
+import 'camera_capture_page.dart';
 import '../../../core/constant/app_colors.dart';
 import '../services/plant_service.dart';
-
+import '../widgets/custom_text_field.dart';
 class AddPlantPage extends StatefulWidget {
   final String? farmId;
-
   const AddPlantPage({
     super.key,
     required this.farmId,
   });
-
   @override
   State<AddPlantPage> createState() => _AddPlantPageState();
 }
-
 class _AddPlantPageState extends State<AddPlantPage> {
-  final TextEditingController _nameController =
-      TextEditingController();
-
-  final TextEditingController _typeController =
-      TextEditingController();
-
+  final TextEditingController _nameController = TextEditingController();
+  final TextEditingController _typeController = TextEditingController();
   final PlantService _plantService = PlantService();
-
-  // STATE TANGGAL
+  final ImagePicker _imagePicker = ImagePicker();
+  XFile? _selectedImage;
+  Uint8List? _selectedImageBytes;
+  // Menyimpan ID tanaman jika data berhasil dibuat,
+  // tetapi upload foto belum berhasil.
+  String? _createdPlantId;
   DateTime? _seedlingDate;
   DateTime? _gardenPlantingDate;
-
-  // STATE FORM
   String _placement = 'indoor';
   String _irrigationSchedule = 'every_3_5_days';
-
   bool _isSubmitting = false;
-
-  // ASSET ICON
+  bool _showValidationErrors = false;
+  // Menyimpan pesan validasi jenis tanaman yang dikirim backend.
+  String? _typeServerError;
+  // Asset icons
   static const String _backIcon = 'assets/icons/back.svg';
   static const String _uploadIcon = 'assets/icons/image_add.svg';
   static const String _nameIcon = 'assets/icons/Pencil.svg';
-  static const String _plantIcon = 'assets/icons/Tree_Palm.svg';
-  static const String _calendarIcon = 'assets/icons/Calendar.svg';
-
-  // SVG ICON HELPER
+  static const String _calendarIcon = 'assets/icons/calendar.svg';
+  static const String _pencilIcon = 'assets/icons/pencil.svg';
+  static const String _treePalmIcon = 'assets/icons/tree_Palm.svg';
+  static const TextStyle _labelStyle = TextStyle(
+    fontFamily: 'Alexandria',
+    fontSize: 13,
+    fontWeight: FontWeight.w700,
+    color: AppColors.textSecondary,
+  );
+  // SVG helper
   Widget _svgIcon(
     String path, {
     double size = 24,
@@ -58,20 +61,105 @@ class _AddPlantPageState extends State<AddPlantPage> {
           : ColorFilter.mode(color, BlendMode.srcIn),
     );
   }
-
-  // THEME DATE PICKER
-  ThemeData _datePickerTheme(BuildContext context) {
-    return Theme.of(context).copyWith(
-      colorScheme: const ColorScheme.light(
-        primary: AppColors.mediumGreen,
-        onPrimary: Colors.white,
-        surface: AppColors.background,
-        onSurface: AppColors.darkGreen,
+  // Theme date picker
+ThemeData _datePickerTheme(BuildContext context) {
+  return Theme.of(context).copyWith(
+    colorScheme: const ColorScheme.light(
+      primary: AppColors.mediumGreen,
+      onPrimary: Colors.white,
+      surface: AppColors.background,
+      onSurface: AppColors.mediumGreen,
+    ),
+    textTheme: const TextTheme(
+      headlineLarge: TextStyle(fontFamily: 'Alexandria'),
+      headlineMedium: TextStyle(fontFamily: 'Alexandria'),
+      titleLarge: TextStyle(
+        fontFamily: 'Alexandria',
+        fontWeight: FontWeight.w600,
+        color: AppColors.mediumGreen,
       ),
-    );
-  }
-
-  // PILIH TANGGAL PENYEMAIAN BIBIT
+      bodyLarge: TextStyle(
+        fontFamily: 'Alexandria',
+        color: AppColors.mediumGreen,
+      ),
+      bodyMedium: TextStyle(
+        fontFamily: 'Alexandria',
+        color: AppColors.mediumGreen,
+      ),
+    ),
+    datePickerTheme: DatePickerThemeData(
+      backgroundColor: AppColors.background,
+      headerBackgroundColor: AppColors.mediumGreen,
+      headerForegroundColor: Colors.white,
+      headerHeadlineStyle: const TextStyle(
+        fontFamily: 'Alexandria',
+        fontSize: 24,
+        fontWeight: FontWeight.w700,
+        color: Colors.white,
+      ),
+      headerHelpStyle: const TextStyle(
+        fontFamily: 'Alexandria',
+        fontSize: 13,
+        fontWeight: FontWeight.w500,
+        color: Colors.white,
+      ),
+      weekdayStyle: const TextStyle(
+        fontFamily: 'Alexandria',
+        fontSize: 11,
+        fontWeight: FontWeight.w600,
+        color: AppColors.mediumGreen,
+      ),
+      dayStyle: const TextStyle(
+        fontFamily: 'Alexandria',
+        fontSize: 13,
+        fontWeight: FontWeight.w500,
+      ),
+      yearStyle: const TextStyle(
+        fontFamily: 'Alexandria',
+        fontSize: 14,
+        fontWeight: FontWeight.w600,
+      ),
+      // Tanggal terpilih menggunakan lingkaran hijau penuh.
+      // State selected diprioritaskan, termasuk saat tanggal terpilih adalah hari ini.
+      todayForegroundColor: WidgetStateProperty.resolveWith<Color?>((states) {
+        if (states.contains(WidgetState.selected)) return Colors.white;
+        return AppColors.mediumGreen;
+      }),
+      todayBackgroundColor: WidgetStateProperty.resolveWith<Color?>((states) {
+        if (states.contains(WidgetState.selected)) {
+          return AppColors.mediumGreen;
+        }
+        return AppColors.successBackground;
+      }),
+      dayForegroundColor: WidgetStateProperty.resolveWith<Color?>((states) {
+        if (states.contains(WidgetState.selected)) return Colors.white;
+        return AppColors.mediumGreen;
+      }),
+      dayBackgroundColor: WidgetStateProperty.resolveWith<Color?>((states) {
+        if (states.contains(WidgetState.selected)) {
+          return AppColors.mediumGreen;
+        }
+        return Colors.transparent;
+      }),
+      todayBorder: const BorderSide(color: AppColors.mediumGreen, width: 1),
+      confirmButtonStyle: TextButton.styleFrom(
+        foregroundColor: AppColors.mediumGreen,
+        textStyle: const TextStyle(
+          fontFamily: 'Alexandria',
+          fontWeight: FontWeight.w600,
+        ),
+      ),
+      cancelButtonStyle: TextButton.styleFrom(
+        foregroundColor: AppColors.grey,
+        textStyle: const TextStyle(
+          fontFamily: 'Alexandria',
+          fontWeight: FontWeight.w500,
+        ),
+      ),
+    ),
+  );
+}
+  // Pilih tanggal penyemaian bibit
   Future<void> _selectSeedlingDate() async {
     final selected = await showDatePicker(
       context: context,
@@ -85,22 +173,24 @@ class _AddPlantPageState extends State<AddPlantPage> {
         );
       },
     );
-
     if (selected != null) {
       setState(() {
         _seedlingDate = selected;
+        // Jika tanggal penyemaian berubah dan tanggal
+        // penanaman menjadi lebih awal, reset tanggal penanaman.
+        if (_gardenPlantingDate != null &&
+            _gardenPlantingDate!.isBefore(selected)) {
+          _gardenPlantingDate = null;
+        }
       });
     }
   }
-
-  // PILIH TANGGAL PENANAMAN DI KEBUN
+  // Pilih tanggal penanaman di kebun
   Future<void> _selectGardenPlantingDate() async {
     final selected = await showDatePicker(
       context: context,
-      initialDate: _gardenPlantingDate ??
-          _seedlingDate ??
-          DateTime.now(),
-      firstDate: DateTime(2000),
+      initialDate: _gardenPlantingDate ?? _seedlingDate ?? DateTime.now(),
+      firstDate: _seedlingDate ?? DateTime(2000),
       lastDate: DateTime.now(),
       builder: (context, child) {
         return Theme(
@@ -109,94 +199,345 @@ class _AddPlantPageState extends State<AddPlantPage> {
         );
       },
     );
-
     if (selected != null) {
       setState(() {
         _gardenPlantingDate = selected;
       });
     }
   }
-
-  // FORMAT TANGGAL UNTUK TAMPILAN
+  // Format tanggal untuk tampilan
   String _formatDate(DateTime? date) {
     if (date == null) return 'dd/mm/yyyy';
-
     return '${date.day.toString().padLeft(2, '0')}/'
         '${date.month.toString().padLeft(2, '0')}/'
         '${date.year}';
   }
-
-  // SNACKBAR
+  // Notifikasi sukses dengan gaya banner seperti notifikasi login/register.
+  void _showSuccessToast() {
+    ScaffoldMessenger.of(context)
+      ..hideCurrentSnackBar()
+      ..showSnackBar(
+        SnackBar(
+          duration: const Duration(seconds: 3),
+          behavior: SnackBarBehavior.floating,
+          backgroundColor: Colors.transparent,
+          elevation: 0,
+          padding: EdgeInsets.zero,
+          margin: const EdgeInsets.fromLTRB(16, 0, 16, 16),
+          content: Container(
+            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 13),
+            decoration: BoxDecoration(
+              color: AppColors.successBackground,
+              borderRadius: BorderRadius.circular(16),
+              boxShadow: [
+                BoxShadow(
+                  color: AppColors.darkGreen.withValues(alpha: 0.08),
+                  blurRadius: 14,
+                  offset: const Offset(0, 4),
+                ),
+              ],
+            ),
+            child: Row(
+              crossAxisAlignment: CrossAxisAlignment.center,
+              children: [
+                Container(
+                  width: 28,
+                  height: 28,
+                  decoration: BoxDecoration(
+                    shape: BoxShape.circle,
+                    border: Border.all(
+                      color: AppColors.mediumGreen,
+                      width: 1.6,
+                    ),
+                  ),
+                  child: const Icon(
+                    Icons.check_rounded,
+                    color: AppColors.mediumGreen,
+                    size: 19,
+                  ),
+                ),
+                const SizedBox(width: 12),
+                const Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      Text(
+                        'Tanaman Berhasil Ditambahkan!',
+                        style: TextStyle(
+                          fontFamily: 'Alexandria',
+                          fontSize: 11,
+                          fontWeight: FontWeight.w700,
+                          color: AppColors.mediumGreen,
+                        ),
+                      ),
+                      SizedBox(height: 4),
+                      Text(
+                        'Data tanaman berhasil disimpan. Selamat menggunakan Tanami.',
+                        style: TextStyle(
+                          fontFamily: 'Alexandria',
+                          fontSize: 9,
+                          height: 1.4,
+                          fontWeight: FontWeight.w400,
+                          color: AppColors.darkGreen,
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ),
+      );
+  }
+  // Snackbar
   void _showMessage(String message) {
     ScaffoldMessenger.of(context).showSnackBar(
       SnackBar(
-        content: Text(message),
+        content: Text(
+          message,
+          style: const TextStyle(fontFamily: 'Alexandria'),
+        ),
         behavior: SnackBarBehavior.floating,
       ),
     );
   }
+  // Bottom sheet sumber foto
+  Future<void> _openCameraPage() async {
+  final image = await Navigator.push<XFile>(
+    context,
+    MaterialPageRoute(builder: (_) => const CameraCapturePage()),
+  );
+  if (image == null) return;
+  final bytes = await image.readAsBytes();
+  if (!mounted) return;
+  setState(() {
+    _selectedImage = image;
+    _selectedImageBytes = bytes;
+  });
+}
 
-  // SUBMIT FORM KE BACKEND
+Future<void> _showPhotoSourcePicker() async {
+    await showModalBottomSheet<void>(
+      context: context,
+      backgroundColor: AppColors.background,
+      shape: const RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(
+          top: Radius.circular(24),
+        ),
+      ),
+      builder: (context) {
+        return SafeArea(
+          child: Padding(
+            padding: const EdgeInsets.fromLTRB(20, 20, 20, 24),
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Container(
+                  width: 42,
+                  height: 4,
+                  decoration: BoxDecoration(
+                    color: AppColors.lightGreen,
+                    borderRadius: BorderRadius.circular(10),
+                  ),
+                ),
+                const SizedBox(height: 20),
+                const Text(
+                  'Pilih Foto Tanaman',
+                  style: TextStyle(
+                    fontFamily: 'Alexandria',
+                    fontSize: 17,
+                    fontWeight: FontWeight.w700,
+                    color: AppColors.darkGreen,
+                  ),
+                ),
+                const SizedBox(height: 18),
+                _photoSourceOption(
+                  icon: Icons.camera_alt_outlined,
+                  label: 'Ambil Foto',
+                  onTap: () {
+                    Navigator.pop(context);
+                    _pickImage(ImageSource.camera);
+                  },
+                ),
+                const SizedBox(height: 10),
+                _photoSourceOption(
+                  icon: Icons.photo_library_outlined,
+                  label: 'Pilih dari Galeri',
+                  onTap: () {
+                    Navigator.pop(context);
+                    _pickImage(ImageSource.gallery);
+                  },
+                ),
+              ],
+            ),
+          ),
+        );
+      },
+    );
+  }
+  Widget _photoSourceOption({
+    required IconData icon,
+    required String label,
+    required VoidCallback onTap,
+  }) {
+    return InkWell(
+      onTap: onTap,
+      borderRadius: BorderRadius.circular(16),
+      child: Container(
+        width: double.infinity,
+        padding: const EdgeInsets.symmetric(
+          horizontal: 16,
+          vertical: 15,
+        ),
+        decoration: BoxDecoration(
+          color: AppColors.fieldBackground,
+          borderRadius: BorderRadius.circular(16),
+        ),
+        child: Row(
+          children: [
+            Icon(
+              icon,
+              color: AppColors.mediumGreen,
+              size: 23,
+            ),
+            const SizedBox(width: 14),
+            Text(
+              label,
+              style: const TextStyle(
+                fontFamily: 'Alexandria',
+                fontSize: 13,
+                fontWeight: FontWeight.w600,
+                color: AppColors.darkGreen,
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+  // Pilih foto dari kamera atau galeri
+  Future<void> _pickImage(ImageSource source) async {
+    try {
+      final image = await _imagePicker.pickImage(
+        source: source,
+        imageQuality: 85,
+      );
+      if (image == null) return;
+      final bytes = await image.readAsBytes();
+      if (!mounted) return;
+      setState(() {
+        _selectedImage = image;
+        _selectedImageBytes = bytes;
+      });
+    } catch (e) {
+      if (!mounted) return;
+      _showMessage('Gagal memilih foto: $e');
+    }
+  }
+  String? get _nameError {
+    if (!_showValidationErrors) return null;
+    return _nameController.text.trim().isEmpty
+        ? 'Nama tanaman wajib diisi.'
+        : null;
+  }
+  String? get _typeError {
+    if (!_showValidationErrors) return null;
+    return _typeController.text.trim().isEmpty
+        ? 'Jenis tanaman wajib diisi.'
+        : null;
+  }
+  // Pesan error lokal atau dari backend ditampilkan di bawah field jenis tanaman.
+  String? get _typeFieldError => _typeError ?? _typeServerError;
+  String? get _seedlingDateError {
+    if (!_showValidationErrors) return null;
+    return _seedlingDate == null
+        ? 'Tanggal penyemaian wajib diisi.'
+        : null;
+  }
+  String? get _gardenPlantingDateError {
+    if (!_showValidationErrors) return null;
+    if (_gardenPlantingDate == null) {
+      return 'Tanggal penanaman wajib diisi.';
+    }
+    if (_seedlingDate != null &&
+        _gardenPlantingDate!.isBefore(_seedlingDate!)) {
+      return 'Tanggal penanaman tidak boleh sebelum tanggal penyemaian.';
+    }
+    return null;
+  }
+  String? get _photoError {
+    if (!_showValidationErrors) return null;
+    return _selectedImageBytes == null
+        ? 'Foto tanaman wajib diunggah.'
+        : null;
+  }
+  // Submit form ke backend
   Future<void> _submitForm() async {
     if (_isSubmitting) return;
-
-    // VALIDASI FARM ID
-    if (widget.farmId == null ||
-        widget.farmId!.isEmpty) {
+    setState(() {
+      _showValidationErrors = true;
+    });
+    if (widget.farmId == null || widget.farmId!.isEmpty) {
       _showMessage('Kebun belum dipilih.');
       return;
     }
-
-    // VALIDASI INPUT
-    if (_nameController.text.trim().isEmpty ||
-        _typeController.text.trim().isEmpty ||
-        _seedlingDate == null ||
-        _gardenPlantingDate == null) {
-      _showMessage(
-        'Lengkapi data tanaman terlebih dahulu.',
-      );
-      return;
-    }
-
-    // VALIDASI TANGGAL
-    if (_gardenPlantingDate!.isBefore(_seedlingDate!)) {
-      _showMessage(
-        'Tanggal penanaman tidak boleh sebelum tanggal pembibitan.',
-      );
-      return;
-    }
-
+    final hasError = _nameError != null ||
+        _typeFieldError != null ||
+        _seedlingDateError != null ||
+        _gardenPlantingDateError != null ||
+        _photoError != null;
+    if (hasError) return;
     setState(() {
       _isSubmitting = true;
     });
-
     try {
-      await _plantService.createPlant(
-        farmId: widget.farmId!,
-        label: _nameController.text.trim(),
-        variety: _typeController.text.trim(),
-        nurseryStartedAt: _seedlingDate!,
-        plantedAt: _gardenPlantingDate!,
-        placement: _placement,
-        irrigationSchedule: _irrigationSchedule,
+      // Buat data tanaman jika belum pernah berhasil dibuat.
+      if (_createdPlantId == null) {
+        final plant = await _plantService.createPlant(
+          farmId: widget.farmId!,
+          label: _nameController.text.trim(),
+          variety: _typeController.text.trim(),
+          nurseryStartedAt: _seedlingDate!,
+          plantedAt: _gardenPlantingDate!,
+          placement: _placement,
+          irrigationSchedule: _irrigationSchedule,
+        );
+        _createdPlantId = plant.id;
+      }
+      // Upload foto dokumentasi tanaman.
+      await _plantService.uploadPlantPhoto(
+        plantId: _createdPlantId!,
+        imageBytes: _selectedImageBytes!,
+        fileName: _selectedImage!.name,
       );
-
       if (!mounted) return;
-
-      _showMessage('Tanaman berhasil ditambahkan!');
-
-      // Kembali ke Garden Page dan mengirim tanda refresh.
+      _showSuccessToast();
       Navigator.pop(context, true);
     } catch (e) {
       if (!mounted) return;
-
-      final errorMessage = e
-          .toString()
-          .replaceFirst('Exception: ', '');
-
-      _showMessage(
-        'Gagal menambahkan tanaman: $errorMessage',
-      );
+      final errorMessage = e.toString().replaceFirst('Exception: ', '').trim();
+      final normalizedError = errorMessage.toLowerCase();
+      final isPlantTypeValidationError =
+          normalizedError.contains('jenis tanaman') &&
+          (normalizedError.contains('mangga') ||
+              normalizedError.contains('jeruk') ||
+              normalizedError.contains('tomat'));
+      if (_createdPlantId != null) {
+        _showMessage(
+          'Data tanaman sudah dibuat, tetapi foto gagal diunggah. '
+          'Tekan Simpan untuk mencoba upload kembali. '
+          'Detail: $errorMessage',
+        );
+      } else if (isPlantTypeValidationError) {
+        // Tampilkan pesan asli dari backend tepat di bawah field jenis tanaman.
+        setState(() {
+          _typeServerError = errorMessage;
+        });
+      } else {
+        _showMessage('Gagal menambahkan tanaman: $errorMessage');
+      }
     } finally {
       if (mounted) {
         setState(() {
@@ -205,14 +546,11 @@ class _AddPlantPageState extends State<AddPlantPage> {
       }
     }
   }
-
-  @override
   void dispose() {
     _nameController.dispose();
     _typeController.dispose();
     super.dispose();
   }
-
   @override
   Widget build(BuildContext context) {
     return Scaffold(
@@ -227,10 +565,7 @@ class _AddPlantPageState extends State<AddPlantPage> {
               child: IntrinsicHeight(
                 child: Column(
                   children: [
-                    // HEADER
                     _buildHeader(),
-
-                    // FORM
                     Expanded(
                       child: Padding(
                         padding: const EdgeInsets.fromLTRB(
@@ -241,110 +576,127 @@ class _AddPlantPageState extends State<AddPlantPage> {
                         ),
                         child: Column(
                           mainAxisSize: MainAxisSize.min,
-                          crossAxisAlignment:
-                              CrossAxisAlignment.start,
+                          crossAxisAlignment: CrossAxisAlignment.start,
                           children: [
-                            // UPLOAD FOTO
+                            // Upload foto
                             const Text(
                               'Unggah Foto Tanaman',
                               style: _labelStyle,
                             ),
-
                             const SizedBox(height: 7),
-
                             _buildPhotoUpload(),
-
+                            if (_photoError != null) ...[
+                              const SizedBox(height: 6),
+                              Row(
+                                crossAxisAlignment: CrossAxisAlignment.start,
+                                children: [
+                                  const Icon(
+                                    Icons.error_outline_rounded,
+                                    color: AppColors.red,
+                                    size: 13,
+                                  ),
+                                  const SizedBox(width: 5),
+                                  Expanded(
+                                    child: Text(
+                                      _photoError!,
+                                      style: const TextStyle(
+                                        fontFamily: 'Alexandria',
+                                        fontSize: 11,
+                                        fontWeight: FontWeight.w500,
+                                        color: AppColors.red,
+                                      ),
+                                    ),
+                                  ),
+                                ],
+                              ),
+                            ],
                             const SizedBox(height: 16),
-
-                            // NAMA TANAMAN
-                            const Text(
-                              'Nama Tanaman',
-                              style: _labelStyle,
-                            ),
-
-                            const SizedBox(height: 7),
-
-                            _textField(
+                            // Nama tanaman
+                            GardenTextField(
                               controller: _nameController,
-                              hint: 'Pohon Mangga',
-                              icon: _nameIcon,
+                              label: 'Nama Tanaman',
+                              hint: 'Masukan Nama Tanaman',
+                              iconAsset: _pencilIcon,
+                              errorText: _nameError,
+                              onChanged: (_) => setState(() {}),
                             ),
-
                             const SizedBox(height: 16),
-
-                            // JENIS TANAMAN
-                            const Text(
-                              'Jenis Tanaman',
-                              style: _labelStyle,
-                            ),
-
-                            const SizedBox(height: 7),
-
-                            _textField(
+                            // Jenis tanaman
+                            GardenTextField(
                               controller: _typeController,
-                              hint: 'Mangga Arumanis',
-                              icon: _plantIcon,
+                              label: 'Jenis Tanaman',
+                              hint: 'Mangga/Tomat/Jeruk',
+                              iconAsset: _treePalmIcon,
+                              errorText: _typeFieldError,
+                              onChanged: (_) {
+                                setState(() {
+                                  _typeServerError = null;
+                                });
+                              },
                             ),
-
                             const SizedBox(height: 16),
-
-                            // TANGGAL PEMBIBITAN
-                            const Text(
-                              'Tanggal Penyemaian Bibit',
-                              style: _labelStyle,
-                            ),
-
-                            const SizedBox(height: 7),
-
-                            _buildDateField(
-                              date: _seedlingDate,
+                            // Tanggal penyemaian
+                            GardenDateField(
+                              label: 'Tanggal Penyemaian Bibit',
+                              iconAsset: _calendarIcon,
+                              value: _formatDate(_seedlingDate),
+                              isPlaceholder: _seedlingDate == null,
                               onTap: _selectSeedlingDate,
+                              errorText: _seedlingDateError,
                             ),
-
                             const SizedBox(height: 16),
-
-                            // TANGGAL PENANAMAN
-                            const Text(
-                              'Tanggal Penanaman di Kebun',
-                              style: _labelStyle,
-                            ),
-
-                            const SizedBox(height: 7),
-
-                            _buildDateField(
-                              date: _gardenPlantingDate,
+                            // Tanggal penanaman
+                            GardenDateField(
+                              label: 'Tanggal Penanaman di Kebun',
+                              iconAsset: _calendarIcon,
+                              value: _formatDate(_gardenPlantingDate),
+                              isPlaceholder: _gardenPlantingDate == null,
                               onTap: _selectGardenPlantingDate,
+                              errorText: _gardenPlantingDateError,
                             ),
-
                             const SizedBox(height: 16),
-
-                            // LOKASI PENEMPATAN
+                            // Lokasi penempatan
                             const Text(
                               'Lokasi Penempatan',
                               style: _labelStyle,
                             ),
-
                             const SizedBox(height: 7),
-
                             _placementSelector(),
-
                             const SizedBox(height: 16),
-
-                            // JADWAL PENYIRAMAN
-                            const Text(
-                              'Jadwal Penyiraman',
-                              style: _labelStyle,
+                            // Jadwal penyiraman
+                            GardenDropdownField(
+                              label: 'Jadwal Penyiraman',
+                              value: _irrigationSchedule,
+                              items: const [
+                                DropdownMenuItem(
+                                  value: 'daily',
+                                  child: Text('Setiap hari'),
+                                ),
+                                DropdownMenuItem(
+                                  value: 'every_3_5_days',
+                                  child: Text('Setiap 3–5 hari'),
+                                ),
+                                DropdownMenuItem(
+                                  value: 'weekly',
+                                  child: Text('Seminggu sekali'),
+                                ),
+                                DropdownMenuItem(
+                                  value: 'never',
+                                  child: Text('Tidak dijadwalkan'),
+                                ),
+                              ],
+                              onChanged: (value) {
+                                if (value == null) return;
+                                setState(() {
+                                  _irrigationSchedule = value;
+                                });
+                              },
                             ),
-
-                            const SizedBox(height: 7),
-
-                            _buildWateringSchedule(),
                           ],
                         ),
                       ),
                     ),
-
-                    // BUTTON SIMPAN
+                    // Tombol simpan
                     Padding(
                       padding: const EdgeInsets.fromLTRB(
                         21,
@@ -363,8 +715,7 @@ class _AddPlantPageState extends State<AddPlantPage> {
       ),
     );
   }
-
-  // HEADER
+  // Header
   Widget _buildHeader() {
     return Container(
       width: double.infinity,
@@ -391,14 +742,12 @@ class _AddPlantPageState extends State<AddPlantPage> {
                   alignment: Alignment.centerLeft,
                   child: GestureDetector(
                     onTap: () => Navigator.pop(context),
-                    child: _svgIcon(
-                      _backIcon,
-                      size: 23,
-                      color: Colors.white,
+                    child: Transform.translate(
+                      offset: const Offset(0,  5),
+                      child: _svgIcon(_backIcon, size: 23, color: Colors.white),
                     ),
                   ),
                 ),
-
                 SvgPicture.asset(
                   'assets/images/logo_header.svg',
                   height: 25,
@@ -407,12 +756,11 @@ class _AddPlantPageState extends State<AddPlantPage> {
               ],
             ),
           ),
-
           const SizedBox(height: 8),
-
           const Text(
             'Tambah Tanaman',
             style: TextStyle(
+              fontFamily: 'Alexandria',
               fontSize: 23,
               fontWeight: FontWeight.w700,
               color: AppColors.background,
@@ -422,155 +770,116 @@ class _AddPlantPageState extends State<AddPlantPage> {
       ),
     );
   }
-
-  // UPLOAD FOTO
+  // Upload foto
   Widget _buildPhotoUpload() {
+    final hasImage = _selectedImageBytes != null;
     return CustomPaint(
-      foregroundPainter: DashedRoundedRectPainter(
-        color: AppColors.mediumGreen,
-        strokeWidth: 1.2,
-        radius: 20,
-        dashWidth: 8,
-        dashSpace: 5,
-      ),
+      foregroundPainter: hasImage
+          ? null
+          : DashedRoundedRectPainter(
+              color: AppColors.mediumGreen,
+              strokeWidth: 1.2,
+              radius: 20,
+              dashWidth: 8,
+              dashSpace: 5,
+            ),
       child: Container(
         width: double.infinity,
         height: 175,
         decoration: BoxDecoration(
           color: AppColors.fieldBackground,
           borderRadius: BorderRadius.circular(20),
-        ),
-        child: InkWell(
-          borderRadius: BorderRadius.circular(20),
-          onTap: () {
-            _showMessage(
-              'Fitur pilih foto akan dihubungkan berikutnya.',
-            );
-          },
-          child: Column(
-            mainAxisAlignment: MainAxisAlignment.center,
-            children: [
-              _svgIcon(
-                _uploadIcon,
-                size: 65,
-                color: AppColors.mediumGreen,
-              ),
-
-              const SizedBox(height: 10),
-
-              const Text(
-                'Ketuk untuk memilih atau ambil foto',
-                style: TextStyle(
+          border: hasImage
+              ? Border.all(
                   color: AppColors.mediumGreen,
-                  fontSize: 14,
-                  fontWeight: FontWeight.w600,
+                  width: 1.2,
+                )
+              : null,
+        ),
+        child: ClipRRect(
+          borderRadius: BorderRadius.circular(20),
+          child: hasImage
+              ? Stack(
+                  fit: StackFit.expand,
+                  children: [
+                    Image.memory(
+                      _selectedImageBytes!,
+                      fit: BoxFit.cover,
+                    ),
+                    Positioned(
+                      right: 10,
+                      top: 10,
+                      child: Row(
+                        children: [
+                          _photoActionButton(
+                            icon: Icons.edit_outlined,
+                            onTap: _openCameraPage,
+                          ),
+                          const SizedBox(width: 8),
+                          _photoActionButton(
+                            icon: Icons.delete_outline,
+                            onTap: () {
+                              setState(() {
+                                _selectedImage = null;
+                                _selectedImageBytes = null;
+                              });
+                            },
+                          ),
+                        ],
+                      ),
+                    ),
+                  ],
+                )
+              : InkWell(
+                  onTap: _openCameraPage,
+                  child: Column(
+                    mainAxisAlignment: MainAxisAlignment.center,
+                    children: [
+                      _svgIcon(
+                        _uploadIcon,
+                        size: 65,
+                        color: AppColors.mediumGreen,
+                      ),
+                      const SizedBox(height: 10),
+                      const Text(
+                        'Ketuk untuk memilih atau ambil foto',
+                        style: TextStyle(
+                          fontFamily: 'Alexandria',
+                          color: AppColors.mediumGreen,
+                          fontSize: 12,
+                          fontWeight: FontWeight.w600,
+                        ),
+                      ),
+                      const SizedBox(height: 5),
+                    ],
+                  ),
                 ),
-              ),
-            ],
-          ),
         ),
       ),
     );
   }
-
-  // TEXT FIELD
-  Widget _textField({
-    required TextEditingController controller,
-    required String hint,
-    required String icon,
-  }) {
-    return SizedBox(
-      height: 50,
-      child: TextField(
-        controller: controller,
-        style: const TextStyle(
-          fontSize: 14,
-          color: AppColors.darkGreen,
-        ),
-        decoration: InputDecoration(
-          hintText: hint,
-          hintStyle: const TextStyle(
-            color: AppColors.mediumGreen,
-            fontSize: 14,
-            fontWeight: FontWeight.w500,
-          ),
-          prefixIcon: Padding(
-            padding: const EdgeInsets.all(14),
-            child: _svgIcon(
-              icon,
-              size: 22,
-              color: AppColors.mediumGreen,
-            ),
-          ),
-          filled: true,
-          fillColor: AppColors.fieldBackground,
-          contentPadding: const EdgeInsets.symmetric(
-            vertical: 12,
-          ),
-          border: OutlineInputBorder(
-            borderRadius: BorderRadius.circular(18),
-            borderSide: BorderSide.none,
-          ),
-          enabledBorder: OutlineInputBorder(
-            borderRadius: BorderRadius.circular(18),
-            borderSide: BorderSide.none,
-          ),
-          focusedBorder: OutlineInputBorder(
-            borderRadius: BorderRadius.circular(18),
-            borderSide: const BorderSide(
-              color: AppColors.mediumGreen,
-              width: 1,
-            ),
-          ),
-        ),
-      ),
-    );
-  }
-
-  // DATE FIELD
-  Widget _buildDateField({
-    required DateTime? date,
+  Widget _photoActionButton({
+    required IconData icon,
     required VoidCallback onTap,
   }) {
-    return InkWell(
-      onTap: onTap,
-      borderRadius: BorderRadius.circular(18),
-      child: Container(
-        height: 50,
-        padding: const EdgeInsets.symmetric(
-          horizontal: 16,
-        ),
-        decoration: BoxDecoration(
-          color: AppColors.fieldBackground,
-          borderRadius: BorderRadius.circular(18),
-        ),
-        child: Row(
-          children: [
-            _svgIcon(
-              _calendarIcon,
-              size: 22,
-              color: AppColors.mediumGreen,
-            ),
-
-            const SizedBox(width: 12),
-
-            Text(
-              _formatDate(date),
-              style: TextStyle(
-                color: date == null
-                    ? AppColors.mediumGreen
-                    : AppColors.darkGreen,
-                fontSize: 14,
-                fontWeight: FontWeight.w500,
-              ),
-            ),
-          ],
+    return Material(
+      color: AppColors.darkGreen.withValues(alpha: 0.75),
+      shape: const CircleBorder(),
+      child: InkWell(
+        onTap: onTap,
+        customBorder: const CircleBorder(),
+        child: Padding(
+          padding: const EdgeInsets.all(9),
+          child: Icon(
+            icon,
+            color: Colors.white,
+            size: 20,
+          ),
         ),
       ),
     );
   }
-
-  // SELECTOR INDOOR / OUTDOOR
+  // Selector indoor / outdoor
   Widget _placementSelector() {
     return Container(
       height: 50,
@@ -588,7 +897,6 @@ class _AddPlantPageState extends State<AddPlantPage> {
                 label: 'Dalam Ruangan',
               ),
             ),
-
             Expanded(
               child: _placementItem(
                 value: 'outdoor',
@@ -600,13 +908,11 @@ class _AddPlantPageState extends State<AddPlantPage> {
       ),
     );
   }
-
   Widget _placementItem({
     required String value,
     required String label,
   }) {
     final isSelected = _placement == value;
-
     return GestureDetector(
       onTap: () {
         setState(() {
@@ -625,7 +931,8 @@ class _AddPlantPageState extends State<AddPlantPage> {
           label,
           textAlign: TextAlign.center,
           style: TextStyle(
-            fontSize: 15,
+            fontFamily: 'Alexandria',
+            fontSize: 12,
             fontWeight: FontWeight.w600,
             color: isSelected
                 ? Colors.white
@@ -635,69 +942,7 @@ class _AddPlantPageState extends State<AddPlantPage> {
       ),
     );
   }
-
-  // JADWAL PENYIRAMAN
-  Widget _buildWateringSchedule() {
-    const schedules = [
-      {
-        'value': 'daily',
-        'label': 'Setiap hari',
-      },
-      {
-        'value': 'every_3_5_days',
-        'label': 'Setiap 3–5 hari',
-      },
-      {
-        'value': 'weekly',
-        'label': 'Seminggu sekali',
-      },
-      {
-        'value': 'never',
-        'label': 'Tidak dijadwalkan',
-      },
-    ];
-
-    return Container(
-      height: 55,
-      padding: const EdgeInsets.symmetric(
-        horizontal: 16,
-      ),
-      decoration: BoxDecoration(
-        color: AppColors.fieldBackground,
-        borderRadius: BorderRadius.circular(18),
-      ),
-      child: DropdownButtonHideUnderline(
-        child: DropdownButton<String>(
-          value: _irrigationSchedule,
-          isExpanded: true,
-          icon: const Icon(
-            Icons.keyboard_arrow_down_rounded,
-            color: AppColors.mediumGreen,
-          ),
-          style: const TextStyle(
-            fontSize: 14,
-            color: AppColors.darkGreen,
-            fontWeight: FontWeight.w500,
-          ),
-          items: schedules.map((schedule) {
-            return DropdownMenuItem<String>(
-              value: schedule['value'],
-              child: Text(schedule['label']!),
-            );
-          }).toList(),
-          onChanged: (value) {
-            if (value == null) return;
-
-            setState(() {
-              _irrigationSchedule = value;
-            });
-          },
-        ),
-      ),
-    );
-  }
-
-  // BUTTON SIMPAN
+  // Tombol simpan
   Widget _buildSubmitButton() {
     return SizedBox(
       width: double.infinity,
@@ -705,7 +950,7 @@ class _AddPlantPageState extends State<AddPlantPage> {
       child: ElevatedButton(
         onPressed: _isSubmitting ? null : _submitForm,
         style: ElevatedButton.styleFrom(
-          backgroundColor: const Color(0xFF6B8F70),
+          backgroundColor: AppColors.mediumGreen,
           foregroundColor: Colors.white,
           disabledBackgroundColor: AppColors.mediumGreen,
           elevation: 0,
@@ -725,30 +970,22 @@ class _AddPlantPageState extends State<AddPlantPage> {
             : const Text(
                 'Simpan',
                 style: TextStyle(
-                  fontSize: 18,
+                  fontFamily: 'Alexandria',
+                  fontSize: 16,
                   fontWeight: FontWeight.w600,
                 ),
               ),
       ),
     );
   }
-
-  // LABEL STYLE
-  static const TextStyle _labelStyle = TextStyle(
-    fontSize: 14,
-    fontWeight: FontWeight.w700,
-    color: AppColors.textSecondary,
-  );
 }
-
-// DASHED BORDER PAINTER
+// Dashed border painter
 class DashedRoundedRectPainter extends CustomPainter {
   final Color color;
   final double strokeWidth;
   final double radius;
   final double dashWidth;
   final double dashSpace;
-
   DashedRoundedRectPainter({
     required this.color,
     this.strokeWidth = 1.5,
@@ -756,21 +993,18 @@ class DashedRoundedRectPainter extends CustomPainter {
     this.dashWidth = 8,
     this.dashSpace = 5,
   });
-
   @override
   void paint(Canvas canvas, Size size) {
     final paint = Paint()
       ..color = color
       ..style = PaintingStyle.stroke
       ..strokeWidth = strokeWidth;
-
     final rect = Rect.fromLTWH(
       strokeWidth / 2,
       strokeWidth / 2,
       size.width - strokeWidth,
       size.height - strokeWidth,
     );
-
     final path = Path()
       ..addRRect(
         RRect.fromRectAndRadius(
@@ -778,25 +1012,20 @@ class DashedRoundedRectPainter extends CustomPainter {
           Radius.circular(radius),
         ),
       );
-
     for (final metric in path.computeMetrics()) {
       double distance = 0;
-
       while (distance < metric.length) {
         final end = (distance + dashWidth)
             .clamp(0.0, metric.length)
             .toDouble();
-
         canvas.drawPath(
           metric.extractPath(distance, end),
           paint,
         );
-
         distance += dashWidth + dashSpace;
       }
     }
   }
-
   @override
   bool shouldRepaint(
     covariant DashedRoundedRectPainter oldDelegate,

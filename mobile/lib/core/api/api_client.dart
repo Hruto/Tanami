@@ -24,7 +24,7 @@ class ApiClient {
     return _handleResponse(response);
   }
 
-  // POST REQUEST
+  // POST JSON REQUEST
   Future<Map<String, dynamic>> post(
     String endpoint,
     Map<String, dynamic> body, {
@@ -43,7 +43,47 @@ class ApiClient {
     return _handleResponse(response);
   }
 
-  // BUILD HEADERS
+  // MULTIPART UPLOAD REQUEST
+  Future<Map<String, dynamic>> uploadFile({
+    required String endpoint,
+    required http.MultipartFile file,
+    Map<String, String>? fields,
+    bool requiresAuth = true,
+  }) async {
+    final request = http.MultipartRequest(
+      'POST',
+      Uri.parse(endpoint),
+    );
+
+    request.headers['Accept'] = 'application/json';
+
+    if (requiresAuth) {
+      final accessToken = await TokenStorage.getAccessToken();
+
+      if (accessToken == null || accessToken.isEmpty) {
+        throw Exception(
+          'Access token tidak ditemukan. Silakan login kembali.',
+        );
+      }
+
+      request.headers['Authorization'] = 'Bearer $accessToken';
+    }
+
+    if (fields != null) {
+      request.fields.addAll(fields);
+    }
+
+    request.files.add(file);
+
+    final streamedResponse = await request.send();
+    final response = await http.Response.fromStream(
+      streamedResponse,
+    );
+
+    return _handleResponse(response);
+  }
+
+  // BUILD JSON HEADERS
   Future<Map<String, String>> _buildHeaders({
     required bool requiresAuth,
   }) async {

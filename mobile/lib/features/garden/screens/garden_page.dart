@@ -7,7 +7,7 @@ import '../models/plant_model.dart';
 import '../services/plant_service.dart';
 import 'add_plant_page.dart';
 
-import '../../../core/widget/harvest_plant_card.dart';
+import '../widgets/garden_plant_card.dart';
 
 class GardenPage extends StatefulWidget {
   final String? farmId;
@@ -283,7 +283,7 @@ Future<void> _openAddPlantPage() async {
   Widget _buildPlantCard(PlantModel plant) {
     return Padding(
       padding: const EdgeInsets.only(bottom: 10),
-      child: HarvestPlantCard(
+      child: GardenPlantCard(
         name: plant.label.isNotEmpty
             ? plant.label
             : plant.displayName,

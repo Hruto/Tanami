@@ -1,4 +1,3 @@
-
 class PlantModel {
   final String id;
   final String farmId;
@@ -7,6 +6,7 @@ class PlantModel {
   final String? commodityCode;
   final String? variety;
   final String? healthStatus;
+  final String? healthStatusReason;
   final String? growthStage;
   final String? expectedHarvestMin;
   final String? expectedHarvestMax;
@@ -31,6 +31,7 @@ class PlantModel {
     this.commodityCode,
     this.variety,
     this.healthStatus,
+    this.healthStatusReason,
     this.growthStage,
     this.expectedHarvestMin,
     this.expectedHarvestMax,
@@ -49,61 +50,45 @@ class PlantModel {
   });
 
   factory PlantModel.fromJson(Map<String, dynamic> json) {
-    final nextHarvest = json['next_harvest'];
-
     return PlantModel(
       id: json['id']?.toString() ?? '',
       farmId: json['farm_id']?.toString() ?? '',
       label: json['label']?.toString() ?? '',
-      commodityLabel:
-          json['commodity_label']?.toString() ?? '',
-      commodityCode:
-          json['commodity_code']?.toString(),
+      commodityLabel: json['commodity_label']?.toString() ?? '',
+      commodityCode: json['commodity_code']?.toString(),
       variety: json['variety']?.toString(),
       healthStatus: json['health_status']?.toString(),
-      growthStage: json['lifecycle_phase']?.toString(),
-
-      expectedHarvestMin:
-          nextHarvest is Map<String, dynamic>
-              ? nextHarvest['start']?.toString()
-              : null,
-
-      expectedHarvestMax:
-          nextHarvest is Map<String, dynamic>
-              ? nextHarvest['end']?.toString()
-              : null,
-
+      healthStatusReason: json['health_status_reason']?.toString(),
+      growthStage: json['growth_stage']?.toString(),
+      expectedHarvestMin: json['expected_harvest_min']?.toString(),
+      expectedHarvestMax: json['expected_harvest_max']?.toString(),
       farmName: json['farm_name']?.toString(),
       village: json['village']?.toString(),
       placement: json['placement']?.toString(),
       coverPhotoUrl: json['cover_photo_url']?.toString(),
       plantedAt: json['planted_at']?.toString(),
-      nurseryStartedAt:
-          json['nursery_started_at']?.toString(),
-      productiveUntil:
-          json['productive_until']?.toString(),
-      irrigationSchedule:
-          json['irrigation_schedule']?.toString(),
-      nextWateringOn:
-          json['next_watering_on']?.toString(),
+      nurseryStartedAt: json['nursery_started_at']?.toString(),
+      productiveUntil: json['productive_until']?.toString(),
+      irrigationSchedule: json['irrigation_schedule']?.toString(),
+      nextWateringOn: json['next_watering_on']?.toString(),
       ageDays: (json['age_days'] as num?)?.toInt() ?? 0,
-      harvestCount:
-          (json['harvest_count'] as num?)?.toInt() ?? 0,
+      harvestCount: (json['harvest_count'] as num?)?.toInt() ?? 0,
       status: json['status']?.toString(),
     );
   }
 
-  String get displayName {
-    return commodityLabel.isNotEmpty
-        ? commodityLabel
-        : label;
-  }
+  String get displayName => commodityLabel.isNotEmpty ? commodityLabel : label;
 
-  bool get isHealthy {
-    return healthStatus == 'healthy';
-  }
+bool? get isHealthy {
+  final status = healthStatus?.toLowerCase();
 
-  // Placeholder sementara karena PlantOut
-  // belum menyediakan maturity percentage.
+  if (status == 'healthy' || status == 'sehat') return true;
+  if (status == 'sick' || status == 'sakit') return false;
+
+  return null;
+}
+
+  // Tetap tersedia untuk kompatibilitas dengan pemanggilan widget lama.
+  // Persentase kematangan belum disediakan oleh response list plants.
   int get maturity => 0;
 }
